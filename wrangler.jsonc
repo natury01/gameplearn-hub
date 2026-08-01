@@ -1,0 +1,17 @@
+{
+  // เกมเพลิน (GamePlearn) — เว็บกลาง
+  // ไฟล์นี้จำเป็นสำหรับ Cloudflare Workers Builds (deploy จาก GitHub)
+  // ไม่มีไฟล์นี้ = build fail ทุกครั้ง
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  "name": "gameplearn",
+  "compatibility_date": "2026-08-01",
+
+  // เว็บนี้เป็น static ล้วน ไม่มีโค้ดฝั่งเซิร์ฟเวอร์ จึงไม่ต้องมี "main"
+  // directory "./" = ไฟล์เว็บอยู่ที่ root ของ repo (index.html, teacher.html, js/, css/)
+  "assets": {
+    "directory": "./",
+    // ไม่พบไฟล์ → ส่ง index.html (กัน 404 ตอนกดลิงก์ hash route ของหน้า teacher)
+    "not_found_handling": "single-page-application"
+  }
+}

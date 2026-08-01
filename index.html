@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เกมเพลิน (GamePlearn) — ศูนย์รวมเกมการเรียนรู้</title>
+<meta name="description" content="เกมเพลิน — Game On. Learn Beyond. ศูนย์รวมเกมการเรียนรู้ ดูผลสัมฤทธิ์และสมรรถนะของนักเรียนได้ในที่เดียว">
+<link rel="stylesheet" href="css/gp.css">
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand"><span class="logo">ก</span> <span id="brand-th">เกมเพลิน</span>
+      <span class="muted" style="font-weight:400;font-size:14px">GamePlearn</span></div>
+    <div class="sp"></div>
+    <a class="btn btn-primary" href="teacher.html">สำหรับครู · Dashboard กลาง</a>
+  </div>
+
+  <div class="card hero">
+    <div class="hero-slogan" id="slogan-en">Game On. Learn Beyond.</div>
+    <h1 id="slogan-th">เริ่มเกม แล้วก้าวไปไกลกว่าการเรียนรู้เดิม</h1>
+    <div class="muted">นักเรียน: เลือกเกมด้านล่างแล้วกด "เล่นเกม" ได้เลย ·
+      ครู: เข้าสู่ระบบเพื่อดูทั้ง<b>ผลสัมฤทธิ์</b>และ<b>สมรรถนะ</b>ของนักเรียนทุกเกมในที่เดียว</div>
+  </div>
+
+  <div class="section-title">เกมทั้งหมด <span class="sub" id="game-count"></span></div>
+  <div class="err-box" id="cat-err"></div>
+  <div id="cat" class="grid cols-3"><div class="card muted"><span class="loading"></span> กำลังโหลดรายชื่อเกม…</div></div>
+
+  <div class="muted small" style="margin-top:34px">
+    เกมเพลิน · แคตตาล็อกอ่านจาก Game Registry อัตโนมัติ — เกมใหม่ที่เผยแพร่จะแสดงที่นี่ทันที
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/gp-core.js"></script>
+<script src="js/gp-standards-panel.js"></script>
+<script>
+(function () {
+  const C = window.GP_CONFIG, G = window.GP, SL = window.GP_SLOGAN;
+  document.getElementById('brand-th').textContent = C.BRAND_TH;
+  document.getElementById('slogan-en').textContent = SL.en;
+  document.getElementById('slogan-th').textContent = SL.th;
+
+  const COVER = { kanchanaburi2050: '🗺️', typing: '⌨️' };
+  const STATUS_TH = { published: 'เปิดใช้งาน', maintenance: 'ปิดปรับปรุงชั่วคราว', testing: 'รุ่นทดสอบ' };
+
+  function gradeText(g) {
+    if (g.minimum_grade == null && g.maximum_grade == null) return 'ทุกระดับชั้น';
+    if (g.minimum_grade === g.maximum_grade) return 'ชั้น ป.' + g.minimum_grade;
+    return 'ชั้น ป.' + g.minimum_grade + '–' + (g.maximum_grade ?? '');
+  }
+
+  function card(g, covers) {
+    const dis = g.status !== 'published';
+    const tags = (covers[g.name] || []).slice(0, 5);
+    return '<div class="card game-card">'
+      + '<div class="game-cover">' + (g.cover_url ? '<img src="' + G.esc(g.cover_url) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px">' : (COVER[g.code] || '🎮')) + '</div>'
+      + '<div><h3>' + G.esc(g.name) + '</h3>'
+      + '<div class="game-meta">' + G.esc(g.description || '') + '</div>'
+      + '<div class="game-meta" style="margin-top:5px">' + gradeText(g)
+      + (g.current_version ? ' · เวอร์ชัน ' + G.esc(g.current_version) : '')
+      + ' · <span class="badge ' + G.esc(g.status) + '">' + (STATUS_TH[g.status] || G.esc(g.status)) + '</span></div>'
+      + (tags.length ? '<div class="tagrow">' + tags.map((t) => '<span class="tag">' + G.esc(t) + '</span>').join('') + '</div>' : '')
+      + '</div>'
+      + '<div class="game-actions">'
+      + (g.launch_url ? '<a class="btn btn-primary' + (dis ? '" style="pointer-events:none;opacity:.5' : '') + '" href="' + G.esc(g.launch_url) + '" target="_blank" rel="noopener">▶ เล่นเกม</a>' : '')
+      + (g.dashboard_url ? '<a class="btn" href="' + G.esc(g.dashboard_url) + '" target="_blank" rel="noopener">📊 Dashboard เกมนี้</a>' : '')
+      + '<button class="btn btn-sm btn-ghost" data-std="' + G.esc(g.code) + '">📋 มาตรฐานที่วัด</button>'
+      + '</div>'
+      + '<div class="std-slot hidden" id="std-' + G.esc(g.code) + '"></div>'
+      + '</div>';
+  }
+
+  Promise.all([
+    G.get('/rest/v1/games?select=code,name,description,launch_url,dashboard_url,cover_url,minimum_grade,maximum_grade,status,current_version&status=in.(published,maintenance)&order=name'),
+    // ป้ายบอกว่าเกมนี้วัดสมรรถนะ/กลุ่มสาระอะไร — อ่านจากทะเบียนความครอบคลุม ไม่ hard-code
+    G.get('/rest/v1/v_framework_coverage?select=item_name,game_names,depth&depth=eq.1&games_covering=gt.0').catch(() => []),
+  ]).then(function (res) {
+    const rows = res[0], cov = res[1] || {};
+    const byGame = {};
+    (Array.isArray(cov) ? cov : []).forEach(function (c) {
+      (c.game_names || []).forEach(function (gn) { (byGame[gn] = byGame[gn] || []).push(c.item_name); });
+    });
+    document.getElementById('game-count').textContent = rows.length + ' เกม';
+    document.getElementById('cat').innerHTML = rows.length
+      ? rows.map(function (g) { return card(g, byGame); }).join('')
+      : '<div class="card muted">ยังไม่มีเกมที่เผยแพร่</div>';
+  }).catch(function (e) {
+    const b = document.getElementById('cat-err');
+    b.textContent = 'โหลดรายชื่อเกมไม่สำเร็จ: ' + e.message + ' — ตรวจการเชื่อมต่ออินเทอร์เน็ตแล้วรีเฟรช';
+    b.classList.add('on');
+    document.getElementById('cat').innerHTML = '';
+  });
+
+  // แผง "มาตรฐานการเรียนรู้ที่เกมนี้วัด" — ใช้คอมโพเนนต์กลางตัวเดียวกับที่ Dashboard ของเกมใช้
+  document.addEventListener('click', function (ev) {
+    const b = ev.target.closest('[data-std]');
+    if (!b) return;
+    const code = b.getAttribute('data-std');
+    const slot = document.getElementById('std-' + code);
+    if (!slot) return;
+    if (!slot.classList.contains('hidden')) { slot.classList.add('hidden'); b.textContent = '📋 มาตรฐานที่วัด'; return; }
+    slot.classList.remove('hidden');
+    b.textContent = '📋 ซ่อนมาตรฐาน';
+    if (!slot.dataset.loaded) {
+      slot.dataset.loaded = '1';
+      window.GPStandards.render(slot, { sbUrl: C.SB_URL, sbAnon: C.SB_ANON, gameCode: code }).catch(function () {});
+    }
+  });
+})();
+</script>
+</body>
+</html>

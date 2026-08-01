@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เกมเพลิน — Dashboard กลางสำหรับครู</title>
+<link rel="stylesheet" href="css/gp.css">
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand"><span class="logo">ก</span> เกมเพลิน
+      <span class="muted" style="font-weight:400;font-size:14px">· สำหรับครู</span></div>
+    <div class="sp"></div>
+    <span class="who" id="who"></span>
+    <a class="btn btn-sm" href="index.html">แคตตาล็อกเกม</a>
+    <button class="btn btn-sm hidden" id="btn-logout">ออกจากระบบ</button>
+  </div>
+
+  <div class="err-box" id="err"></div>
+
+  <!-- ================= หน้า Login ================= -->
+  <div id="v-login" class="hidden">
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start">
+      <div class="card">
+        <h2 style="margin:0 0 4px;font-size:18px">เข้าสู่ระบบครู</h2>
+        <div class="muted small" style="margin-bottom:14px">บัญชีเดียวกับที่ใช้ในเกมทุกเกมของแพลตฟอร์ม</div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;font-size:15.5px" id="btn-google">
+          เข้าสู่ระบบด้วย Google</button>
+        <div class="form-hint" style="margin-top:10px">
+          ครูที่ใช้เกมแบบ "ไม่ต้องสมัคร" อยู่: แนะนำให้ผูกบัญชี Google จากในเกมก่อน แล้วกดปุ่มนี้ด้วยบัญชีเดียวกัน</div>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 4px;font-size:16px">มีโค้ดกู้คืน (KRU-XXXX-XXXX)?</h3>
+        <div class="warn-note" style="margin:10px 0">การกู้คืนจะ<b>ย้ายห้องเรียนทั้งหมด</b>มาไว้กับการเข้าสู่ระบบบนเว็บนี้
+          — อุปกรณ์เดิมที่ยังไม่ได้กู้คืนจะไม่เห็นห้องจนกว่าจะกู้คืนกลับ ใช้เมื่อย้ายเครื่องถาวรเท่านั้น</div>
+        <label class="f">โค้ดกู้คืน</label>
+        <input type="text" id="rec-code" placeholder="KRU-XXXX-XXXX" autocomplete="off">
+        <button class="btn" style="margin-top:10px" id="btn-recover">กู้คืนบัญชีมาที่เว็บนี้</button>
+        <div class="form-hint" id="rec-msg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= หน้าเนื้อหา (หลัง login) ================= -->
+  <div id="v-app" class="hidden">
+    <div id="crumb" class="crumb hidden"><a href="#/">← กลับหน้ารวม</a></div>
+    <div id="content"><div class="card muted"><span class="loading"></span> กำลังโหลดข้อมูล…</div></div>
+  </div>
+
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/gp-core.js"></script>
+<script src="js/gp-standards-panel.js"></script>
+<script>
+(function () {
+  const G = window.GP;
+  const $ = (id) => document.getElementById(id);
+  const S = { teacher: null, games: [], rooms: [], cg: [], students: [], progress: [], summary: [],
+              eventsCount: null, frameworks: [], coverage: [], itemSummary: [], itemProfile: [] };
+  let TAB = 'ach';   // 'ach' = ผลสัมฤทธิ์ | 'comp' = สมรรถนะ
+
+  function showErr(m) { const b = $('err'); b.textContent = m; b.classList.add('on'); }
+  function clearErr() { $('err').classList.remove('on'); }
+
+  /* ===================== เริ่มต้น ===================== */
+  async function boot() {
+    G.captureOAuthReturn();
+    const ok = await G.ensure();
+    if (!ok) { $('v-login').classList.remove('hidden'); return; }
+    $('v-login').classList.add('hidden');
+    $('v-app').classList.remove('hidden');
+    $('btn-logout').classList.remove('hidden');
+    try {
+      S.teacher = await G.ensureTeacherRow();
+      $('who').textContent = 'ครู: ' + ((S.teacher && S.teacher.display_name) || '') + (S.teacher && S.teacher.email ? ' (' + S.teacher.email + ')' : '');
+      await loadAll();
+      route();
+    } catch (e) { showErr('โหลดข้อมูลไม่สำเร็จ: ' + e.message); }
+  }
+
+  // ตารางการวัดผล 2 มิติเป็นของใหม่ (08_ASSESSMENT_CORE.sql) — ถ้ายังไม่ได้รัน ให้เว็บทำงานต่อได้ ไม่พัง
+  const soft = (p) => G.get(p).catch(() => []);
+
+  async function loadAll() {
+    const [games, rooms, cg, students, progress, summary, evCount, frameworks, coverage, itemSummary, itemProfile] = await Promise.all([
+      G.get('/rest/v1/games?select=id,code,name,status,launch_url,dashboard_url,minimum_grade,maximum_grade&order=name'),
+      G.get('/rest/v1/classrooms?select=*&order=created_at.desc'),
+      G.get('/rest/v1/classroom_games?select=*'),
+      G.get('/rest/v1/students?select=id,classroom_id,student_number,first_name,last_name,character_name&order=student_number'),
+      G.get('/rest/v1/student_game_progress?select=*'),
+      G.get('/rest/v1/v_classroom_game_summary?select=*'),
+      G.countRows('/rest/v1/events').catch(() => null),
+      soft('/rest/v1/assessment_frameworks?select=code,kind,name_th,status,level_scale&status=eq.active'),
+      soft('/rest/v1/v_framework_coverage?select=*&depth=eq.1'),
+      soft('/rest/v1/v_classroom_item_summary?select=*'),
+      soft('/rest/v1/v_student_item_profile?select=*&is_latest=is.true'),
+    ]);
+    Object.assign(S, { games, rooms, cg, students, progress, summary, eventsCount: evCount,
+      frameworks, coverage, itemSummary, itemProfile });
+  }
+
+  const gameById = (id) => S.games.find((g) => g.id === id);
+  const roomById = (id) => S.rooms.find((r) => r.id === id);
+  const studentsOf = (cid) => S.students.filter((s) => s.classroom_id === cid);
+  const progOf = (sid) => S.progress.filter((p) => p.student_id === sid);
+  const cgOf = (cid) => S.cg.filter((x) => x.classroom_id === cid);
+  const enabledGames = (cid) => cgOf(cid).filter((x) => x.is_enabled).map((x) => gameById(x.game_id)).filter(Boolean);
+  // กรอบสมรรถนะที่ "มีเกมวัดจริงอย่างน้อย 1 รายการ" — เปลี่ยนหลักสูตรแล้วหน้าเว็บตามเอง ไม่ต้องแก้โค้ด
+  const compFrameworks = () => S.frameworks.filter((f) => f.kind === 'competency')
+    .filter((f) => S.coverage.some((c) => c.framework_code === f.code && c.games_covering > 0));
+  const itemsOf = (fcode) => S.coverage.filter((c) => c.framework_code === fcode)
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+  /* ===================== routing ===================== */
+  function route() {
+    clearErr();
+    const h = location.hash || '#/';
+    const mRoom = h.match(/^#\/room\/([0-9a-f-]+)/i);
+    const mStu = h.match(/^#\/student\/([0-9a-f-]+)/i);
+    $('crumb').classList.toggle('hidden', !(mRoom || mStu));
+    if (mStu) return renderStudent(mStu[1]);
+    if (mRoom) return renderRoom(mRoom[1]);
+    renderHome();
+  }
+  window.addEventListener('hashchange', route);
+
+  /* ===================== ชิ้นส่วน UI ===================== */
+  function meter(p) {
+    const v = Math.max(0, Math.min(100, Number(p) || 0));
+    return '<div class="meter-row"><div class="meter" style="flex:1"><i style="width:' + v + '%"></i></div><span class="pct">' + Math.round(v) + '%</span></div>';
+  }
+  function tile(label, value, unit) {
+    return '<div class="tile"><div class="label">' + label + '</div><div class="value">' + value
+      + (unit ? '<span class="unit">' + unit + '</span>' : '') + '</div></div>';
+  }
+  function tabs() {
+    return '<div class="tabs" role="tablist">'
+      + '<button class="tab" role="tab" data-tab="ach"  aria-selected="' + (TAB === 'ach') + '">ผลสัมฤทธิ์</button>'
+      + '<button class="tab" role="tab" data-tab="comp" aria-selected="' + (TAB === 'comp') + '">สมรรถนะหลัก</button>'
+      + '</div>';
+  }
+
+  /** แผงแถบสมรรถนะ — rows: [{name, sub, percent, level_label, covered}] */
+  function compPanel(title, note, rows) {
+    const body = rows.map(function (r) {
+      const has = r.percent != null;
+      const pct = has ? Math.max(0, Math.min(100, Number(r.percent))) : 0;
+      return '<div class="cbar' + (has ? '' : ' nodata') + '">'
+        + '<div><div class="cname">' + G.esc(r.name) + '</div>'
+        + (r.sub ? '<div class="csub">' + G.esc(r.sub) + '</div>' : '') + '</div>'
+        + '<div class="ctrack">' + (has ? '<i style="width:' + pct + '%"></i>' : '') + '</div>'
+        + '<div class="cval">' + (has
+            ? pct.toFixed(0) + '%' + (r.level_label ? '<span class="lvl">' + G.esc(r.level_label) + '</span>' : '')
+            : (r.covered ? 'ยังไม่มีผล' : 'ยังไม่มีเกมวัด')) + '</div>'
+        + '</div>';
+    }).join('');
+    return '<div class="card"><h3 style="margin:0 0 4px;font-size:16px">' + G.esc(title) + '</h3>'
+      + (note ? '<div class="muted small" style="margin-bottom:8px">' + note + '</div>' : '')
+      + body + '</div>';
+  }
+
+  /* ===================== หน้ารวม ===================== */
+  function renderHome() {
+    const activeGames = new Set(S.cg.filter((x) => x.is_enabled).map((x) => x.game_id)).size;
+    const avgProg = S.progress.length ? S.progress.reduce((a, p) => a + (Number(p.progress_percent) || 0), 0) / S.progress.length : null;
+    const totalAttempts = S.summary.reduce((a, r) => a + (Number(r.total_attempts) || 0), 0);
+
+    let html = '<div class="tiles">'
+      + tile('ห้องเรียน', G.fmtInt(S.rooms.length))
+      + tile('นักเรียน', G.fmtInt(S.students.length))
+      + tile('เกมที่ใช้งาน', G.fmtInt(activeGames))
+      + tile('ความคืบหน้าเฉลี่ย', avgProg == null ? '–' : Math.round(avgProg), avgProg == null ? '' : '%')
+      + tile('รอบที่ส่งผล', G.fmtInt(totalAttempts))
+      + tile('บันทึกการเล่นสะสม', S.eventsCount == null ? '–' : G.fmtInt(S.eventsCount))
+      + '</div>';
+
+    html += tabs();
+
+    if (TAB === 'comp') {
+      html += compSection(null);
+    } else {
+      html += '<div class="section-title">ห้องเรียนของฉัน <span class="sub">' + S.rooms.length + ' ห้อง</span></div>'
+        + '<div class="grid cols-3">' + (S.rooms.map(roomCard).join('') || '<div class="card muted">ยังไม่มีห้องเรียน — สร้างห้องแรกด้านล่าง</div>') + '</div>'
+        + '<div class="section-title">สร้างห้องเรียนใหม่</div>'
+        + '<div class="card" style="max-width:520px">'
+        + '<label class="f">ชื่อห้อง (เช่น ป.4/1)</label><input type="text" id="nr-name" placeholder="ป.4/1">'
+        + '<label class="f">ระดับชั้น</label><input type="text" id="nr-grade" placeholder="4">'
+        + '<button class="btn btn-primary" style="margin-top:12px" id="nr-go">+ สร้างห้อง</button>'
+        + '<div class="form-hint">ระบบจะสร้างโค้ดเข้าห้อง 6 ตัวให้อัตโนมัติ นักเรียนใช้โค้ดนี้เข้าเล่นได้ทุกเกมที่ครูเปิดให้ห้อง</div>'
+        + '</div>';
+    }
+
+    $('content').innerHTML = html;
+    const go = $('nr-go'); if (go) go.onclick = createRoom;
+  }
+
+  /** ส่วนสมรรถนะ — classroomId = null หมายถึงรวมทุกห้องของครู */
+  function compSection(classroomId) {
+    const fws = compFrameworks();
+    if (!fws.length) {
+      return '<div class="card muted">ยังไม่มีข้อมูลสมรรถนะ — ต้องรัน <code>08_ASSESSMENT_CORE.sql</code> '
+        + 'และให้เกมส่งผลสมรรถนะเข้ามาก่อน (ดู <code>07_CONTENT_STANDARDS.md</code>)</div>';
+    }
+    return fws.map(function (f) {
+      const items = itemsOf(f.code);
+      const rows = items.map(function (it) {
+        const src = S.itemSummary.filter((x) => x.framework_code === f.code && x.item_code === it.item_code
+          && (classroomId ? x.classroom_id === classroomId : true));
+        // ถ่วงน้ำหนักด้วยจำนวนนักเรียนที่มีผล เพื่อให้ค่ารวมหลายห้องไม่บิด
+        let num = 0, den = 0, lvl = null;
+        src.forEach(function (x) {
+          if (x.avg_percent != null) { num += Number(x.avg_percent) * (x.students_scored || 1); den += (x.students_scored || 1); }
+          if (x.avg_level != null) lvl = Number(x.avg_level);
+        });
+        const levelLabel = lvl == null ? null : levelToLabel(f, lvl);
+        return { name: it.item_name, covered: it.games_covering > 0,
+          sub: it.games_covering > 0 ? 'วัดโดย: ' + (it.game_names || []).join(', ') : null,
+          percent: den ? num / den : null, level_label: levelLabel };
+      });
+      const uncovered = rows.filter((r) => !r.covered).length;
+      const note = 'ค่าเฉลี่ยของนักเรียนที่มีผล' + (classroomId ? 'ในห้องนี้' : 'ทุกห้องของคุณ')
+        + (uncovered ? ' · ยังไม่มีเกมวัด ' + uncovered + ' ด้าน' : '');
+      return compPanel(f.name_th, note, rows);
+    }).join('')
+    + '<div class="panel-note">ระบบเก็บกรอบหลักสูตรเป็นข้อมูล ไม่ใช่โครงสร้าง — เมื่อหลักสูตรเปลี่ยน '
+    + 'เพิ่มกรอบใหม่ในฐานข้อมูลแล้วหน้านี้จะแสดงตามเองโดยไม่ต้องแก้โค้ด</div>';
+  }
+
+  function levelToLabel(f, lvl) {
+    const scale = Array.isArray(f.level_scale) ? f.level_scale : [];
+    const r = Math.round(lvl);
+    const hit = scale.find((s) => Number(s.level) === r);
+    return hit ? hit.label + ' (ระดับ ' + r + ')' : 'ระดับ ' + r;
+  }
+
+  function roomCard(r) {
+    const stu = studentsOf(r.id).length;
+    const en = enabledGames(r.id);
+    return '<div class="card">'
+      + '<div style="display:flex;align-items:baseline;gap:8px"><h3 style="margin:0;font-size:16.5px;flex:1">🏫 ' + G.esc(r.name) + '</h3>'
+      + (r.is_active ? '' : '<span class="badge">ปิดใช้งาน</span>') + '</div>'
+      + '<div class="muted small" style="margin:4px 0 8px">นักเรียน ' + stu + ' คน · เกมที่เปิด: '
+      + (en.length ? en.map((g) => G.esc(g.name)).join(', ') : '<span style="color:var(--critical)">ยังไม่เปิดเกม</span>') + '</div>'
+      + '<div style="display:flex;align-items:center;gap:10px;margin:8px 0 12px">'
+      + '<span class="muted small">โค้ดเข้าห้อง</span> <span class="joinkey">' + G.esc(r.join_key) + '</span>'
+      + '<button class="btn btn-sm" data-copy="' + G.esc(r.join_key) + '">คัดลอก</button></div>'
+      + assignRows(r)
+      + '<div style="margin-top:12px"><a class="btn btn-sm btn-primary" href="#/room/' + r.id + '">ดูผลของห้องนี้ →</a></div>'
+      + '</div>';
+  }
+
+  function assignRows(r) {
+    return '<div>' + S.games.map((g) => {
+      const row = S.cg.find((x) => x.classroom_id === r.id && x.game_id === g.id);
+      const on = !!(row && row.is_enabled);
+      return '<div class="assign-row"><label class="switch"><input type="checkbox" data-assign="' + r.id + '|' + g.id + '"'
+        + (on ? ' checked' : '') + '><i></i></label><span style="flex:1">' + G.esc(g.name) + '</span>'
+        + '<span class="badge ' + G.esc(g.status) + '">' + G.esc(g.status) + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  async function createRoom() {
+    const name = ($('nr-name').value || '').trim();
+    if (!name) { showErr('ใส่ชื่อห้องก่อน'); return; }
+    const grade = ($('nr-grade').value || '').trim() || null;
+    $('nr-go').disabled = true;
+    for (let i = 0; i < 3; i++) {
+      try {
+        await G.api('/rest/v1/classrooms', { method: 'POST', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify([{ teacher_id: G.session().user_id, name: name, grade: grade,
+            join_key: G.joinKeyGen(), is_active: true, allow_self_add: false, join_pin_required: false }]) });
+        await loadAll(); renderHome(); return;
+      } catch (e) {
+        if (String(e.code) !== '23505') { showErr('สร้างห้องไม่สำเร็จ: ' + e.message); break; }
+      }
+    }
+    $('nr-go').disabled = false;
+  }
+
+  /* ===================== หน้าห้องเรียน ===================== */
+  function renderRoom(cid) {
+    const r = roomById(cid);
+    if (!r) { location.hash = '#/'; return; }
+    const stu = studentsOf(cid);
+    const games = enabledGames(cid);
+    const sums = S.summary.filter((x) => x.classroom_id === cid);
+
+    let html = '<h2 style="margin:0 0 2px;font-size:20px">🏫 ' + G.esc(r.name)
+      + ' <span class="muted" style="font-size:14px;font-weight:400">โค้ดเข้าห้อง <span class="joinkey" style="font-size:15px">' + G.esc(r.join_key) + '</span></span></h2>'
+      + '<div class="muted small">นักเรียน ' + stu.length + ' คน · เกมที่เปิดใช้ ' + games.length + ' เกม</div>'
+      + tabs();
+
+    if (TAB === 'comp') {
+      html += compSection(cid);
+      html += '<div class="section-title">สมรรถนะรายคน</div>'
+        + '<div class="card table-scroll">' + compTable(cid) + '</div>';
+      html += '<div class="section-title">มาตรฐานการเรียนรู้ของเกมที่เปิดใช้ในห้องนี้ '
+        + '<span class="sub">ใช้อ้างอิงในแผนการสอนได้</span></div>'
+        + '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">'
+        + (games.length ? games.map((g) => '<div class="std-slot" data-std-game="' + G.esc(g.code) + '"></div>').join('')
+                        : '<div class="card muted">ยังไม่ได้เปิดเกมให้ห้องนี้</div>')
+        + '</div>';
+    } else {
+      html += '<div class="tiles">' + (sums.length ? sums.map((x) =>
+        '<div class="tile"><div class="label">' + G.esc(x.game_name) + '</div>'
+        + '<div class="value">' + (x.avg_progress == null ? '–' : Math.round(x.avg_progress)) + '<span class="unit">% เฉลี่ย</span></div>'
+        + '<div class="muted small">เล่นแล้ว ' + x.students_played + '/' + stu.length + ' คน · คะแนนเฉลี่ย ' + G.fmt(x.avg_best_score) + '</div></div>'
+      ).join('') : '<div class="tile"><div class="label">ยังไม่มีข้อมูลการเล่น</div></div>') + '</div>';
+
+      html += '<div class="section-title">ผลสัมฤทธิ์รายคน <span class="sub">แตะชื่อเพื่อดูรายละเอียด</span></div>'
+        + '<div class="card table-scroll"><table class="gol"><thead><tr><th>เลขที่</th><th>ชื่อ</th>'
+        + games.map((g) => '<th>' + G.esc(g.name) + '</th>').join('')
+        + '<th class="num">คะแนนรวม</th></tr></thead><tbody>';
+      stu.forEach((s) => {
+        const prows = progOf(s.id);
+        let total = 0;
+        const cells = games.map((g) => {
+          const p = prows.find((x) => x.game_id === g.id);
+          if (p && p.best_score != null) total += Number(p.best_score) || 0;
+          return '<td style="min-width:150px">' + (p ? meter(p.progress_percent)
+            + '<div class="muted small">คะแนน ' + G.fmt(p.best_score) + '</div>' : '<span class="muted small">ยังไม่เริ่ม</span>') + '</td>';
+        }).join('');
+        html += '<tr><td class="num">' + G.esc(s.student_number || '–') + '</td>'
+          + '<td><a href="#/student/' + s.id + '">' + G.esc((s.first_name || '') + ' ' + (s.last_name || '')) + '</a>'
+          + (s.character_name ? ' <span class="muted small">🎮 ' + G.esc(s.character_name) + '</span>' : '') + '</td>'
+          + cells + '<td class="num"><b>' + G.fmt(total) + '</b></td></tr>';
+      });
+      html += '</tbody></table></div>';
+
+      html += '<div class="section-title">เพิ่มนักเรียน</div>'
+        + '<div class="card" style="max-width:560px">'
+        + '<label class="f">พิมพ์ทีละบรรทัด: เลขที่ ชื่อ นามสกุล</label>'
+        + '<textarea id="as-lines" placeholder="1 สมชาย ใจดี&#10;2 สมหญิง เรียนเก่ง"></textarea>'
+        + '<button class="btn btn-primary" style="margin-top:10px" id="as-go">+ เพิ่มรายชื่อ</button></div>';
+    }
+
+    $('content').innerHTML = html;
+    const g2 = $('as-go'); if (g2) g2.onclick = () => addStudents(cid);
+    mountStandardsPanels();
+  }
+
+  /** วางแผงมาตรฐานการเรียนรู้ (คอมโพเนนต์กลางตัวเดียวกับที่ Dashboard ของเกมใช้) */
+  function mountStandardsPanels() {
+    const C = window.GP_CONFIG;
+    document.querySelectorAll('[data-std-game]').forEach(function (el) {
+      if (el.dataset.loaded) return;
+      el.dataset.loaded = '1';
+      window.GPStandards.render(el, { sbUrl: C.SB_URL, sbAnon: C.SB_ANON,
+        gameCode: el.getAttribute('data-std-game') }).catch(function () {});
+    });
+  }
+
+  /** ตารางสมรรถนะรายคนของห้อง (คอลัมน์ = รายการระดับบนที่มีเกมวัด) */
+  function compTable(cid) {
+    const fws = compFrameworks();
+    if (!fws.length) return '<div class="muted">ยังไม่มีข้อมูลสมรรถนะ</div>';
+    const cols = [];
+    fws.forEach((f) => itemsOf(f.code).filter((i) => i.games_covering > 0)
+      .forEach((i) => cols.push({ f: f, code: i.item_code, name: i.item_name })));
+    const stu = studentsOf(cid);
+    return '<table class="gol"><thead><tr><th>เลขที่</th><th>ชื่อ</th>'
+      + cols.map((c) => '<th>' + G.esc(c.name) + '</th>').join('') + '</tr></thead><tbody>'
+      + stu.map(function (s) {
+        return '<tr><td class="num">' + G.esc(s.student_number || '–') + '</td>'
+          + '<td><a href="#/student/' + s.id + '">' + G.esc((s.first_name || '') + ' ' + (s.last_name || '')) + '</a></td>'
+          + cols.map(function (c) {
+            const p = S.itemProfile.find((x) => x.student_id === s.id && x.framework_code === c.f.code && x.item_code === c.code);
+            if (!p || p.percent == null) return '<td><span class="muted small">ยังไม่มีผล</span></td>';
+            return '<td style="min-width:150px">' + meter(p.percent)
+              + (p.level_label ? '<div class="muted small">' + G.esc(p.level_label) + '</div>' : '') + '</td>';
+          }).join('') + '</tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  async function addStudents(cid) {
+    const lines = ($('as-lines').value || '').split('\n').map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+    const rows = lines.map((l) => {
+      const p = l.split(/\s+/);
+      return { classroom_id: cid, student_number: p[0] || null, first_name: p[1] || '', last_name: p.slice(2).join(' ') || '' };
+    });
+    try {
+      await G.api('/rest/v1/students', { method: 'POST', body: JSON.stringify(rows) });
+      await loadAll(); route();
+    } catch (e) { showErr('เพิ่มนักเรียนไม่สำเร็จ: ' + e.message); }
+  }
+
+  /* ===================== หน้านักเรียน ===================== */
+  async function renderStudent(sid) {
+    const s = S.students.find((x) => x.id === sid);
+    if (!s) { location.hash = '#/'; return; }
+    const r = roomById(s.classroom_id);
+    const prows = progOf(sid);
+    const mine = S.itemProfile.filter((x) => x.student_id === sid);
+
+    let html = '<h2 style="margin:0 0 2px;font-size:20px">👦 ' + G.esc((s.first_name || '') + ' ' + (s.last_name || ''))
+      + (s.character_name ? ' <span class="muted" style="font-size:14px">🎮 ' + G.esc(s.character_name) + '</span>' : '') + '</h2>'
+      + '<div class="muted small">เลขที่ ' + G.esc(s.student_number || '–') + ' · ห้อง ' + G.esc(r ? r.name : '') + '</div>';
+
+    // ---- มิติที่ 1: ผลสัมฤทธิ์ ----
+    html += '<div class="section-title">ผลสัมฤทธิ์ <span class="sub">ความก้าวหน้าและคะแนนรายเกม</span></div>';
+    html += '<div class="grid cols-3">' + (prows.length ? prows.map((p) => {
+      const g = gameById(p.game_id);
+      const m = p.summary_metrics || {};
+      return '<div class="card"><h3 style="margin:0 0 8px;font-size:15.5px">' + G.esc(g ? g.name : '') + '</h3>'
+        + meter(p.progress_percent)
+        + '<table class="gol" style="margin-top:8px"><tbody>'
+        + '<tr><td class="muted small">คะแนนดีที่สุด</td><td class="num"><b>' + G.fmt(p.best_score) + '</b></td></tr>'
+        + '<tr><td class="muted small">รอบที่ส่งผล</td><td class="num">' + G.fmtInt(p.attempts_count) + '</td></tr>'
+        + (p.total_play_seconds ? '<tr><td class="muted small">เวลาเล่นสะสม</td><td class="num">' + G.fmtInt(p.total_play_seconds / 60) + ' นาที</td></tr>' : '')
+        + '<tr><td class="muted small">เล่นล่าสุด</td><td class="num">' + G.timeAgo(p.last_played_at) + '</td></tr>'
+        + Object.keys(m).slice(0, 6).map((k) => '<tr><td class="muted small">' + G.esc(k) + '</td><td class="num">' + G.fmt(m[k]) + '</td></tr>').join('')
+        + '</tbody></table></div>';
+    }).join('') : '<div class="card muted">ยังไม่มีข้อมูลการเล่น</div>') + '</div>';
+
+    const achItems = mine.filter((x) => x.framework_kind === 'achievement');
+    if (achItems.length) {
+      html += compPanel('ผลสัมฤทธิ์ตามกลุ่มสาระ', 'อ้างอิง ' + G.esc(achItems[0].framework_name),
+        achItems.sort((a, b) => a.sort_order - b.sort_order).map((x) => ({ name: x.item_name, covered: true, percent: x.percent })));
+    }
+
+    // ---- มิติที่ 2: สมรรถนะ ----
+    html += '<div class="section-title">สมรรถนะหลัก <span class="sub">รวมจากทุกเกมที่นักเรียนเล่น</span></div>';
+    const fws = compFrameworks();
+    if (fws.length) {
+      html += fws.map(function (f) {
+        const rows = itemsOf(f.code).map(function (it) {
+          const p = mine.find((x) => x.framework_code === f.code && x.item_code === it.item_code);
+          return { name: it.item_name, covered: it.games_covering > 0,
+            sub: p && p.games_count ? 'จาก ' + p.games_count + ' เกม' : (it.games_covering > 0 ? 'วัดโดย: ' + (it.game_names || []).join(', ') : null),
+            percent: p ? p.percent : null, level_label: p ? p.level_label : null };
+        });
+        return compPanel(f.name_th, null, rows);
+      }).join('');
+      html += '<div id="stu-sub" class="card muted small" style="margin-top:14px"><span class="loading"></span> กำลังโหลดรายละเอียดด้านย่อย…</div>';
+    } else {
+      html += '<div class="card muted">ยังไม่มีข้อมูลสมรรถนะ</div>';
+    }
+
+    html += '<div class="section-title">กิจกรรมล่าสุด</div><div id="stu-ev" class="card muted small"><span class="loading"></span> กำลังโหลด…</div>';
+    $('content').innerHTML = html;
+
+    // รายละเอียดด้านย่อย (เช่น การคิดขั้นสูง 4 ด้าน) — โหลดแยกเพราะเป็นรายแถวลึก
+    if (fws.length) {
+      try {
+        const subs = await G.get('/rest/v1/student_item_scores?student_id=eq.' + sid
+          + '&select=score,max_score,percent,level,level_label,evidence,computed_at,framework_items(code,name_th,depth,sort_order,parent_id)&order=computed_at.desc');
+        const rows = (subs || []).filter((x) => x.framework_items && x.framework_items.depth >= 2)
+          .sort((a, b) => (a.framework_items.sort_order || 0) - (b.framework_items.sort_order || 0));
+        const parent = (subs || []).find((x) => x.framework_items && x.framework_items.depth === 1);
+        $('stu-sub').className = 'card';
+        $('stu-sub').innerHTML = rows.length
+          ? '<h3 style="margin:0 0 8px;font-size:15.5px">รายละเอียดสมรรถนะย่อย</h3>'
+            + rows.map((x) => '<div class="cbar"><div><div class="cname">' + G.esc(x.framework_items.name_th) + '</div></div>'
+              + '<div class="ctrack"><i style="width:' + Math.max(0, Math.min(100, Number(x.percent) || 0)) + '%"></i></div>'
+              + '<div class="cval">' + G.fmt(x.percent) + '%</div></div>').join('')
+            + (parent && parent.evidence && Object.keys(parent.evidence).length
+              ? '<div class="panel-note">องค์ประกอบคะแนน: ' + Object.entries(parent.evidence)
+                  .map(([k, v]) => G.esc(k) + ' = ' + G.esc(String(v))).join(' · ') + '</div>' : '')
+          : '<span class="muted small">ยังไม่มีรายละเอียดด้านย่อย</span>';
+      } catch (e) { $('stu-sub').textContent = 'โหลดรายละเอียดด้านย่อยไม่สำเร็จ: ' + e.message; }
+    }
+
+    try {
+      const evs = await G.get('/rest/v1/events?student_id=eq.' + sid + '&select=stage_id,kind,score,created_at,game_id&order=created_at.desc&limit=10');
+      $('stu-ev').className = 'card';
+      $('stu-ev').innerHTML = evs.length
+        ? '<table class="gol"><thead><tr><th>เมื่อ</th><th>เกม</th><th>ด่าน</th><th>ประเภท</th><th class="num">คะแนน</th></tr></thead><tbody>'
+          + evs.map((e) => { const g = gameById(e.game_id); return '<tr><td>' + G.timeAgo(e.created_at) + '</td><td>' + G.esc(g ? g.name : '')
+            + '</td><td>' + G.esc(e.stage_id || '–') + '</td><td>' + G.esc(e.kind || '') + '</td><td class="num">' + G.fmt(e.score) + '</td></tr>'; }).join('')
+          + '</tbody></table>'
+        : '<span class="muted small">ยังไม่มีบันทึกกิจกรรม</span>';
+    } catch (e) { $('stu-ev').textContent = 'โหลดไม่สำเร็จ: ' + e.message; }
+  }
+
+  /* ===================== events ===================== */
+  document.addEventListener('click', function (ev) {
+    const t = ev.target.closest('[data-tab]');
+    if (t) { TAB = t.getAttribute('data-tab'); route(); return; }
+    const c = ev.target.closest('[data-copy]');
+    if (c) { navigator.clipboard && navigator.clipboard.writeText(c.getAttribute('data-copy')); c.textContent = 'คัดลอกแล้ว ✓'; }
+  });
+  document.addEventListener('change', async function (ev) {
+    const a = ev.target.closest('[data-assign]');
+    if (!a) return;
+    const parts = a.getAttribute('data-assign').split('|');
+    a.disabled = true;
+    try {
+      await G.api('/rest/v1/classroom_games?on_conflict=classroom_id,game_id', {
+        method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify([{ classroom_id: parts[0], game_id: parts[1], is_enabled: a.checked }]) });
+      S.cg = await G.get('/rest/v1/classroom_games?select=*');
+    } catch (e) { showErr('บันทึกการมอบหมายเกมไม่สำเร็จ: ' + e.message); a.checked = !a.checked; }
+    a.disabled = false;
+  });
+
+  $('btn-google').onclick = () => G.loginGoogle('/teacher.html');
+  $('btn-recover').onclick = async function () {
+    const code = ($('rec-code').value || '').trim();
+    if (!code) return;
+    this.disabled = true; $('rec-msg').textContent = 'กำลังกู้คืน…';
+    try {
+      const res = await G.recoverTeacher(code);
+      $('rec-msg').textContent = 'สำเร็จ! ย้ายห้อง ' + ((res && res.moved) || 0) + ' ห้องมาที่เว็บนี้แล้ว';
+      location.reload();
+    } catch (e) { $('rec-msg').textContent = 'ไม่สำเร็จ: ' + e.message; this.disabled = false; }
+  };
+  $('btn-logout').onclick = () => { G.logout(); location.hash = ''; location.reload(); };
+
+  boot();
+})();
+</script>
+</body>
+</html>

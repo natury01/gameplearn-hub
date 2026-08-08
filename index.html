@@ -431,7 +431,10 @@
       let games = await roomGames(key);
       if (!games.length) games = ALL.filter((g) => g.playable);   /* ยังไม่ได้มอบหมาย = เล่นเกมไหนก็ได้ */
       showRoom(room, key, games);
-      try { sessionStorage.setItem('gp_join', key); } catch (e) {}
+      /* ส่งต่อโค้ดให้เกม — เกมทุกเกมอยู่โดเมนเดียวกันจึงอ่าน localStorage ก้อนนี้ได้
+         ใช้เป็นทางสำรองของ ?join= เผื่อพารามิเตอร์หายระหว่างทาง (ดู js/gp-join.js)
+         คีย์นี้จองไว้ให้แพลตฟอร์ม ห้ามเกมใดใช้ชื่อซ้ำ */
+      try { localStorage.setItem('gp_join_handoff', JSON.stringify({ code: key, at: Date.now() })); } catch (e) {}
     } catch (e) {
       joinErr('เชื่อมต่อไม่สำเร็จ: ' + (e.message || 'ลองใหม่อีกครั้ง'));
     } finally {

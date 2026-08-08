@@ -4,111 +4,490 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>เกมเพลิน (GamePlearn) — ศูนย์รวมเกมการเรียนรู้</title>
-<meta name="description" content="เกมเพลิน — Game On. Learn Beyond. ศูนย์รวมเกมการเรียนรู้ ดูผลสัมฤทธิ์และสมรรถนะของนักเรียนได้ในที่เดียว">
+<meta name="description" content="เกมเพลิน — Game On. Learn Beyond. ศูนย์รวมเกมการเรียนรู้ สำหรับนักเรียนและครู ดูผลสัมฤทธิ์และสมรรถนะของนักเรียนทุกเกมได้ในที่เดียว">
+<meta name="theme-color" content="#2a78d6">
+<meta property="og:title" content="เกมเพลิน (GamePlearn) — ศูนย์รวมเกมการเรียนรู้">
+<meta property="og:description" content="Game On. Learn Beyond. — เริ่มเกม แล้วก้าวไปไกลกว่าการเรียนรู้เดิม">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://gameplearn.com/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/gp.css">
 </head>
 <body>
 <div class="wrap">
 
+  <!-- ==================== หัวเว็บ + เมนูหลัก ==================== -->
   <div class="topbar">
-    <div class="brand"><span class="logo">ก</span> <span id="brand-th">เกมเพลิน</span>
-      <span class="muted" style="font-weight:400;font-size:14px">GamePlearn</span></div>
+    <a class="brand" href="./" style="color:inherit;text-decoration:none">
+      <span class="logo">ก</span> <span id="brand-th">เกมเพลิน</span>
+      <span class="muted" style="font-weight:400;font-size:14px">GamePlearn</span>
+    </a>
     <div class="sp"></div>
-    <a class="btn btn-primary" href="teacher.html">สำหรับครู · Dashboard กลาง</a>
+    <nav class="navlinks" aria-label="เมนูหลัก">
+      <a href="#games">เกมทั้งหมด</a>
+      <a href="#teacher-zone">สำหรับครู</a>
+      <a href="support.html">สนับสนุน</a>
+      <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
+    </nav>
+    <a class="btn btn-primary" href="teacher.html">👩‍🏫 เข้าสู่ระบบครู</a>
   </div>
 
-  <div class="card hero">
-    <div class="hero-slogan" id="slogan-en">Game On. Learn Beyond.</div>
-    <h1 id="slogan-th">เริ่มเกม แล้วก้าวไปไกลกว่าการเรียนรู้เดิม</h1>
-    <div class="muted">นักเรียน: เลือกเกมด้านล่างแล้วกด "เล่นเกม" ได้เลย ·
-      ครู: เข้าสู่ระบบเพื่อดูทั้ง<b>ผลสัมฤทธิ์</b>และ<b>สมรรถนะ</b>ของนักเรียนทุกเกมในที่เดียว</div>
+  <!-- ==================== นักเรียนมาก่อน: กรอกรหัสห้องเรียน ==================== -->
+  <section class="joinhero" aria-labelledby="join-h">
+    <div class="eyebrow" id="slogan-en">Game On. Learn Beyond.</div>
+    <h1 id="join-h">มีโค้ดห้องเรียนจากคุณครูแล้วใช่ไหม? ใส่ตรงนี้เลย</h1>
+    <div class="lede" id="slogan-th">เริ่มเกม แล้วก้าวไปไกลกว่าการเรียนรู้เดิม</div>
+
+    <div class="joinbox">
+      <label class="hidden" for="join-code">โค้ดเข้าห้องเรียน 6 ตัว</label>
+      <input class="code-input" id="join-code" maxlength="6" autocomplete="off"
+             autocapitalize="characters" spellcheck="false"
+             inputmode="text" placeholder="ABC123" aria-describedby="join-hint">
+      <button class="btn btn-primary btn-lg" id="join-go">🏫 เข้าห้องเรียน</button>
+    </div>
+
+    <div class="err-box" id="join-err" style="margin-top:12px"></div>
+    <div class="joinhint" id="join-hint">
+      โค้ด 6 ตัวอยู่ที่คุณครู · <b>ยังไม่มีโค้ดก็เล่นได้</b> — เลื่อนลงไปเลือกเกมด้านล่างได้เลย
+    </div>
+
+    <div id="room-result"></div>
+  </section>
+
+  <!-- ==================== เกมแนะนำ ==================== -->
+  <div class="section-title" id="featured-title" style="display:none">
+    ⭐ เกมแนะนำ <span class="sub">คัดมาให้เริ่มเล่นได้เลย</span>
+  </div>
+  <div id="featured" class="strip fit-3"></div>
+
+  <!-- ==================== เกมทั้งหมด + ตัวกรอง ==================== -->
+  <div class="section-title" id="games">
+    🎮 เกมทั้งหมด <span class="sub" id="game-count"></span>
   </div>
 
-  <div class="section-title">เกมทั้งหมด <span class="sub" id="game-count"></span></div>
   <div class="err-box" id="cat-err"></div>
-  <div id="cat" class="grid cols-3"><div class="card muted"><span class="loading"></span> กำลังโหลดรายชื่อเกม…</div></div>
+  <div class="warn-note hidden" id="basic-note" style="margin-bottom:14px"></div>
 
-  <div class="muted small" style="margin-top:34px">
-    เกมเพลิน · แคตตาล็อกอ่านจาก Game Registry อัตโนมัติ — เกมใหม่ที่เผยแพร่จะแสดงที่นี่ทันที
+  <div class="filterbar" id="filterbar" style="display:none">
+    <div class="searchrow">
+      <div class="search">
+        <label class="hidden" for="q">ค้นหาเกม</label>
+        <input type="text" id="q" placeholder="ค้นหาชื่อเกม เนื้อหา หรือหัวข้อ…" autocomplete="off">
+      </div>
+      <label class="hidden" for="sort">เรียงลำดับ</label>
+      <select id="sort" style="width:auto;min-width:160px"></select>
+      <button class="btn mobile-only" id="toggle-filters" type="button" aria-expanded="false"
+              aria-controls="fgroups">🎛 ตัวกรอง</button>
+    </div>
+    <div id="fgroups"></div>
+    <div class="filter-foot">
+      <span id="result-count"></span>
+      <span class="sp"></span>
+      <button class="btn btn-sm btn-ghost hidden" id="more-filters"></button>
+      <button class="btn btn-sm hidden" id="clear-filters">ล้างตัวกรอง</button>
+    </div>
   </div>
+
+  <div id="cat" class="grid cols-3">
+    <div class="card muted"><span class="loading"></span> กำลังโหลดรายชื่อเกม…</div>
+  </div>
+
+  <!-- ==================== โซนครู ==================== -->
+  <div class="section-title" id="teacher-zone">👩‍🏫 สำหรับคุณครู</div>
+  <section class="zone">
+    <h2>ดูผลนักเรียนทุกเกม ในที่เดียว</h2>
+    <div class="lede">
+      สร้างห้องเรียน แจกโค้ดให้นักเรียน แล้วดูทั้ง<b>ผลสัมฤทธิ์</b>และ<b>สมรรถนะหลัก</b>
+      ของทุกเกมรวมกัน — ไม่ต้องเปิดหลายเว็บ ไม่ต้องคีย์คะแนนเอง
+    </div>
+    <div class="zcards">
+      <a class="zcard" href="teacher.html">
+        <span class="ic">📊</span>
+        <span class="t">Dashboard กลาง</span>
+        <span class="d">คะแนนรายห้อง รายคน แยกตามเกม พร้อมสรุปรวม</span>
+      </a>
+      <a class="zcard" href="teacher.html#rooms">
+        <span class="ic">🏫</span>
+        <span class="t">สร้างห้องเรียน</span>
+        <span class="d">ได้โค้ด 6 ตัวให้นักเรียนใช้เข้าเล่นทันที</span>
+      </a>
+      <a class="zcard" href="#games">
+        <span class="ic">📋</span>
+        <span class="t">มาตรฐานที่แต่ละเกมวัด</span>
+        <span class="d">ตัวชี้วัดและสมรรถนะที่เกมครอบคลุม สำหรับเขียนแผนการสอน</span>
+      </a>
+      <a class="zcard" href="contact.html">
+        <span class="ic">💬</span>
+        <span class="t">แจ้งปัญหา / เสนอแนะ</span>
+        <span class="d">พบบัค อยากได้เกมแนวไหน บอกเราได้เลย</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ==================== ปลายหน้า ==================== -->
+  <footer class="sitefoot">
+    <div class="col">
+      <b>เกมเพลิน (GamePlearn)</b>
+      <span id="foot-slogan">Game On. Learn Beyond.</span>
+      <span style="display:block;margin-top:6px">ศูนย์รวมเกมการเรียนรู้สำหรับโรงเรียนไทย</span>
+    </div>
+    <div class="col">
+      <b>เมนู</b>
+      <a href="#games">เกมทั้งหมด</a>
+      <a href="teacher.html">สำหรับครู</a>
+      <a href="support.html">สนับสนุนเรา</a>
+    </div>
+    <div class="col">
+      <b>ช่วยเหลือ</b>
+      <a href="contact.html">ติดต่อ / แจ้งบัค</a>
+      <a href="contact.html#faq">คำถามที่พบบ่อย</a>
+    </div>
+    <div class="col">
+      <b>อ้างอิงหลักสูตร</b>
+      <a href="https://academic.obec.go.th/" target="_blank" rel="noopener">หลักสูตรแกนกลาง 2551 (ปรับปรุง 2560)</a>
+      <a href="https://cbethailand.com/" target="_blank" rel="noopener">หลักสูตรฐานสมรรถนะ (CBE Thailand)</a>
+    </div>
+  </footer>
 </div>
 
 <script src="js/config.js"></script>
 <script src="js/gp-core.js"></script>
+<script src="js/gp-catalog.js"></script>
 <script src="js/gp-standards-panel.js"></script>
 <script>
 (function () {
-  const C = window.GP_CONFIG, G = window.GP, SL = window.GP_SLOGAN;
+  const C = window.GP_CONFIG, G = window.GP, K = window.GPCatalog, SL = window.GP_SLOGAN;
+  const $ = (id) => document.getElementById(id);
+
   document.getElementById('brand-th').textContent = C.BRAND_TH;
-  document.getElementById('slogan-en').textContent = SL.en;
-  document.getElementById('slogan-th').textContent = SL.th;
+  $('slogan-en').textContent = SL.en;
+  $('slogan-th').textContent = SL.th;
+  $('foot-slogan').textContent = SL.en + ' — ' + SL.th;
 
-  const COVER = { kanchanaburi2050: '🗺️', typing: '⌨️' };
-  const STATUS_TH = { published: 'เปิดใช้งาน', maintenance: 'ปิดปรับปรุงชั่วคราว', testing: 'รุ่นทดสอบ' };
+  /* ไอคอนสำรองต่อเกม (ใช้ตอนยังไม่มี cover_url และยังไม่ได้ตั้ง genre) */
+  const FALLBACK_ICON = { kanchanaburi2050: '🗺️', 'kanchanaburi2050-2': '🛡️', typing: '⌨️' };
 
-  function gradeText(g) {
-    if (g.minimum_grade == null && g.maximum_grade == null) return 'ทุกระดับชั้น';
-    if (g.minimum_grade === g.maximum_grade) return 'ชั้น ป.' + g.minimum_grade;
-    return 'ชั้น ป.' + g.minimum_grade + '–' + (g.maximum_grade ?? '');
+  /* ================= การ์ดเกม ================= */
+  function cover(g) {
+    if (g.cover_url) return '<div class="gcover"><img src="' + G.esc(g.cover_url) + '" alt=""></div>';
+    const icon = g.genre_icon || FALLBACK_ICON[g.code] || '🎮';
+    const ribbon = g.is_featured ? '<span class="ribbon">⭐ แนะนำ</span>' : '';
+    const part = (g.series && g.series_order) ? '<span class="partno">ภาค ' + g.series_order + '</span>' : '';
+    return '<div class="gcover g-' + G.esc(g.genre || 'none') + '">' + icon + ribbon + part + '</div>';
   }
 
-  function card(g, covers) {
-    const dis = g.status !== 'published';
-    const tags = (covers[g.name] || []).slice(0, 5);
-    return '<div class="card game-card">'
-      + '<div class="game-cover">' + (g.cover_url ? '<img src="' + G.esc(g.cover_url) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px">' : (COVER[g.code] || '🎮')) + '</div>'
-      + '<div><h3>' + G.esc(g.name) + '</h3>'
-      + '<div class="game-meta">' + G.esc(g.description || '') + '</div>'
-      + '<div class="game-meta" style="margin-top:5px">' + gradeText(g)
-      + (g.current_version ? ' · เวอร์ชัน ' + G.esc(g.current_version) : '')
-      + ' · <span class="badge ' + G.esc(g.status) + '">' + (STATUS_TH[g.status] || G.esc(g.status)) + '</span></div>'
-      + (tags.length ? '<div class="tagrow">' + tags.map((t) => '<span class="tag">' + G.esc(t) + '</span>').join('') + '</div>' : '')
-      + '</div>'
-      + '<div class="game-actions">'
-      + (g.launch_url ? '<a class="btn btn-primary' + (dis ? '" style="pointer-events:none;opacity:.5' : '') + '" href="' + G.esc(g.launch_url) + '" target="_blank" rel="noopener">▶ เล่นเกม</a>' : '')
-      + (g.dashboard_url ? '<a class="btn" href="' + G.esc(g.dashboard_url) + '" target="_blank" rel="noopener">📊 Dashboard เกมนี้</a>' : '')
-      + '<button class="btn btn-sm btn-ghost" data-std="' + G.esc(g.code) + '">📋 มาตรฐานที่วัด</button>'
-      + '</div>'
-      + '<div class="std-slot hidden" id="std-' + G.esc(g.code) + '"></div>'
-      + '</div>';
+  function facts(g) {
+    const f = [];
+    f.push('<span class="f">🎓 ' + G.esc(g.grade_text) + '</span>');
+    if (g.genre_name) f.push('<span class="f">' + (g.genre_icon || '🎮') + ' ' + G.esc(g.genre_name) + '</span>');
+    if (g.play_minutes) f.push('<span class="f">⏱ ~' + g.play_minutes + ' นาที</span>');
+    if (g.players_count > 0) f.push('<span class="f">👥 ' + G.fmtInt(g.players_count) + ' คนเคยเล่น</span>');
+    return '<div class="gfacts">' + f.join('') + '</div>';
   }
 
-  Promise.all([
-    G.get('/rest/v1/games?select=code,name,description,launch_url,dashboard_url,cover_url,minimum_grade,maximum_grade,status,current_version&status=in.(published,maintenance)&order=name'),
-    // ป้ายบอกว่าเกมนี้วัดสมรรถนะ/กลุ่มสาระอะไร — อ่านจากทะเบียนความครอบคลุม ไม่ hard-code
-    G.get('/rest/v1/v_framework_coverage?select=item_name,game_names,depth&depth=eq.1&games_covering=gt.0').catch(() => []),
-  ]).then(function (res) {
-    const rows = res[0], cov = res[1] || {};
-    const byGame = {};
-    (Array.isArray(cov) ? cov : []).forEach(function (c) {
-      (c.game_names || []).forEach(function (gn) { (byGame[gn] = byGame[gn] || []).push(c.item_name); });
-    });
-    document.getElementById('game-count').textContent = rows.length + ' เกม';
-    document.getElementById('cat').innerHTML = rows.length
-      ? rows.map(function (g) { return card(g, byGame); }).join('')
-      : '<div class="card muted">ยังไม่มีเกมที่เผยแพร่</div>';
+  /* ป้ายบนการ์ด — จำกัดไว้ 4 ป้ายพอ ไม่งั้นการ์ดรกจนอ่านชื่อเกมไม่ทัน
+     และไม่ให้ป้ายซ้ำข้ามหมวด (เช่น "ภาษาไทย" เป็นทั้งกลุ่มสาระและหัวข้อ) */
+  function tags(g) {
+    const seen = {}, out = [];
+    function add(list, cls, max) {
+      let n = 0;
+      for (const s of list) {
+        if (out.length >= 4 || n >= max) break;
+        if (!s || seen[s]) continue;
+        seen[s] = 1; n++;
+        out.push('<span class="tag' + (cls ? ' ' + cls : '') + '">' + G.esc(s) + '</span>');
+      }
+    }
+    add(g.subject_areas, 'subj', 1);
+    add(g.competencies, 'comp', 2);
+    add(g.tags, '', 2);
+    return out.length ? '<div class="tagrow">' + out.join('') + '</div>' : '';
+  }
+
+  function card(g) {
+    const off = !g.playable;
+    return '<article class="gcard">'
+      + cover(g)
+      + '<div class="gbody">'
+      +   '<h3>' + G.esc(g.name) + '</h3>'
+      +   (g.description ? '<div class="gdesc">' + G.esc(g.description) + '</div>' : '')
+      +   facts(g)
+      +   (g.status !== 'published'
+            ? '<div><span class="badge ' + G.esc(g.status) + '">' + G.esc(g.status_th) + '</span></div>' : '')
+      +   tags(g)
+      +   '<div class="std-slot hidden" id="std-' + G.esc(g.code) + '"></div>'
+      + '</div>'
+      + '<div class="gfoot">'
+      +   (g.launch_url
+            ? '<a class="btn btn-play' + (off ? ' ' : '') + '" href="' + G.esc(g.launch_url) + '"'
+              + (off ? ' aria-disabled="true" style="pointer-events:none;opacity:.5"' : '')
+              + ' target="_blank" rel="noopener">▶ เล่นเกม</a>'
+            : '')
+      +   '<button class="btn btn-sm" data-std="' + G.esc(g.code) + '">📋 มาตรฐานที่วัด</button>'
+      + '</div>'
+      + '</article>';
+  }
+
+  /* ================= สถานะตัวกรอง ================= */
+  let ALL = [], FILTERS = [], SOURCE = 'view';
+  const sel = { grade_band: '', genre: '', series: '', subject: '', competency: '', tag: '' };
+  let q = '', sortKey = 'recommended', showAllGroups = false;
+
+  function renderSortOptions() {
+    $('sort').innerHTML = Object.keys(K.SORTS)
+      .map((k) => '<option value="' + k + '">เรียง: ' + G.esc(K.SORTS[k].label) + '</option>').join('');
+    $('sort').value = sortKey;
+  }
+
+  /* แสดงเฉพาะกลุ่มที่ "กรองแล้วผลเปลี่ยน" (มีอย่างน้อย 2 ตัวเลือก)
+     กลุ่มที่มีตัวเลือกเดียวกดแล้วไม่ช่วยอะไร — ซ่อนไว้ใต้ปุ่ม "ดูตัวกรองทั้งหมด" */
+  function visibleGroups() {
+    const useful = FILTERS.filter((d) => d.options.length >= 2);
+    return showAllGroups ? FILTERS : (useful.length ? useful : FILTERS);
+  }
+
+  function renderFilters() {
+    const groups = visibleGroups();
+    $('fgroups').innerHTML = groups.map(function (d) {
+      return '<div class="fgroup"><div class="flabel">' + G.esc(d.label) + '</div><div class="chiprow">'
+        + d.options.map(function (o) {
+            const on = sel[d.key] === o.value;
+            return '<button class="chip" type="button" role="button" aria-pressed="' + (on ? 'true' : 'false') + '"'
+              + ' data-dim="' + G.esc(d.key) + '" data-val="' + G.esc(o.value) + '">'
+              + G.esc(o.label) + ' <span class="n">' + o.count + '</span></button>';
+          }).join('')
+        + '</div></div>';
+    }).join('');
+
+    const hidden = FILTERS.length - groups.length;
+    const mf = $('more-filters');
+    if (hidden > 0 || showAllGroups) {
+      mf.classList.remove('hidden');
+      mf.textContent = showAllGroups ? 'ย่อตัวกรอง' : 'ดูตัวกรองทั้งหมด (+' + hidden + ')';
+    } else { mf.classList.add('hidden'); }
+  }
+
+  function activeCount() { return Object.keys(sel).filter((k) => sel[k]).length + (q ? 1 : 0); }
+
+  function renderList() {
+    const rows = K.apply(ALL, sel, q, sortKey);
+    $('cat').innerHTML = rows.length
+      ? rows.map(card).join('')
+      : '<div class="card muted">ไม่พบเกมที่ตรงกับตัวกรอง — ลองกด "ล้างตัวกรอง" แล้วเลือกใหม่</div>';
+
+    const n = activeCount();
+    $('result-count').textContent = n
+      ? 'พบ ' + rows.length + ' เกม จากทั้งหมด ' + ALL.length + ' เกม'
+      : 'ทั้งหมด ' + ALL.length + ' เกม';
+    $('clear-filters').classList.toggle('hidden', n === 0);
+    $('game-count').textContent = ALL.length + ' เกม';
+    updateToggleLabel();
+  }
+
+  function renderFeatured() {
+    /* มีเกมน้อย → ไม่ต้องมีแถบแยก เพราะจะซ้ำกับ "เกมทั้งหมด" ที่อยู่ถัดลงไปทันที
+       (เกมที่ปักหมุดยังขึ้นก่อนพร้อมป้าย ⭐ ในแคตตาล็อกอยู่ดี) */
+    const minGames = C.FEATURED_MIN_GAMES == null ? 5 : C.FEATURED_MIN_GAMES;
+    if (ALL.length < minGames) { $('featured').innerHTML = ''; return; }
+
+    const feat = ALL.filter((g) => g.is_featured && g.playable);
+    /* ยังไม่ได้ปักเกมแนะนำในฐานข้อมูล → ใช้เกมที่คนเล่นมากที่สุดแทน หน้าแรกจะได้ไม่ว่าง */
+    const list = (feat.length ? feat
+      : ALL.filter((g) => g.playable).slice().sort(K.SORTS.popular.fn)).slice(0, 6);
+    if (!list.length) { $('featured').innerHTML = ''; return; }
+
+    $('featured-title').style.display = '';
+    $('featured-title').querySelector('.sub').textContent =
+      feat.length ? 'คัดมาให้เริ่มเล่นได้เลย' : 'เกมที่มีคนเล่นมากที่สุดตอนนี้';
+    $('featured').innerHTML = list.map(card).join('');
+    $('featured').classList.toggle('fit-3', list.length <= 3);
+  }
+
+  /* ================= โหลดข้อมูล ================= */
+  K.loadCatalog().then(function (res) {
+    ALL = res.rows; SOURCE = res.source;
+    FILTERS = K.buildFilters(ALL);
+    renderSortOptions();
+    $('filterbar').style.display = ALL.length > 1 ? '' : 'none';
+    $('fgroups').classList.add('collapsed');   /* มีผลเฉพาะจอมือถือ (ดู gp.css) */
+    renderFilters();
+    renderFeatured();
+    renderList();
+
+    if (SOURCE === 'basic') {
+      const n = $('basic-note');
+      n.innerHTML = 'ตอนนี้ตัวกรองยังใช้ได้ไม่ครบทุกมิติ — รัน <b>14_GAME_FILTERS.sql</b> '
+        + 'ใน Supabase เพื่อเปิดการกรองตามแนวเกม ชุดเกม เวลาเล่น และเกมยอดนิยม';
+      n.classList.remove('hidden');
+    }
   }).catch(function (e) {
-    const b = document.getElementById('cat-err');
-    b.textContent = 'โหลดรายชื่อเกมไม่สำเร็จ: ' + e.message + ' — ตรวจการเชื่อมต่ออินเทอร์เน็ตแล้วรีเฟรช';
+    const b = $('cat-err');
+    b.textContent = 'โหลดรายชื่อเกมไม่สำเร็จ: ' + e.message + ' — ตรวจการเชื่อมต่ออินเทอร์เน็ตแล้วรีเฟรชหน้านี้';
     b.classList.add('on');
-    document.getElementById('cat').innerHTML = '';
+    $('cat').innerHTML = '';
   });
 
-  // แผง "มาตรฐานการเรียนรู้ที่เกมนี้วัด" — ใช้คอมโพเนนต์กลางตัวเดียวกับที่ Dashboard ของเกมใช้
+  /* ================= เหตุการณ์ตัวกรอง ================= */
+  document.addEventListener('click', function (ev) {
+    const chip = ev.target.closest('.chip[data-dim]');
+    if (chip) {
+      const d = chip.getAttribute('data-dim'), v = chip.getAttribute('data-val');
+      sel[d] = (sel[d] === v) ? '' : v;   /* กดซ้ำ = ยกเลิกตัวกรองนั้น */
+      renderFilters(); renderList();
+      return;
+    }
+    if (ev.target.closest('#clear-filters')) {
+      Object.keys(sel).forEach((k) => { sel[k] = ''; });
+      q = ''; $('q').value = '';
+      renderFilters(); renderList();
+      return;
+    }
+    if (ev.target.closest('#more-filters')) {
+      showAllGroups = !showAllGroups;
+      renderFilters();
+      return;
+    }
+    if (ev.target.closest('#toggle-filters')) {
+      const box = $('fgroups'), btn = $('toggle-filters');
+      const open = box.classList.toggle('collapsed') === false;
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      updateToggleLabel();
+      return;
+    }
+  });
+
+  /* ปุ่มตัวกรองบนมือถือ — บอกจำนวนตัวกรองที่เปิดอยู่ จะได้รู้ว่าทำไมเห็นเกมน้อยลง */
+  function updateToggleLabel() {
+    const btn = $('toggle-filters');
+    if (!btn) return;
+    const n = Object.keys(sel).filter((k) => sel[k]).length;
+    btn.textContent = '🎛 ตัวกรอง' + (n ? ' (' + n + ')' : '');
+  }
+
+  let qt = null;
+  $('q').addEventListener('input', function (e) {
+    clearTimeout(qt);
+    const v = e.target.value;
+    qt = setTimeout(function () { q = v.trim(); renderList(); }, 160);
+  });
+  $('sort').addEventListener('change', function (e) { sortKey = e.target.value; renderList(); });
+
+  /* ================= แผง "มาตรฐานที่เกมนี้วัด" ================= */
   document.addEventListener('click', function (ev) {
     const b = ev.target.closest('[data-std]');
     if (!b) return;
     const code = b.getAttribute('data-std');
     const slot = document.getElementById('std-' + code);
     if (!slot) return;
-    if (!slot.classList.contains('hidden')) { slot.classList.add('hidden'); b.textContent = '📋 มาตรฐานที่วัด'; return; }
+    if (!slot.classList.contains('hidden')) {
+      slot.classList.add('hidden'); b.textContent = '📋 มาตรฐานที่วัด'; return;
+    }
     slot.classList.remove('hidden');
     b.textContent = '📋 ซ่อนมาตรฐาน';
     if (!slot.dataset.loaded) {
       slot.dataset.loaded = '1';
-      window.GPStandards.render(slot, { sbUrl: C.SB_URL, sbAnon: C.SB_ANON, gameCode: code }).catch(function () {});
+      window.GPStandards.render(slot, { sbUrl: C.SB_URL, sbAnon: C.SB_ANON, gameCode: code })
+        .catch(function () {
+          slot.innerHTML = '<div class="panel-note">ยังไม่ได้บันทึกมาตรฐานของเกมนี้ '
+            + '(รัน 08_ASSESSMENT_CORE.sql แล้วลงทะเบียนตัวชี้วัด/สมรรถนะของเกม)</div>';
+        });
     }
   });
+
+  /* ================= นักเรียนเข้าห้องเรียน ================= */
+  const codeInput = $('join-code');
+
+  codeInput.addEventListener('input', function () {
+    const v = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    if (v !== this.value) this.value = v;
+    if (v.length === 6) lookup();          /* ครบ 6 ตัวแล้วตรวจให้เลย ไม่ต้องกดปุ่ม */
+  });
+  codeInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') lookup(); });
+  $('join-go').addEventListener('click', lookup);
+
+  function joinErr(msg) {
+    const b = $('join-err');
+    if (!msg) { b.classList.remove('on'); b.textContent = ''; return; }
+    b.textContent = msg; b.classList.add('on');
+  }
+
+  let looking = false;
+  async function lookup() {
+    const key = (codeInput.value || '').trim().toUpperCase();
+    joinErr('');
+    if (key.length < 4) { joinErr('โค้ดห้องเรียนมี 6 ตัว — ถามคุณครูได้เลยนะ'); codeInput.focus(); return; }
+    if (looking) return;
+    looking = true;
+    const btn = $('join-go'); const label = btn.textContent;
+    btn.disabled = true; btn.textContent = 'กำลังตรวจ…';
+    try {
+      const rows = await G.rpc('rpc_lookup_classroom', { p_join_key: key });
+      if (!rows || !rows.length) {
+        joinErr('ไม่พบห้องเรียนจากโค้ดนี้ — ลองตรวจกับคุณครูอีกครั้งนะ');
+        $('room-result').innerHTML = '';
+        return;
+      }
+      const room = rows[0];
+      let games = await roomGames(key);
+      if (!games.length) games = ALL.filter((g) => g.playable);   /* ยังไม่ได้มอบหมาย = เล่นเกมไหนก็ได้ */
+      showRoom(room, key, games);
+      try { sessionStorage.setItem('gp_join', key); } catch (e) {}
+    } catch (e) {
+      joinErr('เชื่อมต่อไม่สำเร็จ: ' + (e.message || 'ลองใหม่อีกครั้ง'));
+    } finally {
+      looking = false; btn.disabled = false; btn.textContent = label;
+    }
+  }
+
+  /* เกมที่ครูเปิดให้ห้องนี้ — ถ้ายังไม่มี RPC นี้ (ยังไม่รัน 15_STUDENT_JOIN.sql) คืนค่าว่าง
+     แล้วจะถอยไปแสดงเกมทั้งหมดที่เล่นได้แทน */
+  async function roomGames(key) {
+    try {
+      const rows = await G.rpc('rpc_classroom_games', { p_join_key: key });
+      const codes = (rows || []).map((r) => r.code || r.game_code).filter(Boolean);
+      if (!codes.length) return [];
+      const byCode = {}; ALL.forEach((g) => { byCode[g.code] = g; });
+      return codes.map((c) => byCode[c]).filter((g) => g && g.playable);
+    } catch (e) { return []; }
+  }
+
+  function showRoom(room, key, games) {
+    const gcards = games.map(function (g) {
+      return '<a class="btn btn-play" href="' + G.esc(g.launch_url)
+        + (g.launch_url.indexOf('?') >= 0 ? '&' : '?') + 'join=' + encodeURIComponent(key) + '"'
+        + ' target="_blank" rel="noopener">▶ ' + G.esc(g.name) + '</a>';
+    }).join('');
+
+    $('room-result').innerHTML =
+      '<div class="roomcard">'
+      + '<div class="rname">🏫 ' + G.esc(room.name || 'ห้องเรียนของเธอ') + '</div>'
+      + '<div class="rmeta">' + G.esc(room.school_name || '') + '</div>'
+      + '<ol class="steps">'
+      +   '<li>จำโค้ดนี้ไว้นะ <span class="codechip">' + G.esc(key)
+      +     ' <button class="btn btn-sm" id="copy-code" type="button">คัดลอก</button></span></li>'
+      +   '<li>กดปุ่มเกมด้านล่างเพื่อเปิดเกม</li>'
+      +   '<li>ในเกมกด <b>🏫 เข้าห้องเรียน</b> แล้วใส่โค้ดนี้ จากนั้นแตะชื่อของเธอ</li>'
+      + '</ol>'
+      + '<div class="game-actions" style="margin-top:14px">' + gcards + '</div>'
+      + '</div>';
+
+    const cp = document.getElementById('copy-code');
+    if (cp) cp.addEventListener('click', function () {
+      navigator.clipboard.writeText(key).then(function () {
+        cp.textContent = '✓ คัดลอกแล้ว';
+        setTimeout(function () { cp.textContent = 'คัดลอก'; }, 1800);
+      }).catch(function () { cp.textContent = 'คัดลอกไม่ได้'; });
+    });
+
+    $('room-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  /* เปิดหน้าด้วย ?join=ABC123 (เช่น ครูส่งลิงก์ในไลน์กลุ่ม) — กรอกและตรวจให้เลย */
+  const pre = new URLSearchParams(location.search).get('join');
+  if (pre) {
+    codeInput.value = pre.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    setTimeout(lookup, 400);   /* รอแคตตาล็อกโหลดก่อน จะได้จับคู่ชื่อเกมได้ */
+  }
 })();
 </script>
 </body>

@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ติดต่อ / แจ้งปัญหา — เกมเพลิน (GamePlearn)</title>
+<meta name="description" content="สอบถามข้อมูล แจ้งบัค เสนอแนะ หรือติดต่อผู้ดูแลเกมเพลิน">
+<meta name="theme-color" content="#2a78d6">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/gp.css">
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <a class="brand" href="./" style="color:inherit;text-decoration:none">
+      <span class="logo">ก</span> <span id="brand-th">เกมเพลิน</span>
+      <span class="muted" style="font-weight:400;font-size:14px">GamePlearn</span>
+    </a>
+    <div class="sp"></div>
+    <nav class="navlinks" aria-label="เมนูหลัก">
+      <a href="./#games">เกมทั้งหมด</a>
+      <a href="./#teacher-zone">สำหรับครู</a>
+      <a href="support.html">สนับสนุน</a>
+      <a href="contact.html" class="on">ติดต่อ / แจ้งปัญหา</a>
+    </nav>
+    <a class="btn btn-primary" href="teacher.html">👩‍🏫 เข้าสู่ระบบครู</a>
+  </div>
+
+  <div class="crumb"><a href="./">หน้าแรก</a> › ติดต่อ / แจ้งปัญหา</div>
+
+  <section class="joinhero">
+    <div class="eyebrow">CONTACT</div>
+    <h1>มีอะไรอยากบอกเราไหม?</h1>
+    <div class="lede">
+      สอบถามวิธีใช้ · แจ้งบัคที่เจอ · เสนอเกมที่อยากได้ · ติดต่อผู้ดูแลระบบ —
+      เขียนมาได้เลย เราอ่านทุกข้อความ
+    </div>
+  </section>
+
+  <div class="grid cols-2" style="margin-top:18px;align-items:start">
+
+    <!-- ================= ฟอร์ม ================= -->
+    <div class="card">
+      <h2 style="margin:0 0 6px;font-size:19px">📮 ส่งข้อความถึงเรา</h2>
+      <div class="muted small" style="margin-bottom:6px">ช่องที่มี * ต้องกรอก · ไม่ต้องเข้าสู่ระบบก็ส่งได้</div>
+
+      <div class="err-box" id="err"></div>
+      <div id="ok" class="hidden"></div>
+
+      <form id="fb-form">
+        <label class="f" for="kind">เรื่องที่ติดต่อ *</label>
+        <div class="chiprow" id="kindrow" style="margin-top:2px">
+          <button class="chip" type="button" data-kind="question" aria-pressed="true">❓ สอบถามข้อมูล</button>
+          <button class="chip" type="button" data-kind="bug" aria-pressed="false">🐛 แจ้งบัค</button>
+          <button class="chip" type="button" data-kind="idea" aria-pressed="false">💡 เสนอแนะ</button>
+          <button class="chip" type="button" data-kind="other" aria-pressed="false">✉️ อื่น ๆ</button>
+        </div>
+
+        <label class="f" for="game">เกี่ยวกับเกมไหน</label>
+        <select id="game"><option value="">— ไม่เกี่ยวกับเกมใดเกมหนึ่ง —</option></select>
+
+        <label class="f" for="msg">รายละเอียด *</label>
+        <textarea id="msg" maxlength="2000"
+          placeholder="เล่าให้ละเอียดหน่อยนะ เช่น กดปุ่มไหน แล้วเกิดอะไรขึ้น ใช้มือถือหรือคอม"></textarea>
+        <div class="form-hint"><span id="msg-count">0</span>/2000 ตัวอักษร</div>
+
+        <label class="f" for="name">ชื่อของคุณ</label>
+        <input type="text" id="name" maxlength="80" placeholder="เช่น ครูสมชาย · เว้นว่างได้">
+
+        <label class="f" for="email">อีเมลหรือไลน์ไอดี (ถ้าอยากให้ติดต่อกลับ)</label>
+        <input type="text" id="email" maxlength="120" placeholder="เว้นว่างได้ ถ้าไม่ต้องการให้ตอบกลับ">
+
+        <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-lg" type="submit" id="send">ส่งข้อความ</button>
+          <button class="btn" type="reset" id="reset-btn">ล้างฟอร์ม</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ================= FAQ + ช่องทางอื่น ================= -->
+    <div>
+      <div class="card" id="faq">
+        <h2 style="margin:0 0 12px;font-size:19px">❓ คำถามที่พบบ่อย</h2>
+
+        <details style="border-top:1px solid var(--grid);padding:10px 0">
+          <summary style="cursor:pointer;font-weight:600">นักเรียนเข้าเล่นยังไง ต้องสมัครไหม</summary>
+          <div class="muted small" style="margin-top:8px">
+            ไม่ต้องสมัคร ครูสร้างห้องเรียนแล้วจะได้โค้ด 6 ตัว นักเรียนใส่โค้ดที่หน้าแรก
+            แล้วแตะชื่อตัวเองในรายชื่อ ก็เล่นได้เลย คะแนนเข้าระบบอัตโนมัติ
+          </div>
+        </details>
+
+        <details style="border-top:1px solid var(--grid);padding:10px 0">
+          <summary style="cursor:pointer;font-weight:600">ลืมโค้ดห้องเรียนทำยังไง</summary>
+          <div class="muted small" style="margin-top:8px">
+            ถามคุณครูประจำห้อง โค้ดจะแสดงอยู่ในหน้า Dashboard ของครูตลอดเวลา
+          </div>
+        </details>
+
+        <details style="border-top:1px solid var(--grid);padding:10px 0">
+          <summary style="cursor:pointer;font-weight:600">ครูเข้าสู่ระบบด้วยอะไร</summary>
+          <div class="muted small" style="margin-top:8px">
+            เข้าด้วยบัญชี Google หรือใช้รหัสกู้คืนที่ระบบให้ไว้ตอนสร้างห้องครั้งแรก
+            บัญชีเดียวใช้ได้ทั้งเว็บกลางและทุกเกม
+          </div>
+        </details>
+
+        <details style="border-top:1px solid var(--grid);padding:10px 0">
+          <summary style="cursor:pointer;font-weight:600">คะแนนของนักเรียนหายไหม ถ้าปิดเบราว์เซอร์</summary>
+          <div class="muted small" style="margin-top:8px">
+            ไม่หาย ระบบบันทึกขึ้นเซิร์ฟเวอร์ระหว่างเล่น เปิดเครื่องอื่นแล้วใส่โค้ดเดิม
+            แตะชื่อเดิม ก็เล่นต่อจากเดิมได้
+          </div>
+        </details>
+
+        <details style="border-top:1px solid var(--grid);padding:10px 0">
+          <summary style="cursor:pointer;font-weight:600">เกมใช้ฟรีจริงไหม</summary>
+          <div class="muted small" style="margin-top:8px">
+            ฟรีทั้งหมด ไม่มีค่าใช้จ่ายและไม่มีโฆษณา
+            ถ้าอยากช่วยค่าเซิร์ฟเวอร์ ดูได้ที่หน้า <a href="support.html">สนับสนุน</a>
+          </div>
+        </details>
+
+        <details style="border-top:1px solid var(--grid);padding:10px 0">
+          <summary style="cursor:pointer;font-weight:600">เก็บข้อมูลอะไรของนักเรียนบ้าง</summary>
+          <div class="muted small" style="margin-top:8px">
+            เก็บเท่าที่จำเป็นต่อการรายงานผลเท่านั้น — ชื่อในห้องเรียน เลขที่ และผลการเล่น
+            ไม่เก็บเลขบัตรประชาชน ที่อยู่ หรือข้อมูลส่วนตัวอื่น
+          </div>
+        </details>
+      </div>
+
+      <div class="warn-note" style="margin-top:14px">
+        <b>เจอบัคเร่งด่วนตอนสอน?</b> เขียนมาพร้อมบอก 3 อย่างนี้จะแก้ได้เร็วที่สุด:
+        ชื่อเกม · โค้ดห้องเรียน · เวลาที่เกิดปัญหาโดยประมาณ
+      </div>
+    </div>
+  </div>
+
+  <footer class="sitefoot">
+    <div class="col">
+      <b>เกมเพลิน (GamePlearn)</b>
+      <span id="foot-slogan">Game On. Learn Beyond.</span>
+    </div>
+    <div class="col">
+      <b>เมนู</b>
+      <a href="./#games">เกมทั้งหมด</a>
+      <a href="teacher.html">สำหรับครู</a>
+      <a href="support.html">สนับสนุนเรา</a>
+    </div>
+    <div class="col">
+      <b>ช่วยเหลือ</b>
+      <a href="contact.html">ติดต่อ / แจ้งบัค</a>
+      <a href="contact.html#faq">คำถามที่พบบ่อย</a>
+    </div>
+  </footer>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/gp-core.js"></script>
+<script>
+(function () {
+  const C = window.GP_CONFIG, G = window.GP, SL = window.GP_SLOGAN;
+  const $ = (id) => document.getElementById(id);
+  document.getElementById('brand-th').textContent = C.BRAND_TH;
+  $('foot-slogan').textContent = SL.en + ' — ' + SL.th;
+
+  let kind = 'question';
+  const KIND_TH = { question: 'สอบถามข้อมูล', bug: 'แจ้งบัค', idea: 'ข้อเสนอแนะ', other: 'อื่น ๆ' };
+
+  /* เลือกประเภทเรื่อง */
+  $('kindrow').addEventListener('click', function (ev) {
+    const b = ev.target.closest('.chip[data-kind]');
+    if (!b) return;
+    kind = b.getAttribute('data-kind');
+    Array.prototype.forEach.call(this.querySelectorAll('.chip'), function (c) {
+      c.setAttribute('aria-pressed', c === b ? 'true' : 'false');
+    });
+    /* แจ้งบัค → ช่วยเตือนสิ่งที่ต้องบอก */
+    $('msg').placeholder = kind === 'bug'
+      ? 'เกิดอะไรขึ้น · กดปุ่มไหนก่อนหน้านั้น · ใช้มือถือหรือคอม · เกิดตอนประมาณกี่โมง'
+      : 'เล่าให้ละเอียดหน่อยนะ';
+  });
+
+  /* รายชื่อเกมในดรอปดาวน์ — อ่านจากทะเบียนเกม ไม่ hard-code */
+  G.get('/rest/v1/games?select=code,name&status=in.(published,maintenance,testing)&order=name')
+    .then(function (rows) {
+      $('game').insertAdjacentHTML('beforeend',
+        (rows || []).map((g) => '<option value="' + G.esc(g.code) + '">' + G.esc(g.name) + '</option>').join(''));
+    }).catch(function () {});
+
+  $('msg').addEventListener('input', function () { $('msg-count').textContent = this.value.length; });
+  $('reset-btn').addEventListener('click', function () {
+    setTimeout(function () { $('msg-count').textContent = '0'; }, 0);
+  });
+
+  function showErr(m) { const b = $('err'); b.textContent = m; b.classList.toggle('on', !!m); }
+
+  $('fb-form').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    showErr('');
+    const msg = $('msg').value.trim();
+    if (msg.length < 10) { showErr('ช่วยเขียนรายละเอียดอีกนิดนะ (อย่างน้อย 10 ตัวอักษร)'); $('msg').focus(); return; }
+
+    const payload = {
+      p_kind: kind,
+      p_message: msg,
+      p_game_code: $('game').value || null,
+      p_name: $('name').value.trim() || null,
+      p_contact: $('email').value.trim() || null,
+      p_meta: { page: location.pathname, ua: navigator.userAgent.slice(0, 200), at: new Date().toISOString() },
+    };
+
+    const btn = $('send'); btn.disabled = true; btn.textContent = 'กำลังส่ง…';
+    try {
+      await G.rpc('rpc_submit_feedback', payload);
+      done();
+    } catch (e) {
+      /* ยังไม่ได้ติดตั้ง rpc_submit_feedback → ไม่ทิ้งผู้ใช้ไว้กลางทาง
+         เตรียมอีเมลให้พร้อมส่ง โดยไม่ต้องพิมพ์ใหม่ */
+      fallback(payload, e);
+    } finally {
+      btn.disabled = false; btn.textContent = 'ส่งข้อความ';
+    }
+  });
+
+  function done() {
+    $('fb-form').classList.add('hidden');
+    const box = $('ok');
+    box.className = 'card';
+    box.style.borderColor = 'var(--good)';
+    box.innerHTML = '<div style="font-size:40px">✅</div>'
+      + '<h2 style="margin:6px 0 4px;font-size:19px">ส่งเรียบร้อยแล้ว ขอบคุณมาก</h2>'
+      + '<div class="muted small">เราอ่านทุกข้อความ ถ้าทิ้งช่องทางติดต่อไว้จะตอบกลับให้เร็วที่สุด</div>'
+      + '<div style="margin-top:14px"><a class="btn" href="./">← กลับหน้าแรก</a></div>';
+  }
+
+  function fallback(p, e) {
+    const admin = (C && C.ADMIN_EMAIL) || '';
+    const subject = '[เกมเพลิน] ' + (KIND_TH[p.p_kind] || 'ติดต่อ');
+    const body = [
+      'เรื่อง: ' + (KIND_TH[p.p_kind] || '-'),
+      'เกม: ' + (p.p_game_code || '-'),
+      'ชื่อ: ' + (p.p_name || '-'),
+      'ติดต่อกลับ: ' + (p.p_contact || '-'),
+      '', p.p_message, '', '— ส่งจาก ' + location.href,
+    ].join('\n');
+
+    const box = $('ok');
+    box.className = 'card';
+    box.style.borderColor = 'var(--warning)';
+    box.innerHTML = '<b>ระบบรับข้อความอัตโนมัติยังไม่เปิดใช้งาน</b>'
+      + '<div class="muted small" style="margin:6px 0 12px">'
+      + 'ข้อความของคุณยังอยู่ครบ — กดปุ่มด้านล่างเพื่อส่งทางอีเมลแทนได้เลย ไม่ต้องพิมพ์ใหม่'
+      + '</div>'
+      + (admin
+          ? '<a class="btn btn-primary" href="mailto:' + G.esc(admin) + '?subject='
+            + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body) + '">📧 ส่งทางอีเมล</a> '
+          : '')
+      + '<button class="btn" id="copy-msg" type="button">📋 คัดลอกข้อความ</button>'
+      + '<div class="panel-note">ผู้ดูแล: รัน <code>15_SITE_PAGES.sql</code> ใน Supabase '
+      + 'เพื่อเปิดระบบรับข้อความอัตโนมัติ (' + G.esc(e && e.message ? e.message : '') + ')</div>';
+
+    const cp = document.getElementById('copy-msg');
+    if (cp) cp.addEventListener('click', function () {
+      navigator.clipboard.writeText(body).then(function () {
+        cp.textContent = '✓ คัดลอกแล้ว';
+      }).catch(function () { cp.textContent = 'คัดลอกไม่ได้'; });
+    });
+  }
+})();
+</script>
+</body>
+</html>

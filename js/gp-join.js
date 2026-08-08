@@ -3,15 +3,24 @@
  *
  * ปัญหาที่แก้: นักเรียนใส่โค้ดห้องที่ gameplearn.com แล้วต้องใส่ซ้ำอีกรอบในเกม
  *
- * วิธีใช้ — ใส่บรรทัดเดียวใน <head> ของทุกเกม (ไม่ต้องแก้โค้ดเกม):
- *     <script src="/js/gp-join.js" defer></script>
+ * วิธีใช้ — ใส่บรรทัดเดียวเป็นสคริปต์ตัวแรกใน <head> ของทุกเกม:
+ *     <script src="/js/gp-join.js"></script>
+ *   (ไม่ใส่ defer เพื่อให้ window.GP_JOIN พร้อมใช้ตั้งแต่โค้ดเกมบรรทัดแรก
+ *    ไฟล์เล็กมากและแคชไว้ ไม่กระทบเวลาโหลด)
  *
- * แล้วติดป้ายที่ช่องกรอกโค้ดของเกม 1 ที่:
- *     <input data-gp-join-input>          → กรอกให้ (นักเรียนกดตรวจเอง)
- *     <input data-gp-join-input="auto">   → กรอกให้ + กด Enter ให้เลย
+ * จากนั้นเลือกวิธีเชื่อม 1 ใน 2 แบบ:
  *
- * เกมที่ไม่ติดป้ายก็ยังใช้ได้ — อ่านค่าจาก window.GP_JOIN เอาไปใช้เองได้ทุกเมื่อ
- * ไม่โหลดไฟล์นี้ก็ยังใช้ได้ — เกมทำงานเหมือนเดิมทุกอย่าง (ไฟล์นี้เป็นส่วนเสริมล้วน ๆ)
+ *  แบบ A — ติดป้ายที่ช่องกรอกโค้ด (ไม่ต้องแตะโค้ด JS ของเกม)
+ *     <input data-gp-join-input>          → กรอกให้ (นักเรียนกดปุ่มตรวจเอง)
+ *     <input data-gp-join-input="auto">   → กรอกให้ + กดส่งให้เลย
+ *     ระบุปุ่มที่จะกดแทนการจำลอง Enter ได้: data-gp-join-submit="#btn-join-submit"
+ *     ติดได้หลายช่อง (เกมที่มีทางเข้าหลายทาง) — กรอกให้ทุกช่อง แต่กดส่งให้ครั้งเดียว
+ *
+ *  แบบ B — เรียกฟังก์ชันของเกมเอง (เหมาะกับเกมที่มีฟังก์ชันเข้าห้องอยู่แล้ว)
+ *     if (window.GP_JOIN) เรียกฟังก์ชันเข้าห้องของเกมด้วยค่านี้ได้เลย
+ *
+ * เกมที่ไม่ทำอะไรเลยก็ยังใช้ได้ — ไฟล์นี้เป็นส่วนเสริมล้วน ๆ ไม่แตะการทำงานเดิม
+ * ไม่โหลดไฟล์นี้ก็ยังใช้ได้ — เกมทำงานเหมือนเดิมทุกอย่าง
  *
  * ⚠️ คีย์ localStorage 'gp_join_handoff' จองไว้ให้แพลตฟอร์ม — ห้ามเกมใดใช้ชื่อนี้
  */
@@ -53,6 +62,10 @@
     } catch (e) {}
   }
 
+  /* กดส่งให้ครั้งเดียวต่อการโหลดหน้า 1 ครั้ง — เกมที่มีช่องกรอกหลายจุด
+     จะได้ไม่ถูกสั่งค้นหาซ้อนกันหลายรอบ */
+  var submitted = false;
+
   function fill(el) {
     if (!el || el.getAttribute('data-gp-join-done')) return;
     el.setAttribute('data-gp-join-done', '1');
@@ -62,26 +75,32 @@
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
 
-    /* กด Enter ให้เฉพาะกรณีมาจากลิงก์โดยตรง และเกมขออนุญาตไว้ว่า "auto" */
-    if (trusted && el.getAttribute('data-gp-join-input') === 'auto') {
-      setTimeout(function () {
-        el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
-      }, 60);
-    }
+    /* กดส่งให้เฉพาะกรณีมาจากลิงก์โดยตรง และเกมขออนุญาตไว้ว่า "auto" */
+    if (!trusted || submitted || el.getAttribute('data-gp-join-input') !== 'auto') return;
+    submitted = true;
+    setTimeout(function () {
+      /* เกมระบุปุ่มไว้ → กดปุ่มนั้น (เชื่อถือได้กว่าการจำลอง Enter) */
+      var sel = el.getAttribute('data-gp-join-submit');
+      var btn = sel ? document.querySelector(sel) : null;
+      if (btn) { btn.click(); return; }
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+    }, 60);
   }
 
+  /* กรอกให้ "ทุก" ช่องที่ติดป้าย — เกมอาจมีทางเข้าหลายทาง
+     (เช่น แท็บบนหน้าล็อกอิน 1 ช่อง + กล่องป๊อปอัป อีก 1 ช่อง) */
   function scan() {
-    var el = document.querySelector('[data-gp-join-input]:not([data-gp-join-done])');
-    if (el) { fill(el); return true; }
-    return false;
+    var list = document.querySelectorAll('[data-gp-join-input]:not([data-gp-join-done])');
+    for (var i = 0; i < list.length; i++) fill(list[i]);
+    return list.length > 0;
   }
 
   function start() {
-    if (scan()) return;
-    /* ช่องกรอกของเกมส่วนใหญ่ถูกสร้างทีหลัง (ตอนกดปุ่ม "เข้าห้องเรียน")
-       จึงต้องเฝ้าดู DOM แทนการหาแค่ตอนโหลดหน้า */
+    scan();
+    /* ช่องกรอกบางจุดถูกสร้างทีหลัง (ตอนกดปุ่ม "เข้าห้องเรียน")
+       จึงต้องเฝ้าดู DOM ต่อ ไม่ใช่หาแค่ตอนโหลดหน้า */
     if (typeof MutationObserver !== 'function') return;
-    var obs = new MutationObserver(function () { if (scan()) obs.disconnect(); });
+    var obs = new MutationObserver(scan);
     obs.observe(document.documentElement, { childList: true, subtree: true });
     /* เลิกเฝ้าหลัง 3 นาที — ไม่ปล่อยให้ทำงานค้างตลอดเวลาที่เล่นเกม */
     setTimeout(function () { obs.disconnect(); }, 180000);

@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ผู้ดูแลระบบ — เกมเพลิน (GamePlearn)</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#2a78d6">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/gp.css">
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <a class="brand" href="./" style="color:inherit;text-decoration:none">
+      <span class="logo">ก</span> <span id="brand-th">เกมเพลิน</span>
+      <span class="muted" style="font-weight:400;font-size:14px">ผู้ดูแลระบบ</span>
+    </a>
+    <div class="sp"></div>
+    <span class="who" id="who"></span>
+    <a class="btn" href="teacher.html">📊 Dashboard ครู</a>
+    <button class="btn hidden" id="logout">ออกจากระบบ</button>
+  </div>
+
+  <!-- ========== ยังไม่ได้เข้าสู่ระบบ ========== -->
+  <div id="gate" class="card" style="max-width:520px;margin:40px auto;text-align:center">
+    <div style="font-size:44px">🔐</div>
+    <h1 style="font-size:21px;margin:8px 0 6px">หน้าสำหรับผู้ดูแลระบบ</h1>
+    <div class="muted small" style="margin-bottom:18px">
+      เข้าสู่ระบบด้วยบัญชี Google ที่ลงทะเบียนเป็นผู้ดูแลไว้
+    </div>
+    <div class="err-box" id="gate-err" style="margin-bottom:14px;text-align:left"></div>
+    <button class="btn btn-primary btn-lg" id="login">เข้าสู่ระบบด้วย Google</button>
+    <div class="panel-note" style="text-align:left">
+      ยังไม่ได้เป็นผู้ดูแล? รัน <code>22_ADMIN_SETUP.sql</code> ใน Supabase
+      แล้วเข้าสู่ระบบด้วยอีเมลที่ลงทะเบียนไว้
+    </div>
+  </div>
+
+  <!-- ========== หน้าหลัก ========== -->
+  <div id="app" class="hidden">
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="brand"    aria-selected="true">🎨 แบรนด์และหน้าเว็บ</button>
+      <button class="tab" role="tab" data-tab="support"  aria-selected="false">💙 หน้าสนับสนุน</button>
+      <button class="tab" role="tab" data-tab="games"    aria-selected="false">🎮 ทะเบียนเกม</button>
+      <button class="tab" role="tab" data-tab="inbox"    aria-selected="false">💬 กล่องข้อความ <span id="inbox-badge"></span></button>
+      <button class="tab" role="tab" data-tab="contact"  aria-selected="false">⚙️ ช่องทางติดต่อ</button>
+    </div>
+
+    <div class="err-box" id="err"></div>
+    <div id="saved" class="hidden" style="position:fixed;right:18px;bottom:18px;background:var(--good);
+         color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;z-index:50;box-shadow:var(--lift)">
+      ✓ บันทึกแล้ว
+    </div>
+
+    <!-- ---------- แบรนด์ ---------- -->
+    <section class="panel" id="panel-brand">
+      <div class="card">
+        <h2 style="margin:0 0 4px;font-size:18px">โลโก้และไอคอน</h2>
+        <div class="muted small" style="margin-bottom:14px">
+          เปลี่ยนแล้วมีผลทุกหน้าทันที ไม่ต้องแก้โค้ดเว็บ
+        </div>
+        <div id="brand-fields"></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2 style="margin:0 0 4px;font-size:18px">ประกาศบนหัวเว็บ</h2>
+        <div class="muted small" style="margin-bottom:14px">
+          แถบสีเหลืองบนสุดของทุกหน้า — เว้นว่าง = ไม่แสดง ·
+          ผู้ใช้กดปิดได้ แต่จะขึ้นใหม่เมื่อเปลี่ยนข้อความ
+        </div>
+        <div id="announce-fields"></div>
+      </div>
+    </section>
+
+    <!-- ---------- สนับสนุน ---------- -->
+    <section class="panel hidden" id="panel-support">
+      <div class="grid cols-2" style="align-items:start">
+        <div class="card">
+          <h2 style="margin:0 0 4px;font-size:18px">QR และข้อมูลการสนับสนุน</h2>
+          <div class="muted small" style="margin-bottom:14px">แสดงที่หน้า <a href="support.html" target="_blank">support.html</a></div>
+          <div id="support-fields"></div>
+        </div>
+        <div class="card">
+          <h2 style="margin:0 0 12px;font-size:18px">ตัวอย่างที่ผู้ใช้จะเห็น</h2>
+          <div id="qr-preview" style="text-align:center"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- เกม ---------- -->
+    <section class="panel hidden" id="panel-games">
+      <div class="card">
+        <h2 style="margin:0 0 4px;font-size:18px">ทะเบียนเกม</h2>
+        <div class="muted small" style="margin-bottom:14px">
+          ปักเกมแนะนำ · เปลี่ยนสถานะ · จัดลำดับในแคตตาล็อก — บันทึกทันทีเมื่อแก้
+        </div>
+        <div class="table-scroll"><table class="gol" id="games-table"></table></div>
+        <div class="warn-note" style="margin-top:14px">
+          <b>เพิ่มเกมใหม่</b> ทำผ่าน <code>17_ADD_NEW_GAME.sql</code> ใน Supabase
+          เพราะต้องตั้ง <code>game_code</code> ให้ตรงกับที่ตัวเกมส่งคะแนนมา ตั้งผิดแล้วแก้ไม่ได้
+          <br><b>ลบเกม</b> ทำไม่ได้ตามกฎข้อ 1 — ใช้สถานะ "รุ่นทดสอบ" เพื่อซ่อนจากแคตตาล็อกแทน
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- กล่องข้อความ ---------- -->
+    <section class="panel hidden" id="panel-inbox">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <h2 style="margin:0;font-size:18px">ข้อความจากผู้ใช้</h2>
+          <span class="sp" style="flex:1"></span>
+          <div class="chiprow" id="inbox-filter">
+            <button class="chip" data-st="new"  aria-pressed="true">ใหม่</button>
+            <button class="chip" data-st="seen" aria-pressed="false">อ่านแล้ว</button>
+            <button class="chip" data-st="done" aria-pressed="false">จัดการแล้ว</button>
+            <button class="chip" data-st="spam" aria-pressed="false">สแปม</button>
+            <button class="chip" data-st="all"  aria-pressed="false">ทั้งหมด</button>
+          </div>
+        </div>
+        <div id="inbox-list"><span class="loading"></span> กำลังโหลด…</div>
+      </div>
+    </section>
+
+    <!-- ---------- ช่องทางติดต่อ ---------- -->
+    <section class="panel hidden" id="panel-contact">
+      <div class="card">
+        <h2 style="margin:0 0 4px;font-size:18px">ช่องทางติดต่อและค่าอื่น ๆ</h2>
+        <div class="muted small" style="margin-bottom:14px">
+          อีเมลนี้ใช้เป็นช่องทางสำรองของหน้าติดต่อ เมื่อระบบรับข้อความอัตโนมัติมีปัญหา
+        </div>
+        <div id="contact-fields"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/gp-core.js"></script>
+<script src="js/gp-brand.js"></script>
+<script>
+(function () {
+  const C = window.GP_CONFIG, G = window.GP;
+  const $ = (id) => document.getElementById(id);
+
+  $('brand-th').textContent = C.BRAND_TH;
+
+  /* ============ นิยามช่องตั้งค่า — เพิ่มค่าใหม่ = เพิ่ม 1 บรรทัด ============ */
+  const FIELDS = {
+    brand: [
+      { key: 'site_logo_url', label: 'โลโก้บนหัวเว็บ', type: 'image',
+        hint: 'แนะนำ PNG พื้นหลังโปร่งใส สูงอย่างน้อย 120px · แสดงผลที่ความสูง 30px' },
+      { key: 'site_favicon_url', label: 'ไอคอนแท็บเบราว์เซอร์ (favicon)', type: 'image',
+        hint: 'รูปสี่เหลี่ยมจัตุรัส 32–512px · ควรเป็นแบบย่อของโลโก้ที่ยังดูออกตอนเล็ก' },
+      { key: 'hero_headline', label: 'พาดหัวหน้าแรก', type: 'text',
+        hint: 'เว้นว่าง = ใช้ข้อความมาตรฐาน "มีโค้ดห้องเรียนจากคุณครูแล้วใช่ไหม? ใส่ตรงนี้เลย"' },
+      { key: 'featured_min_games', label: 'แถบ "เกมแนะนำ" โผล่เมื่อมีกี่เกม', type: 'text',
+        hint: 'เว้นว่าง = 5 · ใส่ 1 ถ้าอยากให้โผล่ตั้งแต่ตอนนี้' },
+    ],
+    announce: [
+      { key: 'site_announcement', label: 'ข้อความประกาศ', type: 'textarea',
+        hint: 'เช่น "ปิดปรับปรุงระบบ 20 ส.ค. 22:00–23:00 น." · เว้นว่าง = ไม่แสดงแถบ' },
+    ],
+    support: [
+      { key: 'support_qr_url', label: 'รูป QR สำหรับรับการสนับสนุน', type: 'image',
+        hint: 'บันทึก QR จากแอปธนาคารเป็นรูป แล้วอัปโหลดที่นี่' },
+      { key: 'support_promptpay', label: 'เบอร์/เลขพร้อมเพย์', type: 'text' },
+      { key: 'support_text', label: 'ข้อความใต้ QR', type: 'text' },
+      { key: 'support_bank_note', label: 'ชื่อบัญชี / หมายเหตุเพิ่มเติม', type: 'text' },
+    ],
+    contact: [
+      { key: 'contact_email', label: 'อีเมลผู้ดูแล', type: 'text' },
+      { key: 'contact_line', label: 'ไลน์ไอดี หรือลิงก์กลุ่มไลน์', type: 'text' },
+      { key: 'contact_facebook', label: 'ลิงก์เพจเฟซบุ๊ก', type: 'text' },
+    ],
+  };
+
+  const STATUS_TH = { published: 'เปิดใช้งาน', maintenance: 'ปิดปรับปรุง', testing: 'รุ่นทดสอบ' };
+  const KIND_TH = { question: '❓ สอบถาม', bug: '🐛 บัค', idea: '💡 เสนอแนะ', other: '✉️ อื่น ๆ' };
+  const FB_STATUS_TH = { new: 'ใหม่', seen: 'อ่านแล้ว', done: 'จัดการแล้ว', spam: 'สแปม' };
+
+  let settings = {}, games = [], inboxStatus = 'new';
+
+  /* ============ เข้าสู่ระบบ ============ */
+  function gateErr(m) { const b = $('gate-err'); b.textContent = m || ''; b.classList.toggle('on', !!m); }
+
+  $('login').addEventListener('click', () => G.loginGoogle('/admin.html'));
+  $('logout').addEventListener('click', () => { G.logout(); location.reload(); });
+
+  async function boot() {
+    G.captureOAuthReturn();
+    G.loadSess();
+    if (!(await G.ensure())) return;
+
+    const uid = G.session() && G.session().user_id;
+    if (!uid) return;
+
+    let me;
+    try {
+      const rows = await G.get('/rest/v1/teachers?id=eq.' + uid + '&select=email,display_name,role');
+      me = rows && rows[0];
+    } catch (e) { gateErr('ตรวจสิทธิ์ไม่สำเร็จ: ' + e.message); return; }
+
+    if (!me) { gateErr('ไม่พบบัญชีนี้ในระบบ — ลองเข้า Dashboard ครูหนึ่งครั้งก่อน แล้วกลับมาใหม่'); return; }
+    if (me.role !== 'admin') {
+      gateErr('บัญชี ' + (me.email || '') + ' ยังไม่มีสิทธิ์ผู้ดูแลระบบ — '
+        + 'เพิ่มอีเมลนี้ในตาราง admin_emails แล้วเข้าสู่ระบบใหม่');
+      return;
+    }
+
+    $('who').textContent = me.email || me.display_name || 'ผู้ดูแล';
+    $('gate').classList.add('hidden');
+    $('logout').classList.remove('hidden');
+    $('app').classList.remove('hidden');
+    await Promise.all([loadSettings(), loadGames(), loadInbox()]);
+  }
+
+  function showErr(m) { const b = $('err'); b.textContent = m || ''; b.classList.toggle('on', !!m); }
+  let toastT = null;
+  function toast() {
+    $('saved').classList.remove('hidden');
+    clearTimeout(toastT);
+    toastT = setTimeout(() => $('saved').classList.add('hidden'), 1600);
+  }
+
+  /* ============ ค่าตั้งค่า ============ */
+  async function loadSettings() {
+    const rows = await G.get('/rest/v1/site_settings?select=key,value,note&order=key');
+    settings = {};
+    (rows || []).forEach((r) => { settings[r.key] = r.value || ''; });
+    renderFields('brand-fields', FIELDS.brand);
+    renderFields('announce-fields', FIELDS.announce);
+    renderFields('support-fields', FIELDS.support);
+    renderFields('contact-fields', FIELDS.contact);
+    renderQrPreview();
+  }
+
+  function renderFields(slotId, list) {
+    $(slotId).innerHTML = list.map(function (f) {
+      const v = settings[f.key] || '';
+      let input;
+      if (f.type === 'textarea') {
+        input = '<textarea data-key="' + f.key + '">' + G.esc(v) + '</textarea>';
+      } else {
+        input = '<input type="text" data-key="' + f.key + '" value="' + G.esc(v) + '"'
+          + (f.type === 'image' ? ' placeholder="วาง URL รูป หรือกดอัปโหลดด้านล่าง"' : '') + '>';
+      }
+      return '<div style="padding:12px 0;border-top:1px solid var(--grid)">'
+        + '<label class="f" style="margin-top:0;font-weight:600;color:var(--ink)">' + G.esc(f.label) + '</label>'
+        + input
+        + (f.hint ? '<div class="form-hint">' + f.hint + '</div>' : '')
+        + (f.type === 'image'
+            ? '<div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap">'
+              + '<label class="btn btn-sm" style="cursor:pointer">📤 อัปโหลดรูป'
+              + '<input type="file" accept="image/*" data-upload="' + f.key + '" style="display:none"></label>'
+              + (v ? '<img src="' + G.esc(v) + '" alt="" style="height:38px;width:auto;'
+                     + 'border:1px solid var(--border);border-radius:8px;background:#fff;padding:3px">' : '')
+              + '<span class="muted small" data-upstat="' + f.key + '"></span>'
+              + '</div>'
+            : '')
+        + '</div>';
+    }).join('');
+  }
+
+  /* บันทึกเมื่อออกจากช่อง — ไม่ต้องกดปุ่มบันทึก ลดโอกาสลืม */
+  document.addEventListener('change', async function (ev) {
+    const el = ev.target.closest('[data-key]');
+    if (!el) return;
+    const key = el.getAttribute('data-key');
+    const val = el.value.trim();
+    if ((settings[key] || '') === val) return;
+    try {
+      await saveSetting(key, val);
+      settings[key] = val;
+      toast();
+      if (key.indexOf('support_') === 0) renderQrPreview();
+    } catch (e) { showErr('บันทึก "' + key + '" ไม่สำเร็จ: ' + e.message); }
+  });
+
+  async function saveSetting(key, val) {
+    showErr('');
+    await G.api('/rest/v1/site_settings?key=eq.' + encodeURIComponent(key), {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ value: val === '' ? null : val, updated_at: new Date().toISOString() }),
+    });
+  }
+
+  /* ============ อัปโหลดรูปขึ้น Supabase Storage ============ */
+  document.addEventListener('change', async function (ev) {
+    const inp = ev.target.closest('[data-upload]');
+    if (!inp || !inp.files || !inp.files[0]) return;
+    const key = inp.getAttribute('data-upload');
+    const file = inp.files[0];
+    const stat = document.querySelector('[data-upstat="' + key + '"]');
+
+    if (file.size > 3 * 1024 * 1024) {
+      if (stat) stat.textContent = 'ไฟล์ใหญ่เกิน 3MB — ย่อรูปก่อนอัปโหลด';
+      return;
+    }
+    if (stat) stat.textContent = 'กำลังอัปโหลด…';
+
+    /* ชื่อไฟล์ใส่เวลาไว้ด้วย เพื่อให้เบราว์เซอร์ไม่ติดแคชรูปเก่า */
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const path = key + '-' + Date.now() + '.' + ext;
+    const sess = G.session();
+
+    try {
+      const r = await fetch(C.SB_URL + '/storage/v1/object/brand/' + path, {
+        method: 'POST',
+        headers: {
+          apikey: C.SB_ANON,
+          Authorization: 'Bearer ' + (sess && sess.access_token),
+          'Content-Type': file.type || 'application/octet-stream',
+          'x-upsert': 'true',
+        },
+        body: file,
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(r.status + ' ' + t.slice(0, 160));
+      }
+      const url = C.SB_URL + '/storage/v1/object/public/brand/' + path;
+      await saveSetting(key, url);
+      settings[key] = url;
+      const field = document.querySelector('[data-key="' + key + '"]');
+      if (field) field.value = url;
+      if (stat) stat.textContent = '';
+      /* วาดใหม่เพื่อให้รูปตัวอย่างอัปเดต */
+      loadSettings();
+      toast();
+    } catch (e) {
+      if (stat) stat.textContent = '';
+      showErr('อัปโหลดไม่สำเร็จ: ' + e.message
+        + ' — ถ้ายังไม่ได้สร้างที่เก็บรูป ให้รัน 22_ADMIN_SETUP.sql ส่วนที่ 4 '
+        + 'หรือใช้วิธีวาง URL รูปเองแทน');
+    } finally { inp.value = ''; }
+  });
+
+  function renderQrPreview() {
+    const qr = settings.support_qr_url;
+    $('qr-preview').innerHTML = qr
+      ? '<img src="' + G.esc(qr) + '" alt="" style="width:100%;max-width:230px;border-radius:14px;'
+        + 'border:1px solid var(--border)">'
+        + '<div class="muted small" style="margin-top:10px">' + G.esc(settings.support_text || '') + '</div>'
+        + (settings.support_promptpay ? '<div class="joinkey" style="margin-top:6px">'
+            + G.esc(settings.support_promptpay) + '</div>' : '')
+        + (settings.support_bank_note ? '<div class="muted small">' + G.esc(settings.support_bank_note) + '</div>' : '')
+      : '<div class="muted small" style="padding:30px 0">ยังไม่ได้ตั้งค่า QR — อัปโหลดรูปทางซ้าย</div>';
+  }
+
+  /* ============ ทะเบียนเกม ============ */
+  async function loadGames() {
+    games = await G.get('/rest/v1/games?select=id,code,name,status,is_featured,sort_order,launch_url&order=sort_order,name')
+      .catch(async function () {
+        /* ยังไม่ได้รัน 14_GAME_FILTERS.sql → ยังไม่มีคอลัมน์ is_featured/sort_order */
+        const rows = await G.get('/rest/v1/games?select=id,code,name,status,launch_url&order=name');
+        return rows.map((g) => Object.assign({ is_featured: null, sort_order: null }, g));
+      });
+    renderGames();
+  }
+
+  function renderGames() {
+    const noFilters = games.length && games[0].is_featured === null;
+    $('games-table').innerHTML =
+      '<thead><tr><th>เกม</th><th>สถานะ</th><th style="text-align:center">แนะนำ</th>'
+      + '<th style="text-align:center">ลำดับ</th><th></th></tr></thead><tbody>'
+      + games.map(function (g) {
+          return '<tr>'
+            + '<td><b>' + G.esc(g.name) + '</b><div class="muted small">' + G.esc(g.code) + '</div></td>'
+            + '<td><select data-game="' + g.id + '" data-field="status" style="width:auto;min-width:130px">'
+            +   Object.keys(STATUS_TH).map((s) => '<option value="' + s + '"'
+                  + (g.status === s ? ' selected' : '') + '>' + STATUS_TH[s] + '</option>').join('')
+            + '</select></td>'
+            + '<td style="text-align:center">'
+            +   (noFilters ? '<span class="muted small">—</span>'
+                : '<label class="switch"><input type="checkbox" data-game="' + g.id + '" data-field="is_featured"'
+                  + (g.is_featured ? ' checked' : '') + '><i></i></label>')
+            + '</td>'
+            + '<td style="text-align:center">'
+            +   (noFilters ? '<span class="muted small">—</span>'
+                : '<input type="text" inputmode="numeric" data-game="' + g.id + '" data-field="sort_order"'
+                  + ' value="' + (g.sort_order == null ? '' : g.sort_order) + '"'
+                  + ' style="width:64px;text-align:center">')
+            + '</td>'
+            + '<td>' + (g.launch_url
+                ? '<a class="btn btn-sm" href="' + G.esc(g.launch_url) + '" target="_blank" rel="noopener">เปิด</a>'
+                : '') + '</td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody>';
+
+    /* วาดใหม่ได้หลายครั้ง — ต้องไม่ให้ข้อความซ้อนกันเพิ่มขึ้นเรื่อย ๆ */
+    const old = document.getElementById('games-note');
+    if (old) old.remove();
+    if (noFilters) {
+      $('games-table').insertAdjacentHTML('afterend',
+        '<div class="panel-note" id="games-note">ปักเกมแนะนำและจัดลำดับได้หลังรัน '
+        + '<code>14_GAME_FILTERS.sql</code></div>');
+    }
+  }
+
+  document.addEventListener('change', async function (ev) {
+    const el = ev.target.closest('[data-game]');
+    if (!el) return;
+    const id = el.getAttribute('data-game'), field = el.getAttribute('data-field');
+    let val;
+    if (field === 'is_featured') val = el.checked;
+    else if (field === 'sort_order') { val = parseInt(el.value, 10); if (isNaN(val)) val = 0; el.value = val; }
+    else val = el.value;
+
+    const body = {}; body[field] = val;
+    try {
+      showErr('');
+      await G.api('/rest/v1/games?id=eq.' + id, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
+      const g = games.find((x) => x.id === id); if (g) g[field] = val;
+      toast();
+    } catch (e) {
+      showErr('บันทึกไม่สำเร็จ: ' + e.message
+        + ' — ถ้าขึ้นว่าไม่มีสิทธิ์ ให้รัน 22_ADMIN_SETUP.sql ส่วนที่ 3');
+      loadGames();
+    }
+  });
+
+  /* ============ กล่องข้อความ ============ */
+  async function loadInbox() {
+    const q = inboxStatus === 'all' ? '' : '&status=eq.' + inboxStatus;
+    let rows;
+    try {
+      rows = await G.get('/rest/v1/feedback?select=id,created_at,kind,message,name,contact,status,game_id'
+        + q + '&order=created_at.desc&limit=100');
+    } catch (e) {
+      $('inbox-list').innerHTML = '<div class="warn-note">ยังไม่ได้เปิดระบบรับข้อความ — '
+        + 'รัน <code>15_SITE_PAGES.sql</code> ใน Supabase</div>';
+      return;
+    }
+
+    try {
+      const n = await G.countRows('/rest/v1/feedback?status=eq.new');
+      $('inbox-badge').textContent = n ? ' (' + n + ')' : '';
+    } catch (e) {}
+
+    if (!rows.length) {
+      $('inbox-list').innerHTML = '<div class="muted" style="padding:20px 0">ไม่มีข้อความในหมวดนี้</div>';
+      return;
+    }
+
+    $('inbox-list').innerHTML = rows.map(function (f) {
+      return '<div class="card" style="margin-bottom:10px">'
+        + '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">'
+        +   '<b>' + (KIND_TH[f.kind] || f.kind) + '</b>'
+        +   '<span class="muted small">' + G.timeAgo(f.created_at) + '</span>'
+        +   '<span class="sp" style="flex:1"></span>'
+        +   '<span class="badge">' + (FB_STATUS_TH[f.status] || f.status) + '</span>'
+        + '</div>'
+        + '<div style="margin:8px 0;white-space:pre-wrap">' + G.esc(f.message) + '</div>'
+        + '<div class="muted small">'
+        +   (f.name ? 'จาก: ' + G.esc(f.name) + ' · ' : '')
+        +   (f.contact ? 'ติดต่อกลับ: <b>' + G.esc(f.contact) + '</b>' : 'ไม่ได้ทิ้งช่องทางติดต่อไว้')
+        + '</div>'
+        + '<div class="game-actions" style="margin-top:10px">'
+        +   ['seen', 'done', 'spam'].filter((s) => s !== f.status)
+              .map((s) => '<button class="btn btn-sm" data-fb="' + f.id + '" data-st="' + s + '">'
+                + 'ทำเป็น' + FB_STATUS_TH[s] + '</button>').join('')
+        +   (f.contact && /@/.test(f.contact)
+              ? '<a class="btn btn-sm" href="mailto:' + G.esc(f.contact)
+                + '?subject=' + encodeURIComponent('[เกมเพลิน] ตอบกลับข้อความของคุณ') + '">📧 ตอบกลับ</a>'
+              : '')
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  $('inbox-filter').addEventListener('click', function (ev) {
+    const b = ev.target.closest('.chip[data-st]');
+    if (!b) return;
+    inboxStatus = b.getAttribute('data-st');
+    Array.prototype.forEach.call(this.querySelectorAll('.chip'), function (c) {
+      c.setAttribute('aria-pressed', c === b ? 'true' : 'false');
+    });
+    $('inbox-list').innerHTML = '<span class="loading"></span> กำลังโหลด…';
+    loadInbox();
+  });
+
+  document.addEventListener('click', async function (ev) {
+    const b = ev.target.closest('[data-fb]');
+    if (!b) return;
+    try {
+      showErr('');
+      await G.api('/rest/v1/feedback?id=eq.' + b.getAttribute('data-fb'), {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ status: b.getAttribute('data-st') }) });
+      toast();
+      loadInbox();
+    } catch (e) { showErr('อัปเดตไม่สำเร็จ: ' + e.message); }
+  });
+
+  /* ============ แท็บ ============ */
+  document.querySelector('.tabs').addEventListener('click', function (ev) {
+    const t = ev.target.closest('.tab');
+    if (!t) return;
+    const name = t.getAttribute('data-tab');
+    Array.prototype.forEach.call(this.querySelectorAll('.tab'), function (x) {
+      x.setAttribute('aria-selected', x === t ? 'true' : 'false');
+    });
+    ['brand', 'support', 'games', 'inbox', 'contact'].forEach(function (p) {
+      $('panel-' + p).classList.toggle('hidden', p !== name);
+    });
+  });
+
+  boot().catch(function (e) { gateErr('เกิดข้อผิดพลาด: ' + e.message); });
+})();
+</script>
+</body>
+</html>

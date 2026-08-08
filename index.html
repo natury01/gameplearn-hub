@@ -141,6 +141,7 @@
       <b>ช่วยเหลือ</b>
       <a href="contact.html">ติดต่อ / แจ้งบัค</a>
       <a href="contact.html#faq">คำถามที่พบบ่อย</a>
+      <a href="admin.html">ผู้ดูแลระบบ</a>
     </div>
     <div class="col">
       <b>อ้างอิงหลักสูตร</b>
@@ -152,6 +153,7 @@
 
 <script src="js/config.js"></script>
 <script src="js/gp-core.js"></script>
+<script src="js/gp-brand.js"></script>
 <script src="js/gp-catalog.js"></script>
 <script src="js/gp-standards-panel.js"></script>
 <script>
@@ -287,7 +289,10 @@
   function renderFeatured() {
     /* มีเกมน้อย → ไม่ต้องมีแถบแยก เพราะจะซ้ำกับ "เกมทั้งหมด" ที่อยู่ถัดลงไปทันที
        (เกมที่ปักหมุดยังขึ้นก่อนพร้อมป้าย ⭐ ในแคตตาล็อกอยู่ดี) */
-    const minGames = C.FEATURED_MIN_GAMES == null ? 5 : C.FEATURED_MIN_GAMES;
+    /* ค่าจากหน้า Admin มาก่อน ถ้าไม่ได้ตั้งไว้จึงใช้ค่าใน config.js */
+    const fromAdmin = parseInt((window.GP_SETTINGS || {}).featured_min_games, 10);
+    const minGames = !isNaN(fromAdmin) ? fromAdmin
+      : (C.FEATURED_MIN_GAMES == null ? 5 : C.FEATURED_MIN_GAMES);
     if (ALL.length < minGames) { $('featured').innerHTML = ''; return; }
 
     const feat = ALL.filter((g) => g.is_featured && g.playable);
@@ -304,7 +309,12 @@
   }
 
   /* ================= โหลดข้อมูล ================= */
-  K.loadCatalog().then(function (res) {
+  Promise.all([
+    K.loadCatalog(),
+    /* รอค่าตั้งค่าจากหน้า Admin ก่อนวาด — กันแถบ "เกมแนะนำ" กะพริบเพราะใช้ค่าเก่าไปก่อน */
+    window.GP_SETTINGS_READY || Promise.resolve({}),
+  ]).then(function (r) {
+    const res = r[0];
     ALL = res.rows; SOURCE = res.source;
     FILTERS = K.buildFilters(ALL);
     renderSortOptions();

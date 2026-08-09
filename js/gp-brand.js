@@ -1,7 +1,10 @@
-/* เกมเพลิน — แบรนด์และประกาศบนหัวเว็บ (อ่านจาก site_settings)
- * เวอร์ชัน 1.0 · 2026-08-08
+/* เกมเพลิน — แบรนด์ ธีม และประกาศบนหัวเว็บ (อ่านจาก site_settings)
+ * เวอร์ชัน 1.1 · 2026-08-09
  *
- * ทำ 3 อย่าง โดยไม่ต้องแก้โค้ดเว็บเวลาเปลี่ยนโลโก้:
+ * ทำ 6 อย่าง โดยไม่ต้องแก้โค้ดเว็บ:
+ *   0. ธีม สว่าง/มืด + สกินสี      ← site_settings.site_theme / site_skin
+ *      + ปุ่มสลับบนหัวเว็บ (ผู้ใช้เลือกเองได้ ทับค่ากลาง)
+ *   0ก. โลโก้สำหรับโหมดมืดแยกไฟล์  ← site_settings.site_logo_dark_url
  *   1. เปลี่ยนโลโก้บนหัวเว็บ  ← site_settings.site_logo_url
  *   2. เปลี่ยนไอคอนแท็บ       ← site_settings.site_favicon_url
  *   3. แสดงแถบประกาศบนสุด     ← site_settings.site_announcement
@@ -28,8 +31,74 @@
     try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), v: v })); } catch (e) {}
   }
 
+  /* ============ ธีม ============
+     ลำดับความสำคัญ: ผู้ใช้เลือกเอง > ค่ากลางจากหน้า Admin > light + playful
+     เก็บทั้งหมดในคีย์เดียว 'gp_theme' = {m,s = ผู้ใช้เลือก · dm,ds = ค่ากลาง} */
+  var THEME_KEY = 'gp_theme';
+  function themeState() {
+    try { return JSON.parse(localStorage.getItem(THEME_KEY) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function saveTheme(t) {
+    try { localStorage.setItem(THEME_KEY, JSON.stringify(t)); } catch (e) {}
+  }
+  function paintTheme() {
+    var t = themeState(), d = document.documentElement;
+    d.dataset.theme = t.m || t.dm || 'light';
+    d.dataset.skin = t.s || t.ds || 'playful';
+    var b = document.getElementById('gp-theme-btn');
+    if (b) {
+      var dark = d.dataset.theme === 'dark';
+      b.textContent = dark ? '☀️' : '🌙';
+      b.title = dark ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด';
+      b.setAttribute('aria-label', b.title);
+    }
+    logoForTheme();
+  }
+
+  /* ปุ่มสลับสว่าง/มืด — ใส่ให้เองทุกหน้าที่มีแถบหัวเว็บ ไม่ต้องแก้ HTML ทีละหน้า */
+  function addThemeButton() {
+    if (document.getElementById('gp-theme-btn')) return;
+    var bar = document.querySelector('.topbar');
+    if (!bar) return;
+    var b = document.createElement('button');
+    b.id = 'gp-theme-btn';
+    b.type = 'button';
+    b.className = 'theme-btn';
+    b.addEventListener('click', function () {
+      var t = themeState();
+      var now = document.documentElement.dataset.theme;
+      t.m = (now === 'dark') ? 'light' : 'dark';   /* ผู้ใช้เลือกเอง = ทับค่ากลาง */
+      saveTheme(t);
+      paintTheme();
+    });
+    var last = bar.querySelector('.btn-primary');
+    if (last) bar.insertBefore(b, last); else bar.appendChild(b);
+  }
+
+  /* โลโก้แยกตามโหมด — โลโก้สีเข้มมักจมหายบนพื้นมืด */
+  var LOGOS = {};
+  function logoForTheme() {
+    var dark = document.documentElement.dataset.theme === 'dark';
+    var url = (dark && LOGOS.dark) ? LOGOS.dark : LOGOS.light;
+    if (!url) return;
+    var imgs = document.querySelectorAll('.brand .logo img[data-gp-logo]');
+    for (var i = 0; i < imgs.length; i++) {
+      if (imgs[i].getAttribute('src') !== url) imgs[i].setAttribute('src', url);
+    }
+  }
+
   function apply(s) {
     if (!s) return;
+
+    /* 0. ธีม — เก็บค่ากลางจาก Admin ไว้ใน localStorage ให้สคริปต์ใน <head> ใช้ได้ตั้งแต่รอบหน้า
+       ไม่ทับค่าที่ผู้ใช้เลือกเอง (t.m / t.s) */
+    var t = themeState();
+    t.dm = s.site_theme || 'light';
+    t.ds = s.site_skin || 'playful';
+    saveTheme(t);
+    LOGOS.light = s.site_logo_url || '';
+    LOGOS.dark = s.site_logo_dark_url || '';
+    paintTheme();
 
     /* 1. โลโก้บนหัวเว็บ — แทนตัวอักษร ก ด้วยรูปจริง */
     if (s.site_logo_url) {
@@ -43,7 +112,9 @@
         el.style.width = 'auto';
         el.style.borderRadius = '0';
         var img = document.createElement('img');
-        img.src = s.site_logo_url;
+        img.setAttribute('data-gp-logo', '1');
+        img.src = (document.documentElement.dataset.theme === 'dark' && s.site_logo_dark_url)
+          ? s.site_logo_dark_url : s.site_logo_url;
         img.alt = C.BRAND_TH || 'เกมเพลิน';
         img.style.cssText = 'height:30px;width:auto;display:block';
         /* โหลดรูปไม่ได้ → คืนตัวอักษรเดิม ไม่ปล่อยหัวเว็บว่าง */
@@ -110,6 +181,8 @@
 
   function finish(s) {
     window.GP_SETTINGS = s || {};
+    addThemeButton();      /* ต้องมีปุ่มเสมอ แม้โหลดค่ากลางไม่สำเร็จ */
+    paintTheme();
     apply(window.GP_SETTINGS);
     ready(window.GP_SETTINGS);
   }
@@ -118,7 +191,8 @@
     var c = cached();
     if (c) { finish(c); return; }
     G.get('/rest/v1/site_settings?select=key,value'
-        + '&key=in.(site_logo_url,site_favicon_url,site_announcement,hero_headline,featured_min_games)')
+        + '&key=in.(site_logo_url,site_logo_dark_url,site_favicon_url,site_announcement,'
+        + 'hero_headline,featured_min_games,site_theme,site_skin)')
       .then(function (rows) {
         var s = {};
         (rows || []).forEach(function (r) { if (r.value) s[r.key] = r.value; });

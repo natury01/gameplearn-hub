@@ -4,6 +4,13 @@
  *   เด็ก ป.4 กดถูก · ครูกล้าเปิดในห้องประชุม
  * โทเคนสีข้อมูล (accent/good/warning/critical) ตามมาตรฐาน dataviz — ห้ามใช้สีแบรนด์แทนสีข้อมูล
  */
+/* ============================================================
+   ธีม — คุมด้วย 2 อย่างที่แยกจากกัน
+     data-theme = light | dark | auto   (โหมดสว่าง/มืด)
+     data-skin  = playful | soft | contrast   (บุคลิกของสี)
+   ค่าเริ่มต้น: light + playful
+   ตั้งค่ากลางได้จากหน้า Admin · ผู้ใช้กดสลับเองได้จากปุ่มบนหัวเว็บ
+   ============================================================ */
 :root {
   color-scheme: light;
   --page: #f9f9f7;
@@ -22,6 +29,8 @@
   --warning: #fab219;
   --critical: #d03b3b;
   --shadow: 0 1px 2px rgba(11, 11, 11, 0.05);
+  --base-size: 15.5px;
+  --border-w: 1px;
 
   /* --- สีแบรนด์ (ใช้เป็นสีตกแต่ง/หมวดหมู่เท่านั้น ไม่ใช้กับกราฟ) --- */
   --brand-blue: #2a78d6;
@@ -40,8 +49,92 @@
   --r-xl: 26px;
   --lift: 0 6px 18px rgba(11, 11, 11, 0.08);
 }
+/* ---------- สกิน ข · นุ่มตา (Soft) — สีอ่อนลง มุมมนขึ้น เหมาะกับการใช้งานนาน ---------- */
+[data-skin="soft"] {
+  --page: #f5f7fb;
+  --surface: #ffffff;
+  --ink: #1b2230;
+  --ink-2: #5a657a;
+  --muted: #93a0b5;
+  --grid: #e6ecf5;
+  --baseline: #c6d2e3;
+  --border: rgba(27, 34, 48, 0.09);
+  --accent: #4a89dc;
+  --accent-strong: #2f66b0;
+  --meter-track: #dbe8fa;
+  --brand-blue: #4a89dc;
+  --brand-orange: #f08b62;
+  --brand-teal: #4ec5a0;
+  --brand-yellow: #f2c25c;
+  --tint-blue: #eaf1fc;
+  --tint-orange: #fdf0ea;
+  --tint-teal: #e9f8f3;
+  --tint-yellow: #fdf6e6;
+  --r-sm: 11px; --r-md: 17px; --r-lg: 24px; --r-xl: 30px;
+  --shadow: 0 1px 3px rgba(27, 34, 48, 0.05);
+}
+
+/* ---------- สกิน ค · คมชัด (Contrast) — เน้นอ่านง่าย เหมาะกับโปรเจกเตอร์เก่าและสายตาไม่ดี ---------- */
+[data-skin="contrast"] {
+  --page: #ffffff;
+  --surface: #ffffff;
+  --ink: #000000;
+  --ink-2: #2c2c2c;
+  --muted: #5a5a5a;          /* ผ่าน AA บนพื้นขาว (4.5:1) */
+  --grid: #c9c9c9;
+  --baseline: #767676;
+  --border: rgba(0, 0, 0, 0.42);
+  --accent: #14539e;          /* เข้มพอให้ตัวอักษรสีขาวบนปุ่มผ่าน AA */
+  --accent-strong: #0d3d78;
+  --meter-track: #d6e4f5;
+  --good-text: #005c00;
+  --critical: #b3261e;
+  --brand-orange: #b5410f;    /* ส้มเข้มขึ้นให้อ่านออกบนพื้นขาว */
+  --tint-blue: #eaf1fa;
+  --tint-orange: #fbeee7;
+  --tint-teal: #e6f5ef;
+  --tint-yellow: #fbf2dd;
+  --base-size: 16.5px;
+  --border-w: 2px;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px;
+  --shadow: none;
+}
+
+/* ---------- โหมดมืด ---------- */
+/* ใช้กับทุกสกิน — คงสีเน้นของสกินนั้นไว้ เปลี่ยนแค่พื้นหลังและตัวอักษร */
+[data-theme="dark"],
+[data-theme="auto"] {
+  --dark-page: #0d0d0d;
+  --dark-surface: #1a1a19;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --accent: #3987e5;
+  --accent-strong: #6da7ec;
+  --meter-track: #184f95;
+  --good-text: #0ca30c;
+  --shadow: none;
+  --brand-blue: #5b9bea;
+  --brand-orange: #f08256;
+  --brand-teal: #35c391;
+  --brand-yellow: #f0b840;
+  --tint-blue: #16283f;
+  --tint-orange: #3a2118;
+  --tint-teal: #123026;
+  --tint-yellow: #33260c;
+  --lift: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+/* auto = ตามเครื่องของผู้ใช้ */
 @media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) {
+  [data-theme="auto"] {
     color-scheme: dark;
     --page: #0d0d0d;
     --surface: #1a1a19;
@@ -62,7 +155,7 @@
     --brand-yellow: #f0b840;
     --tint-blue: #16283f;
     --tint-orange: #3a2118;
-    --tint-teal: #12302633;
+    --tint-teal: #123026;
     --tint-yellow: #33260c;
     --lift: 0 6px 18px rgba(0, 0, 0, 0.5);
   }
@@ -74,7 +167,7 @@ body {
   background: var(--page);
   color: var(--ink);
   font-family: system-ui, -apple-system, "Segoe UI", "Sarabun", "Noto Sans Thai", sans-serif;
-  font-size: 15.5px;
+  font-size: var(--base-size);
   line-height: 1.55;
 }
 a { color: var(--accent-strong); text-decoration: none; }
@@ -112,7 +205,7 @@ a:hover { text-decoration: underline; }
 /* ---------- ปุ่ม ---------- */
 .btn {
   display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
-  border: 1px solid var(--border); border-radius: var(--r-sm);
+  border: var(--border-w) solid var(--border); border-radius: var(--r-sm);
   background: var(--surface); color: var(--ink);
   padding: 8px 14px; font-size: 14.5px; font-family: inherit;
   transition: transform .12s ease, background .12s ease, border-color .12s ease;
@@ -130,7 +223,7 @@ a:hover { text-decoration: underline; }
 
 /* ---------- การ์ด/กริด ---------- */
 .card {
-  background: var(--surface); border: 1px solid var(--border);
+  background: var(--surface); border: var(--border-w) solid var(--border);
   border-radius: var(--r-md); padding: 18px; box-shadow: var(--shadow);
 }
 .grid { display: grid; gap: 14px; }
@@ -192,7 +285,7 @@ table.gol td.num { font-variant-numeric: tabular-nums; text-align: right; }
 /* ---------- ฟอร์ม ---------- */
 input[type=text], input[type=password], input[type=email], select, textarea {
   font-family: inherit; font-size: 14.5px; color: var(--ink);
-  background: var(--surface); border: 1px solid var(--baseline); border-radius: var(--r-sm);
+  background: var(--surface); border: var(--border-w) solid var(--baseline); border-radius: var(--r-sm);
   padding: 8px 11px; width: 100%;
 }
 textarea { min-height: 92px; resize: vertical; }
@@ -282,7 +375,7 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
 .chiprow { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
 .chip {
   cursor: pointer; font-family: inherit; font-size: 13px;
-  border: 1px solid var(--border); background: var(--page); color: var(--ink-2);
+  border: var(--border-w) solid var(--border); background: var(--page); color: var(--ink-2);
   border-radius: 999px; padding: 4px 12px; display: inline-flex; align-items: center; gap: 5px;
   transition: background .12s, color .12s, border-color .12s;
 }
@@ -414,3 +507,12 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
   * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
   .gcard:hover { transform: none; }
 }
+
+/* ---------- ปุ่มสลับโหมดสว่าง/มืด บนหัวเว็บ ---------- */
+.theme-btn {
+  border: var(--border-w) solid var(--border); background: var(--surface); color: var(--ink);
+  border-radius: 999px; width: 38px; height: 38px; flex: none; cursor: pointer;
+  font-size: 17px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+  transition: background .12s, border-color .12s;
+}
+.theme-btn:hover { border-color: var(--baseline); background: var(--tint-blue); }

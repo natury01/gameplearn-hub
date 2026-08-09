@@ -7,6 +7,10 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#2a78d6">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>/* ตั้งธีมก่อนวาดหน้า กันจอกะพริบ · คีย์ gp_theme จองไว้ให้แพลตฟอร์ม */
+try{var _t=JSON.parse(localStorage.getItem('gp_theme')||'{}');
+var d=document.documentElement;d.dataset.theme=_t.m||_t.dm||'light';d.dataset.skin=_t.s||_t.ds||'playful';}
+catch(e){document.documentElement.dataset.theme='light';}</script>
 <link rel="stylesheet" href="css/gp.css">
 </head>
 <body>
@@ -63,6 +67,15 @@
           เปลี่ยนแล้วมีผลทุกหน้าทันที ไม่ต้องแก้โค้ดเว็บ
         </div>
         <div id="brand-fields"></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2 style="margin:0 0 4px;font-size:18px">ธีมและสีของเว็บ</h2>
+        <div class="muted small" style="margin-bottom:14px">
+          ค่าที่ตั้งตรงนี้เป็น<b>ค่าเริ่มต้นของทุกคน</b> — ผู้ใช้ยังกดปุ่ม 🌙 บนหัวเว็บ
+          เพื่อสลับสว่าง/มืดเองได้ และตัวเลือกของเขาจะถูกจำไว้
+        </div>
+        <div id="theme-fields"></div>
       </div>
 
       <div class="card" style="margin-top:14px">
@@ -152,12 +165,26 @@
     brand: [
       { key: 'site_logo_url', label: 'โลโก้บนหัวเว็บ', type: 'image',
         hint: 'แนะนำ PNG พื้นหลังโปร่งใส สูงอย่างน้อย 120px · แสดงผลที่ความสูง 30px' },
+      { key: 'site_logo_dark_url', label: 'โลโก้สำหรับโหมดมืด', type: 'image',
+        hint: 'เว้นว่าง = ใช้โลโก้เดียวกับโหมดสว่าง · ใส่เมื่อโลโก้สีเข้มจมหายบนพื้นมืด' },
       { key: 'site_favicon_url', label: 'ไอคอนแท็บเบราว์เซอร์ (favicon)', type: 'image',
         hint: 'รูปสี่เหลี่ยมจัตุรัส 32–512px · ควรเป็นแบบย่อของโลโก้ที่ยังดูออกตอนเล็ก' },
       { key: 'hero_headline', label: 'พาดหัวหน้าแรก', type: 'text',
         hint: 'เว้นว่าง = ใช้ข้อความมาตรฐาน "มีโค้ดห้องเรียนจากคุณครูแล้วใช่ไหม? ใส่ตรงนี้เลย"' },
       { key: 'featured_min_games', label: 'แถบ "เกมแนะนำ" โผล่เมื่อมีกี่เกม', type: 'text',
         hint: 'เว้นว่าง = 5 · ใส่ 1 ถ้าอยากให้โผล่ตั้งแต่ตอนนี้' },
+    ],
+    theme: [
+      { key: 'site_theme', label: 'โหมดสีเริ่มต้นของเว็บ', type: 'select',
+        options: [['light', '☀️ สว่างเสมอ (แนะนำ)'], ['dark', '🌙 มืดเสมอ'],
+                  ['auto', '🔄 ตามการตั้งค่าเครื่องของผู้ใช้']],
+        hint: 'เลือก "ตามเครื่อง" แล้วเครื่องนักเรียนที่ตั้งโหมดมืดไว้จะเห็นเว็บเป็นสีดำ '
+            + 'ซึ่งอาจไม่ตรงกับที่ครูเห็นตอนเตรียมสอน · "สว่างเสมอ" ปลอดภัยที่สุดสำหรับโปรเจกเตอร์' },
+      { key: 'site_skin', label: 'ชุดสีของเว็บ', type: 'select',
+        options: [['playful', '🎨 สนุกสดใส — สีสด มุมมน เหมาะกับเด็ก'],
+                  ['soft', '🫧 นุ่มตา — สีอ่อน สบายตา เหมาะกับใช้งานนาน'],
+                  ['contrast', '🔍 คมชัด — ตัวอักษรใหญ่ เส้นขอบหนา อ่านง่ายบนโปรเจกเตอร์เก่า']],
+        hint: 'เปลี่ยนแล้วเห็นผลทันทีในหน้านี้ ลองสลับดูได้เลย' },
     ],
     announce: [
       { key: 'site_announcement', label: 'ข้อความประกาศ', type: 'textarea',
@@ -231,6 +258,7 @@
     settings = {};
     (rows || []).forEach((r) => { settings[r.key] = r.value || ''; });
     renderFields('brand-fields', FIELDS.brand);
+    renderFields('theme-fields', FIELDS.theme);
     renderFields('announce-fields', FIELDS.announce);
     renderFields('support-fields', FIELDS.support);
     renderFields('contact-fields', FIELDS.contact);
@@ -243,6 +271,13 @@
       let input;
       if (f.type === 'textarea') {
         input = '<textarea data-key="' + f.key + '">' + G.esc(v) + '</textarea>';
+      } else if (f.type === 'select') {
+        input = '<select data-key="' + f.key + '">'
+          + f.options.map(function (o) {
+              return '<option value="' + G.esc(o[0]) + '"'
+                + ((v || f.options[0][0]) === o[0] ? ' selected' : '') + '>' + G.esc(o[1]) + '</option>';
+            }).join('')
+          + '</select>';
       } else {
         input = '<input type="text" data-key="' + f.key + '" value="' + G.esc(v) + '"'
           + (f.type === 'image' ? ' placeholder="วาง URL รูป หรือกดอัปโหลดด้านล่าง"' : '') + '>';
@@ -276,6 +311,17 @@
       settings[key] = val;
       toast();
       if (key.indexOf('support_') === 0) renderQrPreview();
+      /* ธีม/สกิน — ปรับหน้าจอให้เห็นผลทันที ไม่ต้องรีเฟรช */
+      if (key === 'site_theme' || key === 'site_skin') {
+        try {
+          const t = JSON.parse(localStorage.getItem('gp_theme') || '{}');
+          if (key === 'site_theme') { t.dm = val || 'light'; delete t.m; }
+          else { t.ds = val || 'playful'; delete t.s; }
+          localStorage.setItem('gp_theme', JSON.stringify(t));
+          document.documentElement.dataset.theme = t.m || t.dm || 'light';
+          document.documentElement.dataset.skin = t.s || t.ds || 'playful';
+        } catch (e) {}
+      }
     } catch (e) { showErr('บันทึก "' + key + '" ไม่สำเร็จ: ' + e.message); }
   });
 

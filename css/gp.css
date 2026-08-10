@@ -864,3 +864,24 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
   .lvpill, .lvbar > div, .lvkey, .meter, .meter > i, .gp-lv {
     -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ═══════════ สมรรถนะหลัก 6 ด้าน + ใบรายงานผล (43_REPORT_CARDS) ═══════════ */
+.c6wrap { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+.c6radar { flex: 0 1 340px; min-width: 260px; }
+.c6list { flex: 1 1 320px; min-width: 280px; }
+.c6row { border-top: 1px solid var(--grid); }
+.c6row:first-child { border-top: 0; }
+.c6head { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0;
+  padding: 9px 2px; font: inherit; color: inherit; cursor: pointer; text-align: left; min-height: 34px; }
+.c6head:disabled { cursor: default; }
+.c6name { flex: 0 0 176px; font-weight: 600; font-size: 13.5px; }
+.c6bar { flex: 1; height: 10px; border-radius: 6px; background: var(--meter-track); overflow: hidden; }
+.c6bar i { display: block; height: 100%; border-radius: 6px; background: var(--accent); }
+.c6bar.sm { height: 7px; }
+.c6val { flex: 0 0 46px; text-align: right; font-weight: 700; font-size: 13px; }
+.c6none { color: var(--muted); font-size: 12.5px; }
+.c6body { padding: 2px 2px 12px; }
+.c6subs { display: flex; flex-direction: column; gap: 5px; margin-bottom: 6px; }
+.c6sub { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+.c6sub > span:first-child { flex: 0 0 176px; color: var(--ink-2); }
+@media (max-width: 560px) { .c6name, .c6sub > span:first-child { flex-basis: 118px; } }

@@ -18,8 +18,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   <div class="topbar">
     <a class="brand" href="./" style="color:inherit;text-decoration:none">
-      <span class="logo">ก</span> <span id="brand-th">เกมเพลิน</span>
-      <span class="muted" style="font-weight:400;font-size:14px">ผู้ดูแลระบบ</span>
+      <span class="logo">ก</span>
+      <span class="bname"><span class="th" id="brand-th">เกมเพลิน</span><span class="en">GamePlearn · ผู้ดูแลระบบ</span></span>
     </a>
     <div class="sp"></div>
     <span class="who" id="who"></span>
@@ -75,6 +75,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           เพื่อสลับสว่าง/มืดเองได้ และตัวเลือกของเขาจะถูกจำไว้
         </div>
         <div id="theme-fields"></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2 style="margin:0 0 4px;font-size:18px">สโลแกน</h2>
+        <div class="muted small" style="margin-bottom:14px">
+          แสดงบนหัวหน้าแรกและท้ายทุกหน้า — ใส่หลายอันได้ เว็บจะสลับวนให้เอง
+        </div>
+        <div id="slogan-fields"></div>
       </div>
 
       <div class="card" style="margin-top:14px">
@@ -189,6 +197,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
                   ['creative', '💜 สร้างสรรค์ — ม่วง ทันสมัย']],
         hint: 'เปลี่ยนแล้วเห็นผลทันทีในหน้านี้ ลองสลับดูได้เลย' },
     ],
+    slogans: [
+      { key: 'site_slogans', label: 'สโลแกนของเว็บ', type: 'slogans',
+        hint: 'ใส่ได้หลายอัน — หน้าเว็บจะสลับวนให้เองทุก 7 วินาที · มีอันเดียวจะแสดงนิ่ง ๆ ไม่สลับ' },
+    ],
     announce: [
       { key: 'site_announcement', label: 'ข้อความประกาศ', type: 'textarea',
         hint: 'เช่น "ปิดปรับปรุงระบบ 20 ส.ค. 22:00–23:00 น." · เว้นว่าง = ไม่แสดงแถบ' },
@@ -198,8 +210,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         hint: 'เว้นว่าง = "ช่วยให้เกมเพลินเปิดให้โรงเรียนใช้ฟรีต่อไป"' },
       { key: 'support_lede', label: 'ข้อความใต้พาดหัว', type: 'textarea',
         hint: 'อธิบายว่าทำไมต้องขอการสนับสนุน · ขึ้นบรรทัดใหม่ได้ · เว้นว่าง = ใช้ข้อความมาตรฐาน' },
-      { key: 'support_usage_text', label: 'เงินสนับสนุนถูกใช้ทำอะไรบ้าง', type: 'textarea',
-        hint: 'กล่องล่างสุดของหน้า · ยิ่งบอกละเอียดยิ่งน่าเชื่อถือ · เว้นว่าง = ใช้ข้อความมาตรฐาน' },
+      { key: 'support_usage_headline', label: 'หัวข้อกล่องล่างสุด', type: 'text',
+        hint: 'เว้นว่าง = "การสนับสนุนของคุณช่วยต่อยอดอะไรบ้าง"' },
+      { key: 'support_usage_text', label: 'เนื้อหาในกล่องล่างสุด', type: 'textarea',
+        hint: 'รายการว่าเงินถูกใช้ทำอะไร · ขึ้นบรรทัดใหม่ได้ · ยิ่งบอกละเอียดยิ่งน่าเชื่อถือ · เว้นว่าง = ใช้ข้อความมาตรฐาน' },
       { key: 'support_qr_url', label: 'รูป QR สำหรับรับการสนับสนุน', type: 'image',
         hint: 'บันทึก QR จากแอปธนาคารเป็นรูป แล้วอัปโหลดที่นี่' },
       { key: 'support_promptpay', label: 'เบอร์/เลขพร้อมเพย์', type: 'text' },
@@ -269,17 +283,96 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     (rows || []).forEach((r) => { settings[r.key] = r.value || ''; });
     renderFields('brand-fields', FIELDS.brand);
     renderFields('theme-fields', FIELDS.theme);
+    renderFields('slogan-fields', FIELDS.slogans);
     renderFields('announce-fields', FIELDS.announce);
     renderFields('support-fields', FIELDS.support);
     renderFields('contact-fields', FIELDS.contact);
     renderQrPreview();
   }
 
+  /* ============ ตัวแก้สโลแกน (เพิ่ม/ลบได้) ============
+     เก็บลงฐานข้อมูลเป็น JSON ก้อนเดียว: [{"en":"...","th":"..."}, ...]
+     หน้าเว็บจะสลับวนให้เองถ้ามีมากกว่า 1 อัน */
+  function parseSlogans(v) {
+    if (v) { try { const p = JSON.parse(v); if (Array.isArray(p)) return p; } catch (e) {} }
+    return (C.SLOGANS || []).slice();   /* ยังไม่เคยตั้ง → ใช้ค่าใน config.js เป็นตัวตั้งต้น */
+  }
+
+  function sloganRow(i, s) {
+    return '<div class="slogan-row" data-i="' + i + '">'
+      + '<span class="slogan-no">' + (i + 1) + '</span>'
+      + '<div class="slogan-in">'
+      +   '<input type="text" data-slogan="en" value="' + G.esc((s && s.en) || '') + '"'
+      +     ' placeholder="ภาษาอังกฤษ เช่น Game On. Learn Beyond.">'
+      +   '<input type="text" data-slogan="th" value="' + G.esc((s && s.th) || '') + '"'
+      +     ' placeholder="ภาษาไทย เช่น เริ่มเกม แล้วก้าวไปไกลกว่าการเรียนรู้เดิม">'
+      + '</div>'
+      + '<button class="btn btn-sm" type="button" data-slogan-del="' + i + '" title="ลบสโลแกนนี้">🗑</button>'
+      + '</div>';
+  }
+
+  function sloganEditor(key, v) {
+    const list = parseSlogans(v);
+    return '<div id="slogan-box" data-slogan-key="' + key + '">'
+      + '<div id="slogan-rows">' + list.map(sloganRow).join('') + '</div>'
+      + '<button class="btn btn-sm" type="button" id="slogan-add" style="margin-top:8px">➕ เพิ่มสโลแกน</button>'
+      + '</div>';
+  }
+
+  function readSlogans() {
+    return Array.from(document.querySelectorAll('#slogan-rows .slogan-row')).map(function (r) {
+      return { en: r.querySelector('[data-slogan="en"]').value.trim(),
+               th: r.querySelector('[data-slogan="th"]').value.trim() };
+    }).filter(function (s) { return s.en || s.th; });
+  }
+
+  async function saveSlogans() {
+    const box = document.getElementById('slogan-box');
+    if (!box) return;
+    const key = box.getAttribute('data-slogan-key');
+    const val = JSON.stringify(readSlogans());
+    if ((settings[key] || '') === val) return;
+    try {
+      showErr('');
+      await saveSetting(key, val);
+      settings[key] = val;
+      toast();
+    } catch (e) { showErr('บันทึกสโลแกนไม่สำเร็จ: ' + e.message); }
+  }
+
+  document.addEventListener('click', function (ev) {
+    if (ev.target.closest('#slogan-add')) {
+      const rows = document.getElementById('slogan-rows');
+      rows.insertAdjacentHTML('beforeend', sloganRow(rows.children.length, null));
+      rows.lastElementChild.querySelector('input').focus();
+      return;
+    }
+    const del = ev.target.closest('[data-slogan-del]');
+    if (del) {
+      const rows = document.getElementById('slogan-rows');
+      if (rows.children.length <= 1) { showErr('ต้องเหลือสโลแกนอย่างน้อย 1 อัน'); return; }
+      del.closest('.slogan-row').remove();
+      /* เรียงเลขใหม่ให้ตรง หลังลบตรงกลาง */
+      Array.from(rows.children).forEach(function (r, i) {
+        r.setAttribute('data-i', i);
+        r.querySelector('.slogan-no').textContent = i + 1;
+        r.querySelector('[data-slogan-del]').setAttribute('data-slogan-del', i);
+      });
+      saveSlogans();
+    }
+  });
+
+  document.addEventListener('change', function (ev) {
+    if (ev.target.closest('[data-slogan]')) saveSlogans();
+  });
+
   function renderFields(slotId, list) {
     $(slotId).innerHTML = list.map(function (f) {
       const v = settings[f.key] || '';
       let input;
-      if (f.type === 'textarea') {
+      if (f.type === 'slogans') {
+        input = sloganEditor(f.key, v);
+      } else if (f.type === 'textarea') {
         input = '<textarea data-key="' + f.key + '">' + G.esc(v) + '</textarea>';
       } else if (f.type === 'select') {
         input = '<select data-key="' + f.key + '">'
@@ -419,12 +512,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   /* ============ ทะเบียนเกม ============ */
   async function loadGames() {
-    games = await G.get('/rest/v1/games?select=id,code,name,status,is_featured,sort_order,'
+    games = await G.get('/rest/v1/games?select=id,code,name,description,status,is_featured,sort_order,'
       + 'launch_url,cover_url,topic&order=sort_order,name')
       .catch(async function () {
         /* ยังไม่ได้รัน 14_GAME_FILTERS.sql → ยังไม่มีคอลัมน์ is_featured/sort_order */
-        const rows = await G.get('/rest/v1/games?select=id,code,name,status,launch_url&order=name');
-        return rows.map((g) => Object.assign({ is_featured: null, sort_order: null, cover_url: null, topic: '' }, g));
+        const rows = await G.get('/rest/v1/games?select=id,code,name,description,status,launch_url&order=name');
+        return rows.map((g) => Object.assign({ is_featured: null, sort_order: null, cover_url: null, topic: '', description: '' }, g));
       });
     renderGames();
   }
@@ -459,8 +552,20 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
                   : '')
             + '</td>'
             + '</tr>'
-            /* แถวขยาย — รูปปกและชื่อเรื่อง (ซ่อนไว้จนกดแก้ไข) */
+            /* แถวขยาย — ชื่อเกม คำอธิบาย รูปปก ชื่อเรื่อง (ซ่อนไว้จนกดแก้ไข) */
             + '<tr class="hidden" id="edit-' + g.id + '"><td colspan="5" style="background:var(--page)">'
+            +   '<div style="padding:6px 2px 0">'
+            +     '<label class="f" style="margin-top:0;font-weight:600;color:var(--ink)">ชื่อเกมที่แสดงบนเว็บ</label>'
+            +     '<div class="form-hint" style="margin:0 0 8px">'
+            +       'ชื่อนี้เก็บอยู่ในทะเบียนเกมของเว็บกลาง <b>ไม่ได้ดึงมาจากตัวเกม</b> — '
+            +       'ตัวเกมส่งมาแค่รหัส <code>' + G.esc(g.code) + '</code> เท่านั้น จึงตั้งใหม่ได้ตามใจ'
+            +     '</div>'
+            +     '<input type="text" data-game="' + g.id + '" data-field="name" value="' + G.esc(g.name || '') + '">'
+            +     '<label class="f" style="font-weight:600;color:var(--ink)">คำอธิบายสั้น</label>'
+            +     '<div class="form-hint" style="margin:0 0 8px">1–2 บรรทัดใต้ชื่อเกมบนการ์ด — บอกครูว่าเกมนี้ทำอะไร</div>'
+            +     '<textarea rows="2" data-game="' + g.id + '" data-field="description">'
+            +       G.esc(g.description || '') + '</textarea>'
+            +   '</div>'
             +   '<div class="grid cols-2" style="align-items:start;padding:6px 2px">'
             +     '<div>'
             +       '<label class="f" style="margin-top:0;font-weight:600;color:var(--ink)">รูปปกเกม</label>'
@@ -506,7 +611,17 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let val;
     if (field === 'is_featured') val = el.checked;
     else if (field === 'sort_order') { val = parseInt(el.value, 10); if (isNaN(val)) val = 0; el.value = val; }
-    else if (field === 'cover_url' || field === 'topic') val = el.value.trim() || null;
+    else if (field === 'cover_url' || field === 'topic' || field === 'description') val = el.value.trim() || null;
+    else if (field === 'name') {
+      /* ชื่อเกมว่างไม่ได้ — การ์ดจะกลายเป็นช่องเปล่าบนหน้าแรก */
+      val = el.value.trim();
+      if (!val) {
+        const g0 = games.find((x) => x.id === id);
+        el.value = (g0 && g0.name) || '';
+        showErr('ชื่อเกมเว้นว่างไม่ได้ — คืนค่าเดิมให้แล้ว');
+        return;
+      }
+    }
     else val = el.value;
 
     const body = {}; body[field] = val;

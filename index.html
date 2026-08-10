@@ -23,8 +23,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   <!-- ==================== หัวเว็บ + เมนูหลัก ==================== -->
   <div class="topbar">
     <a class="brand" href="./" style="color:inherit;text-decoration:none">
-      <span class="logo">ก</span> <span id="brand-th">เกมเพลิน</span>
-      <span class="muted" style="font-weight:400;font-size:14px">GamePlearn</span>
+      <span class="logo">ก</span>
+      <span class="bname"><span class="th" id="brand-th">เกมเพลิน</span><span class="en">GamePlearn</span></span>
     </a>
     <div class="sp"></div>
     <nav class="navlinks" aria-label="เมนูหลัก">
@@ -33,7 +33,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <a href="support.html">สนับสนุน</a>
       <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
     </nav>
-    <a class="btn btn-primary" href="teacher.html">👩‍🏫 เข้าสู่ระบบครู</a>
+    <a class="btn btn-primary" id="auth-btn" href="teacher.html">👩‍🏫 เข้าสู่ระบบครู</a>
   </div>
 
   <!-- ==================== นักเรียนมาก่อน: กรอกรหัสห้องเรียน ==================== -->
@@ -273,7 +273,23 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   function renderFilters() {
     const groups = visibleGroups();
     $('fgroups').innerHTML = groups.map(function (d) {
-      return '<div class="fgroup"><div class="flabel">' + G.esc(d.label) + '</div><div class="chiprow">'
+      const head = '<div class="fgroup"><div class="flabel">' + G.esc(d.label) + '</div>';
+
+      /* มิติที่โตตามจำนวนเกม (ชุดเกม · หัวข้อ) ใช้ Dropdown ไม่ให้หน้ายาวขึ้นเรื่อย ๆ */
+      if (d.ui === 'select') {
+        const cur = sel[d.key] || '';
+        return head + '<select class="fselect" data-dim="' + G.esc(d.key) + '"'
+          + ' aria-label="กรองตาม' + G.esc(d.label) + '">'
+          + '<option value="">ทั้งหมด (' + d.options.length + ')</option>'
+          + d.options.map(function (o) {
+              return '<option value="' + G.esc(o.value) + '"' + (cur === o.value ? ' selected' : '') + '>'
+                + G.esc(o.label) + ' (' + o.count + ')</option>';
+            }).join('')
+          + '</select></div>';
+      }
+
+      /* มิติที่จำนวนตายตัวตามหลักสูตร ใช้ชิป กดทีเดียวติด เห็นตัวเลือกทั้งหมดพร้อมกัน */
+      return head + '<div class="chiprow">'
         + d.options.map(function (o) {
             const on = sel[d.key] === o.value;
             return '<button class="chip" type="button" role="button" aria-pressed="' + (on ? 'true' : 'false') + '"'
@@ -360,6 +376,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   });
 
   /* ================= เหตุการณ์ตัวกรอง ================= */
+  /* Dropdown ของมิติที่โต (ชุดเกม · หัวข้อ) — ไม่ต้อง renderFilters ซ้ำ
+     เพราะ <select> จำค่าที่เลือกไว้เองอยู่แล้ว วาดใหม่จะทำให้โฟกัสหลุด */
+  document.addEventListener('change', function (ev) {
+    const s = ev.target.closest('.fselect[data-dim]');
+    if (!s) return;
+    sel[s.getAttribute('data-dim')] = s.value;
+    renderList();
+  });
+
   document.addEventListener('click', function (ev) {
     const chip = ev.target.closest('.chip[data-dim]');
     if (chip) {

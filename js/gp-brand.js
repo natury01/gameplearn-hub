@@ -1,7 +1,8 @@
 /* เกมเพลิน — แบรนด์ ธีม และประกาศบนหัวเว็บ (อ่านจาก site_settings)
- * เวอร์ชัน 1.1 · 2026-08-09
+ * เวอร์ชัน 1.2 · 2026-08-10
  *
- * ทำ 6 อย่าง โดยไม่ต้องแก้โค้ดเว็บ:
+ * ทำ 7 อย่าง โดยไม่ต้องแก้โค้ดเว็บ:
+ *   0ข. ปุ่ม #auth-btn สลับ "เข้าสู่ระบบครู" ↔ "ออกจากระบบ" ตามสถานะล็อกอิน
  *   0. ธีม สว่าง/มืด + สกินสี      ← site_settings.site_theme / site_skin
  *      + ปุ่มสลับบนหัวเว็บ (ผู้ใช้เลือกเองได้ ทับค่ากลาง)
  *   0ก. โลโก้สำหรับโหมดมืดแยกไฟล์  ← site_settings.site_logo_dark_url
@@ -106,6 +107,115 @@
     var sp = bar.querySelector('.sp');
     if (sp && sp.nextSibling) bar.insertBefore(wrap, sp.nextSibling);
     else bar.appendChild(wrap);
+  }
+
+  /* ============ ปุ่มเข้าสู่ระบบ / ออกจากระบบ บนหัวเว็บ ============
+     ปุ่มเดียวกัน เปลี่ยนหน้าที่ตามสถานะ:
+       ยังไม่ล็อกอิน → "เข้าสู่ระบบครู" ลิงก์ไป teacher.html (เหมือนเดิม)
+       ล็อกอินแล้ว   → "ออกจากระบบ" + ลิงก์ลัดเข้าห้องเรียนของครู
+
+     ทำที่นี่ที่เดียวเพราะทุกหน้าโหลดไฟล์นี้ — ไม่ต้องไล่แก้ทีละหน้า
+     หน้า teacher.html / admin.html มีปุ่มออกจากระบบของตัวเองอยู่แล้ว จึงข้าม */
+  async function renderAuthButton() {
+    var btn = document.getElementById('auth-btn');
+    if (!btn) return;
+    var loggedIn = false;
+    try { loggedIn = !!(await G.ensure()); } catch (e) { loggedIn = false; }
+    if (!loggedIn) return;                       /* ยังไม่ล็อกอิน = ปล่อยตามเดิม */
+
+    /* ลิงก์เข้าห้องเรียน แทรกไว้ก่อนปุ่มออกจากระบบ ไม่งั้นครูจะกลับเข้าหน้าครูไม่ได้ */
+    if (!document.getElementById('auth-home')) {
+      var go = document.createElement('a');
+      go.id = 'auth-home';
+      go.className = 'btn btn-sm';
+      go.href = 'teacher.html';
+      go.textContent = '👩‍🏫 ห้องเรียนของฉัน';
+      btn.parentNode.insertBefore(go, btn);
+    }
+
+    btn.textContent = 'ออกจากระบบ';
+    btn.classList.remove('btn-primary');
+    btn.removeAttribute('href');                 /* ไม่ใช่ลิงก์แล้ว */
+    btn.setAttribute('role', 'button');
+    btn.setAttribute('tabindex', '0');
+    btn.style.cursor = 'pointer';
+
+    function doLogout(ev) {
+      if (ev) ev.preventDefault();
+      G.logout();
+      try { sessionStorage.removeItem(CACHE_KEY); } catch (e) {}
+      location.reload();
+    }
+    btn.addEventListener('click', doLogout);
+    btn.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' || ev.key === ' ') doLogout(ev);
+    });
+  }
+
+  /* ============ สโลแกนสลับวน ============
+     อ่านรายการจาก site_settings.site_slogans (JSON) · ไม่มีก็ใช้ค่าใน config.js
+     สลับทุก 7 วินาที ค่อย ๆ จางเข้าออก · มีสโลแกนเดียวก็ไม่ต้องสลับ
+
+     ช่องที่รองรับ (หน้าไหนไม่มีก็ข้าม):
+       #slogan-en · #slogan-th · #foot-slogan (เอา en — th มาต่อกัน) */
+  var SLOG_MS = 7000;
+  var slogTimer = null;
+
+  function slogansFrom(s) {
+    var list = null;
+    if (s && s.site_slogans) {
+      try {
+        var p = JSON.parse(s.site_slogans);
+        if (Array.isArray(p)) {
+          list = p.filter(function (x) { return x && (x.en || x.th); })
+                  .map(function (x) { return { en: String(x.en || ''), th: String(x.th || '') }; });
+        }
+      } catch (e) { /* JSON เสีย → ใช้ค่าใน config.js ต่อ ไม่ทำหน้าพัง */ }
+    }
+    if (!list || !list.length) list = (C.SLOGANS || []).slice();
+    return list.length ? list : [{ en: C.BRAND_EN || '', th: '' }];
+  }
+
+  function paintSlogan(sl) {
+    var pairs = [['slogan-en', sl.en], ['slogan-th', sl.th],
+                 ['foot-slogan', sl.en && sl.th ? sl.en + ' — ' + sl.th : (sl.en || sl.th)]];
+    for (var i = 0; i < pairs.length; i++) {
+      var el = document.getElementById(pairs[i][0]);
+      if (el && pairs[i][1]) el.textContent = pairs[i][1];
+    }
+  }
+
+  function startSlogans(s) {
+    var list = slogansFrom(s);
+    if (slogTimer) { clearInterval(slogTimer); slogTimer = null; }
+
+    /* ผู้ใช้ตั้งค่าเครื่องว่าไม่อยากเห็นภาพเคลื่อนไหว → แสดงตัวแรกนิ่ง ๆ ไม่สลับ */
+    var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    paintSlogan(list[0]);
+    if (list.length < 2 || still) return;
+
+    var ids = ['slogan-en', 'slogan-th', 'foot-slogan'];
+    ids.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.add('slogan-fx');
+    });
+
+    var i = 0;
+    slogTimer = setInterval(function () {
+      if (document.hidden) return;          /* แท็บถูกซ่อนอยู่ ไม่ต้องสลับให้เปลืองเปล่า */
+      i = (i + 1) % list.length;
+      ids.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.add('is-out');
+      });
+      setTimeout(function () {
+        paintSlogan(list[i]);
+        ids.forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.classList.remove('is-out');
+        });
+      }, 320);
+    }, SLOG_MS);
   }
 
   /* โลโก้แยกตามโหมด — โลโก้สีเข้มมักจมหายบนพื้นมืด */
@@ -216,7 +326,9 @@
     window.GP_SETTINGS = s || {};
     addThemeButton();      /* ต้องมีปุ่มเสมอ แม้โหลดค่ากลางไม่สำเร็จ */
     paintTheme();
+    renderAuthButton();    /* เข้าสู่ระบบ ↔ ออกจากระบบ */
     renderModeSwitch();    /* ขึ้นเฉพาะบัญชี admin */
+    startSlogans(s);       /* สโลแกนสลับวน */
     apply(window.GP_SETTINGS);
     ready(window.GP_SETTINGS);
   }
@@ -226,7 +338,7 @@
     if (c) { finish(c); return; }
     G.get('/rest/v1/site_settings?select=key,value'
         + '&key=in.(site_logo_url,site_logo_dark_url,site_favicon_url,site_announcement,'
-        + 'hero_headline,featured_min_games,site_theme,site_skin)')
+        + 'hero_headline,featured_min_games,site_theme,site_skin,site_slogans)')
       .then(function (rows) {
         var s = {};
         (rows || []).forEach(function (r) { if (r.value) s[r.key] = r.value; });
@@ -238,6 +350,7 @@
 
   /* ให้หน้าที่เพิ่งล็อกอินเสร็จสั่งตรวจสิทธิ์ใหม่ได้ */
   G.refreshModeSwitch = function () { return renderModeSwitch(true); };
+  G.refreshAuthButton = function () { return renderAuthButton(); };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();

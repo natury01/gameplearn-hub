@@ -119,14 +119,32 @@
   /* ---------- สร้างรายการตัวกรองจากเกมที่มีจริง ----------
    * ไม่เรียก v_catalog_filters เพราะคำนวณจาก rows ที่โหลดมาแล้วได้ผลเหมือนกัน
    * และไม่ต้องยิง request เพิ่ม — สำคัญตอนอินเทอร์เน็ตโรงเรียนช้า */
+  /* ui: 'chips' = ปุ่มกดทีเดียวติด · 'select' = Dropdown
+   *
+   * เกณฑ์ที่ใช้เลือก — "มิตินี้โตตามจำนวนเกมไหม":
+   *   ระดับชั้น 4 · แนวเกม 8 · กลุ่มสาระ 8 · สมรรถนะ 6  → ตายตัวตามหลักสูตร ไม่โต → ชิป
+   *   ชุดเกม · หัวข้อ                                    → โตทุกครั้งที่เพิ่มเกม → Dropdown
+   * รวมชิปสูงสุด 26 ตัวตลอดไป ไม่ว่าจะมีกี่เกม จึงไม่ต้องกลัวหน้ายาว
+   *
+   * กลุ่มสาระ/สมรรถนะกรองด้วย "รหัส" ไม่ใช่ชื่อเต็ม เพราะชื่อเต็มตามหลักสูตรยาวมาก
+   * (เช่น "การอยู่ร่วมกับธรรมชาติและวิทยาการอย่างยั่งยืน") ชิปจะล้นจอ
+   * ถ้าเกมยังไม่มีรหัส (ฐานข้อมูลเก่า) จะถอยไปใช้ชื่อเต็มให้เอง */
   const DIMENSIONS = [
-    { key: 'grade_band',  label: 'ระดับชั้น',   pick: (g) => (g.grade_band ? [g.grade_band] : []) },
-    { key: 'genre',       label: 'แนวเกม',      pick: (g) => (g.genre ? [g.genre] : []),
+    { key: 'grade_band',  label: 'ระดับชั้น', ui: 'chips',
+      pick: (g) => (g.grade_band ? [g.grade_band] : []) },
+    { key: 'genre',       label: 'แนวเกม', ui: 'chips',
+      pick: (g) => (g.genre ? [g.genre] : []),
       labelOf: (v, g) => (g.genre_icon ? g.genre_icon + ' ' : '') + (g.genre_name || v) },
-    { key: 'series',      label: 'ชุดเกม',      pick: (g) => (g.series ? [g.series] : []) },
-    { key: 'subject',     label: 'กลุ่มสาระ',   pick: (g) => g.subject_areas },
-    { key: 'competency',  label: 'สมรรถนะ',     pick: (g) => g.competencies },
-    { key: 'tag',         label: 'หัวข้อ',      pick: (g) => g.tags },
+    { key: 'subject',     label: 'กลุ่มสาระ', ui: 'chips',
+      pick: (g) => (g.subject_codes.length ? g.subject_codes : g.subject_areas),
+      labelOf: (v) => SUBJ_SHORT[v] || v },
+    { key: 'competency',  label: 'สมรรถนะ', ui: 'chips',
+      pick: (g) => (g.competency_codes.length ? g.competency_codes : g.competencies),
+      labelOf: (v) => COMP_SHORT[v] || String(v).replace(/^สมรรถนะ/, '') },
+    { key: 'series',      label: 'ชุดเกม', ui: 'select',
+      pick: (g) => (g.series ? [g.series] : []) },
+    { key: 'tag',         label: 'หัวข้อ', ui: 'select',
+      pick: (g) => g.tags },
   ];
 
   function buildFilters(rows) {
@@ -141,7 +159,7 @@
       });
       const options = Object.keys(seen).map((k) => seen[k])
         .sort((a, b) => b.count - a.count || String(a.label).localeCompare(String(b.label), 'th'));
-      return { key: d.key, label: d.label, options: options };
+      return { key: d.key, label: d.label, ui: d.ui || 'chips', options: options };
     }).filter((d) => d.options.length > 0);
   }
 
@@ -156,8 +174,10 @@
     if (sel.grade_band && g.grade_band !== sel.grade_band) return false;
     if (sel.genre && g.genre !== sel.genre) return false;
     if (sel.series && g.series !== sel.series) return false;
-    if (sel.subject && !has(g.subject_areas, sel.subject)) return false;
-    if (sel.competency && !has(g.competencies, sel.competency)) return false;
+    /* ค่าที่เลือกอาจเป็นรหัส (SC) หรือชื่อเต็ม แล้วแต่ว่าเกมมีรหัสไหม — รับทั้งสองแบบ */
+    if (sel.subject && !has(g.subject_codes, sel.subject) && !has(g.subject_areas, sel.subject)) return false;
+    if (sel.competency && !has(g.competency_codes, sel.competency)
+        && !has(g.competencies, sel.competency)) return false;
     if (sel.tag && !has(g.tags, sel.tag)) return false;
     return true;
   }

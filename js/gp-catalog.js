@@ -48,6 +48,18 @@
     return 'ป.' + g.minimum_grade + '–' + (g.maximum_grade == null ? '' : g.maximum_grade);
   }
 
+  /* เวลาเล่น — เก็บเป็นนาทีเสมอ แต่แสดงให้อ่านง่าย
+     ต่ำกว่า 1 ชม. บอกเป็นนาที · ตั้งแต่ 1 ชม. ขึ้นไปบอกเป็นชั่วโมง
+     ("300 นาที" ครูต้องหารเอง กว่าจะรู้ว่าคือ 5 ชั่วโมง = 5 คาบ) */
+  function playTime(min) {
+    const n = Number(min);
+    if (!n || isNaN(n) || n <= 0) return null;
+    if (n < 60) return n + ' นาที';
+    const h = Math.floor(n / 60), m = Math.round(n % 60);
+    if (!m) return h + ' ชั่วโมง';
+    return h + ' ชม. ' + m + ' นาที';
+  }
+
   const arr = (v) => (Array.isArray(v) ? v : []);
 
   /* ---------- โหลดแคตตาล็อก ----------
@@ -232,5 +244,5 @@
 
   window.GPCatalog = { loadCatalog, buildFilters, apply, matches, SORTS, DIMENSIONS,
     GENRE_ICON, GENRE_TH, STATUS_TH, COMP_SHORT, SUBJ_SHORT, CBE_TOTAL, ALL6,
-    gradeBand, gradeText, gradeList, gradeLabel };
+    gradeBand, gradeText, gradeList, gradeLabel, playTime };
 })();

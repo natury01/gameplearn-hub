@@ -36,9 +36,25 @@
     return refresh();
   }
 
-  /* ---------- ตัวเรียก REST/RPC ---------- */
-  async function api(path, opt) {
+  /* ---------- ตัวเรียก REST/RPC ----------
+     โทเคนของ Supabase มีอายุราว 1 ชั่วโมง ครูมักเปิดหน้า Admin ค้างไว้ทั้งวัน
+     พอกดบันทึกทีหลังจะเจอ "JWT expired" ทั้งที่ยังล็อกอินอยู่แท้ ๆ
+
+     กัน 2 ชั้น:
+       1. ก่อนยิงทุกครั้ง เรียก ensure() — ต่ออายุให้ล่วงหน้าถ้าใกล้หมด
+          (ไม่เปลืองเน็ต เพราะเช็กแค่เวลาหมดอายุ ยังไม่หมดก็ไม่ยิงอะไร)
+       2. ถ้ายังโดน 401 อยู่ดี (เช่นเวลาเครื่องเพี้ยน) ต่ออายุแล้วลองใหม่ 1 ครั้ง
+          ลองแค่ครั้งเดียวเสมอ กันวนไม่รู้จบตอนโทเคนใช้ไม่ได้จริง ๆ */
+  function isAuthErr(status, j) {
+    if (status !== 401) return false;
+    const m = String((j && (j.message || j.msg || j.error_description)) || '');
+    return /jwt|token|expired|invalid claim/i.test(m) || !m;
+  }
+
+  async function api(path, opt, _retried) {
     opt = opt || {};
+    if (sess && !_retried) { try { await ensure(); } catch (e) {} }
+
     const h = Object.assign({
       apikey: CFG.SB_ANON, 'Content-Type': 'application/json',
       Authorization: 'Bearer ' + ((sess && sess.access_token) || CFG.SB_ANON),
@@ -46,7 +62,13 @@
     const r = await fetch(CFG.SB_URL + path, Object.assign({}, opt, { headers: h }));
     const t = await r.text();
     let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {}
+
     if (!r.ok) {
+      if (!_retried && sess && isAuthErr(r.status, j)) {
+        if (await refresh()) return api(path, opt, true);
+        const e2 = new Error('เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่');
+        e2.status = 401; e2.code = 'SESSION_EXPIRED'; throw e2;
+      }
       const m = (j && (j.message || j.msg || j.error_description || j.hint)) || ('HTTP ' + r.status);
       const err = new Error(m); err.status = r.status; err.code = (j && j.code) || ''; throw err;
     }

@@ -403,7 +403,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       await saveSetting(key, val);
       settings[key] = val;
       toast();
-    } catch (e) { showErr('บันทึก "' + LIST_SPEC[key].itemName + '" ไม่สำเร็จ: ' + e.message); }
+    } catch (e) { showErr(saveErr(e, 'ช่อง "' + LIST_SPEC[key].itemName + '"')); }
   }
 
   document.addEventListener('click', function (ev) {
@@ -435,6 +435,21 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const f = ev.target.closest('[data-lfield]');
     if (f) saveList(f.closest('.listbox'));
   });
+
+  /* ข้อความ error ที่บอกทางแก้ให้ตรงเหตุ
+     เดิมขึ้น "ถ้าขึ้นว่าไม่มีสิทธิ์ ให้รัน 22_ADMIN_SETUP.sql" กับทุกกรณี
+     พอโทเคนหมดอายุ ครูก็ไปรัน SQL ซ้ำเปล่า ๆ ทั้งที่แค่ต้องเข้าสู่ระบบใหม่ */
+  function saveErr(e, extra) {
+    const m = String((e && e.message) || '');
+    if (e && (e.code === 'SESSION_EXPIRED' || e.status === 401) || /jwt|expired/i.test(m)) {
+      return 'เซสชันหมดอายุ (เปิดหน้านี้ค้างไว้นานเกินไป) — กดปุ่มออกจากระบบแล้วเข้าสู่ระบบใหม่ '
+           + 'ค่าที่แก้ค้างไว้จะยังอยู่ในช่อง แต่ยังไม่ถูกบันทึก';
+    }
+    if (/permission|denied|row-level|RLS|42501/i.test(m)) {
+      return 'ไม่มีสิทธิ์บันทึก: ' + m + ' — ให้รัน 22_ADMIN_SETUP.sql แล้วเข้าสู่ระบบด้วยอีเมลผู้ดูแล';
+    }
+    return 'บันทึกไม่สำเร็จ: ' + m + (extra ? ' — ' + extra : '');
+  }
 
   function renderFields(slotId, list) {
     $(slotId).innerHTML = list.map(function (f) {
@@ -495,7 +510,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           document.documentElement.dataset.skin = t.s || t.ds || 'playful';
         } catch (e) {}
       }
-    } catch (e) { showErr('บันทึก "' + key + '" ไม่สำเร็จ: ' + e.message); }
+    } catch (e) { showErr(saveErr(e, 'ช่อง "' + key + '"')); }
   });
 
   async function saveSetting(key, val) {
@@ -628,6 +643,25 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     renderGames();
   }
 
+  /* คำอธิบายใต้ช่องเวลาเล่น — ต้องอัปเดตทันทีที่พิมพ์
+     ของเดิมคำนวณตอนวาดแถวครั้งเดียว พิมพ์ 300 แล้วยังค้างว่า "1.0 ชั่วโมง" ของค่าเก่า */
+  function playHint(min) {
+    const n = Number(min);
+    if (!n || isNaN(n) || n <= 0) return 'ครูใช้วางแผนคาบเรียน · ใส่เป็นนาที';
+    if (n < 60) return 'น้อยกว่า 1 ชั่วโมง — จบได้ใน 1 คาบ';
+    const h = Math.floor(n / 60), m = Math.round(n % 60);
+    return 'ประมาณ ' + h + (m ? ' ชั่วโมง ' + m + ' นาที' : ' ชั่วโมง')
+      + ' · ราว ' + Math.max(1, Math.round(n / 50)) + ' คาบ';
+  }
+
+  /* พิมพ์ปุ๊บเห็นผลปั๊บ ไม่ต้องรอออกจากช่อง */
+  document.addEventListener('input', function (ev) {
+    const el = ev.target.closest('[data-field="play_minutes"][data-game]');
+    if (!el) return;
+    const hint = document.querySelector('[data-hint-for="' + el.getAttribute('data-game') + '"]');
+    if (hint) hint.textContent = playHint(el.value);
+  });
+
   /* ---- ติ๊กกลุ่มสาระ / สมรรถนะ → เขียนลง game_framework_items ---- */
   function checkRow(gid, kind, list) {
     const on = codesOfGame(gid);
@@ -662,7 +696,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       toast();
     } catch (e) {
       cb.checked = !cb.checked;
-      showErr('บันทึกไม่สำเร็จ: ' + e.message + ' — ถ้าเพิ่งเพิ่มช่องนี้ ให้รัน 37_GAME_ADMIN_FIELDS.sql ก่อน');
+      showErr(saveErr(e, 'ถ้าเพิ่งเพิ่มช่องนี้ ให้รัน 37_GAME_ADMIN_FIELDS.sql ก่อน'));
     }
     cb.disabled = false;
   });
@@ -749,7 +783,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             +             ' data-field="play_minutes" value="' + (g.play_minutes == null ? '' : g.play_minutes) + '">'
             +           '<span class="muted small">นาที</span>'
             +         '</div>'
-            +         '<div class="form-hint">' + (g.play_minutes ? 'ประมาณ ' + (g.play_minutes / 60).toFixed(1) + ' ชั่วโมง' : 'ครูใช้วางแผนคาบเรียน') + '</div>'
+            +         '<div class="form-hint" data-hint-for="' + g.id + '">' + playHint(g.play_minutes) + '</div>'
             +       '</div>'
             +     '</div>'
 
@@ -857,8 +891,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       const g = games.find((x) => x.id === id); if (g) g[field] = val;
       toast();
     } catch (e) {
-      showErr('บันทึกไม่สำเร็จ: ' + e.message
-        + ' — ถ้าขึ้นว่าไม่มีสิทธิ์ ให้รัน 22_ADMIN_SETUP.sql ส่วนที่ 3');
+      showErr(saveErr(e));
       loadGames();
     }
   });

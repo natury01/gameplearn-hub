@@ -37,10 +37,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   </div>
 
   <!-- ==================== นักเรียนมาก่อน: กรอกรหัสห้องเรียน ==================== -->
-  <section class="joinhero" aria-labelledby="join-h">
-    <div class="eyebrow" id="slogan-en">Game On. Learn Beyond.</div>
-    <h1 id="join-h">มีโค้ดห้องเรียนจากคุณครูแล้วใช่ไหม? ใส่ตรงนี้เลย</h1>
-    <div class="lede" id="slogan-th">เริ่มเกม แล้วก้าวไปไกลกว่าการเรียนรู้เดิม</div>
+  <!-- ย่อเหลือ 2 บรรทัด: หัวข้อ+สโลแกน / ช่องกรอก+ปุ่ม
+       เดิมสูง 5 บรรทัดจนดันแคตตาล็อกเกมตกจอ ซึ่งขัดกับหลัก "นักเรียนมาก่อน" -->
+  <section class="joinhero compact" aria-labelledby="join-h">
+    <div class="joinhead">
+      <h1 id="join-h">มีโค้ดห้องเรียนจากคุณครู? ใส่ตรงนี้เลย</h1>
+      <span class="eyebrow" id="slogan-en">Game On. Learn Beyond.</span>
+      <span class="lede" id="slogan-th">เริ่มเกม แล้วก้าวไปไกลกว่าการเรียนรู้เดิม</span>
+    </div>
 
     <div class="joinbox">
       <label class="hidden" for="join-code">โค้ดเข้าห้องเรียน 6 ตัว</label>
@@ -48,12 +52,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
              autocapitalize="characters" spellcheck="false"
              inputmode="text" placeholder="ABC123" aria-describedby="join-hint">
       <button class="btn btn-primary btn-lg" id="join-go">🏫 เข้าห้องเรียน</button>
+      <span class="joinhint" id="join-hint">ยังไม่มีโค้ดก็เล่นได้ — เลื่อนดูเกมด้านล่าง</span>
     </div>
 
-    <div class="err-box" id="join-err" style="margin-top:12px"></div>
-    <div class="joinhint" id="join-hint">
-      โค้ด 6 ตัวอยู่ที่คุณครู · <b>ยังไม่มีโค้ดก็เล่นได้</b> — เลื่อนลงไปเลือกเกมด้านล่างได้เลย
-    </div>
+    <div class="err-box" id="join-err" style="margin-top:10px"></div>
 
     <div id="room-result"></div>
   </section>
@@ -185,7 +187,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const f = [];
     f.push('<span class="f">🎓 ' + G.esc(g.grade_text) + '</span>');
     if (g.genre_name) f.push('<span class="f">' + (g.genre_icon || '🎮') + ' ' + G.esc(g.genre_name) + '</span>');
-    if (g.play_minutes) f.push('<span class="f">⏱ ~' + g.play_minutes + ' นาที</span>');
+    const pt = K.playTime(g.play_minutes);
+    if (pt) f.push('<span class="f">⏱ ~' + pt + '</span>');
     if (g.players_count > 0) f.push('<span class="f">👥 ' + G.fmtInt(g.players_count) + ' คนเคยเล่น</span>');
     return '<div class="gfacts">' + f.join('') + '</div>';
   }

@@ -91,7 +91,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   const soft = (p) => G.get(p).catch(() => []);
 
   async function loadAll() {
-    const [games, rooms, cg, students, progress, summary, evCount, frameworks, coverage, itemSummary, itemProfile] = await Promise.all([
+    const [games, rooms, cg, students, progress, summary, evCount, frameworks, coverage, itemSummary, itemProfile, comp] = await Promise.all([
       G.get('/rest/v1/games?select=id,code,name,status,launch_url,dashboard_url,minimum_grade,maximum_grade&order=name'),
       G.get('/rest/v1/classrooms?select=*&order=created_at.desc'),
       G.get('/rest/v1/classroom_games?select=*'),
@@ -103,9 +103,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       soft('/rest/v1/v_framework_coverage?select=*&depth=eq.1'),
       soft('/rest/v1/v_classroom_item_summary?select=*'),
       soft('/rest/v1/v_student_item_profile?select=*&is_latest=is.true'),
+      /* ผลสมรรถนะที่ "เกมคิดแล้วส่งลงมา" — เว็บกลางอ่านอย่างเดียว ไม่คิดซ้ำ (38_CENTRAL_DASHBOARD.sql) */
+      soft('/rest/v1/v_student_competency?select=*'),
     ]);
     Object.assign(S, { games, rooms, cg, students, progress, summary, eventsCount: evCount,
-      frameworks, coverage, itemSummary, itemProfile });
+      frameworks, coverage, itemSummary, itemProfile, comp });
   }
 
   const gameById = (id) => S.games.find((g) => g.id === id);
@@ -148,6 +150,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     return '<div class="tabs" role="tablist">'
       + '<button class="tab" role="tab" data-tab="ach"  aria-selected="' + (TAB === 'ach') + '">ผลสัมฤทธิ์</button>'
       + '<button class="tab" role="tab" data-tab="comp" aria-selected="' + (TAB === 'comp') + '">สมรรถนะหลัก</button>'
+      + '<button class="tab" role="tab" data-tab="hots" aria-selected="' + (TAB === 'hots') + '">ระดับสมรรถนะรายเกม</button>'
       + '</div>';
   }
 
@@ -187,7 +190,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
     html += tabs();
 
-    if (TAB === 'comp') {
+    if (TAB === 'hots') {
+      html += hotsSection(null);
+    } else if (TAB === 'comp') {
       html += compSection(null);
     } else {
       html += '<div class="section-title">ห้องเรียนของฉัน <span class="sub">' + S.rooms.length + ' ห้อง</span></div>'
@@ -235,6 +240,178 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     }).join('')
     + '<div class="panel-note">ระบบเก็บกรอบหลักสูตรเป็นข้อมูล ไม่ใช่โครงสร้าง — เมื่อหลักสูตรเปลี่ยน '
     + 'เพิ่มกรอบใหม่ในฐานข้อมูลแล้วหน้านี้จะแสดงตามเองโดยไม่ต้องแก้โค้ด</div>';
+  }
+
+  /* ===================== ระดับสมรรถนะรายเกม (HOTS) =====================
+     ข้อมูลมาจาก v_student_competency ซึ่งเป็น "ผลที่เกมคิดเสร็จแล้วส่งลงมา"
+     เว็บกลางไม่คิดคะแนนเอง — กติกาให้คะแนนอยู่ในตัวเกม (ภาค 2 มีตารางจับคู่ข้อสอบ 66 รายการ)
+     ถ้าคิดซ้ำที่นี่ วันหนึ่งตัวเลขสองที่จะไม่ตรงกัน แล้วครูจะไม่รู้ว่าอันไหนถูก */
+
+  const LV_COLOR = { 6:'#16a34a', 5:'#3b82f6', 4:'#f59e0b', 3:'#94a3b8' };
+  const LV_NAME  = { 6:'เหนือความคาดหวัง', 5:'สามารถ', 4:'กำลังพัฒนา', 3:'เริ่มต้น' };
+  const HOTS = [['ctc','คิดวิเคราะห์'], ['stm','คิดเป็นระบบ'], ['crt','คิดสร้างสรรค์'], ['prb','แก้ปัญหา']];
+
+  const compRows = (cid) => (S.comp || []).filter((r) => !cid || r.classroom_id === cid);
+
+  function avgOf(rows, key) {
+    const v = rows.map((r) => Number(r[key])).filter((n) => !isNaN(n));
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  }
+
+  /* แถบเทียบเกณฑ์ — สัดส่วนนักเรียนในแต่ละระดับ เรียง 6→3 */
+  function levelBar(rows) {
+    const n = rows.length;
+    if (!n) return '';
+    const seg = [6, 5, 4, 3].map(function (lv) {
+      const c = rows.filter((r) => Number(r.level) === lv).length;
+      if (!c) return '';
+      const pct = (c / n) * 100;
+      return '<div style="width:' + pct.toFixed(2) + '%;background:' + LV_COLOR[lv] + '"'
+        + ' title="ระดับ ' + lv + ' ' + LV_NAME[lv] + ' — ' + c + ' คน">'
+        + (pct >= 9 ? c : '') + '</div>';
+    }).join('');
+    const legend = [6, 5, 4, 3].map(function (lv) {
+      const c = rows.filter((r) => Number(r.level) === lv).length;
+      return '<span class="lvkey"><i style="background:' + LV_COLOR[lv] + '"></i>ระดับ ' + lv
+        + ' <b>' + c + '</b></span>';
+    }).join('');
+    const none = rows.filter((r) => r.level == null).length;
+    return '<div class="lvbar">' + seg + '</div>'
+      + '<div class="lvlegend">' + legend
+      + (none ? '<span class="lvkey"><i style="background:#e5e7eb"></i>ยังไม่สรุป <b>' + none + '</b></span>' : '')
+      + '</div>';
+  }
+
+  function hotsBars(rows) {
+    return HOTS.map(function (h) {
+      const a = avgOf(rows, h[0]);
+      const pct = a == null ? 0 : Math.max(0, Math.min(100, a));
+      return '<div class="cbar' + (a == null ? ' nodata' : '') + '">'
+        + '<div><div class="cname">' + h[1] + '</div></div>'
+        + '<div class="ctrack">' + (a == null ? '' : '<i style="width:' + pct + '%"></i>') + '</div>'
+        + '<div class="cval">' + (a == null ? 'ยังไม่มีผล' : a.toFixed(1)) + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  function gameCompCard(gameCode, rows) {
+    const g0 = rows[0] || {};
+    const avg = avgOf(rows, 'total');
+    const legacy = rows.filter((r) => r.is_legacy).length;
+    const strict = rows.filter((r) => r.research_eligible).length;
+    return '<div class="card">'
+      + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:2px">'
+      +   '<h3 style="margin:0;font-size:16px">' + G.esc(g0.game_name || gameCode) + '</h3>'
+      +   '<span class="muted small">' + rows.length + ' คนมีผล</span>'
+      +   (g0.game_version ? '<span class="muted small">· รุ่น ' + G.esc(g0.game_version) + '</span>' : '')
+      + '</div>'
+      + '<div class="muted small" style="margin-bottom:10px">'
+      +   'คะแนนรวมเฉลี่ย <b style="color:var(--ink);font-size:15px">' + (avg == null ? '–' : avg.toFixed(1)) + '</b> / 100'
+      +   ' · ผ่านเกณฑ์วิจัย ' + strict + ' คน'
+      +   (legacy ? ' · เป็นข้อมูลเก่าจากชีต ' + legacy + ' คน' : '')
+      + '</div>'
+      + levelBar(rows)
+      + '<div style="margin-top:12px">'
+      +   '<div class="muted small" style="margin-bottom:4px">การคิดขั้นสูง 4 ด้าน (เฉลี่ย)</div>'
+      +   hotsBars(rows)
+      + '</div>'
+      + '</div>';
+  }
+
+  function hotsSection(cid) {
+    const rows = compRows(cid);
+
+    if (!rows.length) {
+      const where = cid ? 'ห้องนี้' : 'ห้องเรียนของคุณ';
+      return '<div class="card">'
+        + '<h3 style="margin:0 0 6px;font-size:16px">ยังไม่มีผลระดับสมรรถนะของ' + where + '</h3>'
+        + '<div class="muted small">หน้านี้แสดงผลที่<b>ตัวเกมคิดเสร็จแล้วส่งลงมา</b> '
+        + 'เว็บกลางไม่คิดคะแนนเอง เพราะกติกาให้คะแนนอยู่ในตัวเกมแต่ละเกม</div>'
+        + '<div class="panel-note" style="margin-top:10px">ถ้ายังว่างอยู่ ให้ตรวจ 2 อย่าง:<br>'
+        + '1. รัน <code>38_CENTRAL_DASHBOARD.sql</code> บน Supabase แล้วหรือยัง<br>'
+        + '2. ส่ง <code>39_PROMPT_GAME_SUBMIT.md</code> ให้แชตของเกมเพื่อเพิ่มการส่งผลแล้วหรือยัง</div>'
+        + '</div>';
+    }
+
+    /* สรุปรวมทุกเกมก่อน แล้วค่อยแยกรายเกม */
+    const avgAll = avgOf(rows, 'total');
+    const byGame = {};
+    rows.forEach(function (r) { (byGame[r.game_code] = byGame[r.game_code] || []).push(r); });
+    const codes = Object.keys(byGame).sort();
+    const people = new Set(rows.map((r) => r.student_id)).size;
+
+    let html = '<div class="tiles">'
+      + tile('เกมที่มีผล', G.fmtInt(codes.length))
+      + tile('นักเรียนที่มีผล', G.fmtInt(people))
+      + tile('ผลทั้งหมด', G.fmtInt(rows.length))
+      + tile('คะแนนรวมเฉลี่ย', avgAll == null ? '–' : avgAll.toFixed(1))
+      + tile('ถึงระดับ 6', G.fmtInt(rows.filter((r) => Number(r.level) === 6).length))
+      + '</div>';
+
+    html += '<div class="card">'
+      + '<h3 style="margin:0 0 4px;font-size:16px">สรุปรวมทุกเกม — การเทียบเกณฑ์</h3>'
+      + '<div class="muted small" style="margin-bottom:10px">'
+      +   'นับผลรายคนต่อเกม · เล่นหลายเกมจะถูกนับหลายผล เพราะแต่ละเกมประเมินคนละเรื่อง'
+      + '</div>'
+      + levelBar(rows)
+      + '<div style="margin-top:12px">'
+      +   '<div class="muted small" style="margin-bottom:4px">การคิดขั้นสูง 4 ด้าน (เฉลี่ยทุกเกม)</div>'
+      +   hotsBars(rows)
+      + '</div>'
+      + '</div>';
+
+    html += '<div class="section-title">แยกรายเกม <span class="sub">' + codes.length + ' เกม</span></div>'
+      + '<div class="grid cols-2">' + codes.map((c) => gameCompCard(c, byGame[c])).join('') + '</div>';
+
+    html += '<div class="panel-note">'
+      + '<b>เกณฑ์ระดับ</b> — คะแนนรวม ≥80 = ระดับ 6 · 65–79 = 5 · 50–64 = 4 · ต่ำกว่า 50 = 3<br>'
+      + 'ระดับ 6 ต้องผ่านเงื่อนไขเพิ่ม: ผ่านเกณฑ์วิจัย และการคิดขั้นสูงทั้ง 4 ด้านต้องไม่ต่ำกว่า 65<br>'
+      + 'ตัวเลขทั้งหมดเป็นค่าที่เกมคิดและส่งลงมา — ตรงกับที่เห็นในหน้า Dashboard ของเกมเสมอ'
+      + '</div>';
+
+    return html;
+  }
+
+  /* ตารางระดับสมรรถนะรายคนในห้อง — เรียงเลขที่แบบจำนวนนับ */
+  function hotsTable(cid) {
+    const rows = compRows(cid);
+    if (!rows.length) return '<div class="muted">ยังไม่มีผลของห้องนี้</div>';
+
+    const codes = Array.from(new Set(rows.map((r) => r.game_code))).sort();
+    const byStu = {};
+    rows.forEach(function (r) { (byStu[r.student_id] = byStu[r.student_id] || {})[r.game_code] = r; });
+
+    const studs = studentsOf(cid).filter((s) => byStu[s.id]);
+    const head = '<tr><th class="num">เลขที่</th><th class="name">ชื่อ</th>'
+      + codes.map(function (c) {
+          const nm = (rows.find((r) => r.game_code === c) || {}).game_name || c;
+          return '<th>' + G.esc(nm) + '</th>';
+        }).join('')
+      + '<th>เฉลี่ย</th></tr>';
+
+    const body = studs.map(function (s) {
+      const mine = byStu[s.id];
+      const vals = codes.map((c) => mine[c]).filter(Boolean);
+      const avg = avgOf(vals, 'total');
+      return '<tr><td class="num">' + G.esc(s.student_number || '–') + '</td>'
+        + '<td class="name"><a href="#/student/' + s.id + '">'
+        +   G.esc(((s.first_name || '') + ' ' + (s.last_name || '')).trim() || '(ไม่มีชื่อ)') + '</a></td>'
+        + codes.map(function (c) {
+            const r = mine[c];
+            if (!r) return '<td class="muted">ยังไม่เริ่ม</td>';
+            const lv = Number(r.level);
+            const badge = isNaN(lv) ? '<span class="muted">ยังไม่สรุป</span>'
+              : '<span class="lvpill" style="background:' + (LV_COLOR[lv] || '#94a3b8') + '">'
+                + lv + '</span>';
+            const tot = r.total == null ? '–' : Number(r.total).toFixed(0);
+            return '<td>' + badge + ' <b>' + tot + '</b>'
+              + (r.is_legacy ? ' <span class="muted small" title="ข้อมูลเก่าจาก Google Sheets">เก่า</span>' : '')
+              + '</td>';
+          }).join('')
+        + '<td><b>' + (avg == null ? '–' : avg.toFixed(1)) + '</b></td></tr>';
+    }).join('');
+
+    return '<table class="gol"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
   }
 
   function levelToLabel(f, lvl) {
@@ -301,7 +478,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + '<div class="muted small">นักเรียน ' + stu.length + ' คน · เกมที่เปิดใช้ ' + games.length + ' เกม</div>'
       + tabs();
 
-    if (TAB === 'comp') {
+    if (TAB === 'hots') {
+      html += hotsSection(cid);
+      html += '<div class="section-title">ระดับสมรรถนะรายคน</div>'
+        + '<div class="card table-scroll">' + hotsTable(cid) + '</div>';
+    } else if (TAB === 'comp') {
       html += compSection(cid);
       html += '<div class="section-title">สมรรถนะรายคน</div>'
         + '<div class="card table-scroll">' + compTable(cid) + '</div>';

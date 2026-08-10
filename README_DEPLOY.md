@@ -13,6 +13,9 @@ Static site ล้วน ไม่ต้อง build — deploy บน **Cloudfl
 ```text
 gameplearn-hub/
 ├── wrangler.jsonc            ★ ไฟล์ตั้งค่า Cloudflare — ไม่มี = build fail
+├── _headers                  CSP + header ความปลอดภัย (Cloudflare อ่านไฟล์นี้เองอัตโนมัติ — ต้องอัปโหลดด้วย)
+│                             ⚠️ ถ้าย้ายโปรเจกต์ Supabase ต้องแก้ URL ใน connect-src ของไฟล์นี้ด้วย
+│                             (คู่กับ SB_URL ใน js/config.js — เป็นข้อยกเว้นเดียวของกฎ "แก้ที่ config.js ที่เดียว")
 ├── index.html                แคตตาล็อกเกม + ปุ่ม "📋 มาตรฐานที่วัด" ต่อเกม
 ├── teacher.html              เข้าสู่ระบบครู + ห้องเรียน + มอบหมายเกม + Dashboard กลาง 2 มิติ
 ├── js/config.js              ค่ากลาง (Supabase + แบรนด์ + สโลแกน) — แก้ที่นี่ที่เดียว
@@ -33,7 +36,7 @@ gameplearn-hub/
 
 ## ขั้นตอน Deploy (~15 นาที)
 
-1. **สร้าง GitHub repo** ชื่อ `gameplearn-hub` → อัปโหลดไฟล์ทั้งโฟลเดอร์นี้ **รวม `wrangler.jsonc`** (คงโครง `js/` และ `css/`)
+1. **สร้าง GitHub repo** ชื่อ `gameplearn-hub` → อัปโหลดไฟล์ทั้งโฟลเดอร์นี้ **รวม `wrangler.jsonc` และ `_headers`** (คงโครง `js/` และ `css/`)
 2. **Cloudflare** → Workers & Pages → Create → **Workers** → Import a repository → เลือก repo
    - Build command: **เว้นว่าง** (เว็บนี้ไม่มี build step และไม่มี `package.json`)
    - Deploy → ได้ URL ชั่วคราวของ Worker

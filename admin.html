@@ -14,9 +14,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 <link rel="stylesheet" href="css/gp.css">
 </head>
 <body>
+<a class="skip-link" href="#content">ข้ามไปเนื้อหาหลัก</a>
 <div class="wrap">
 
-  <div class="topbar topbar-app">
+  <header class="topbar topbar-app" role="banner">
     <a class="brand" href="./" style="color:inherit;text-decoration:none">
       <span class="logo">ก</span>
       <span class="bname"><span class="th" id="brand-th">เกมเพลิน</span><span class="en">GamePlearn · ผู้ดูแลระบบ</span></span>
@@ -24,7 +25,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     <div class="sp"></div>
     <span class="who" id="who"></span>
     <button class="btn hidden" id="logout">ออกจากระบบ</button>
-  </div>
+  </header>
+
+  <main id="content">
 
   <!-- ========== ยังไม่ได้เข้าสู่ระบบ ========== -->
   <div id="gate" class="card" style="max-width:520px;margin:40px auto;text-align:center">
@@ -33,7 +36,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     <div class="muted small" style="margin-bottom:18px">
       เข้าสู่ระบบด้วยบัญชี Google ที่ลงทะเบียนเป็นผู้ดูแลไว้
     </div>
-    <div class="err-box" id="gate-err" style="margin-bottom:14px;text-align:left"></div>
+    <div class="err-box" id="gate-err" role="alert" style="margin-bottom:14px;text-align:left"></div>
     <button class="btn btn-primary btn-lg" id="login">เข้าสู่ระบบด้วย Google</button>
     <div class="panel-note" style="text-align:left">
       ยังไม่ได้เป็นผู้ดูแล? รัน <code>22_ADMIN_SETUP.sql</code> ใน Supabase
@@ -43,6 +46,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   <!-- ========== หน้าหลัก ========== -->
   <div id="app" class="hidden">
+    <h1 class="sr-only">จัดการระบบเกมเพลิน</h1>
 
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" data-tab="brand"    aria-selected="true">🎨 แบรนด์และหน้าเว็บ</button>
@@ -52,8 +56,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <button class="tab" role="tab" data-tab="contact"  aria-selected="false">⚙️ ช่องทางติดต่อ</button>
     </div>
 
-    <div class="err-box" id="err"></div>
-    <div id="saved" class="hidden" style="position:fixed;right:18px;bottom:18px;background:var(--good);
+    <div class="err-box" id="err" role="alert"></div>
+    <div id="saved" class="hidden" role="status" style="position:fixed;right:18px;bottom:18px;background:var(--good-text);
          color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;z-index:50;box-shadow:var(--lift)">
       ✓ บันทึกแล้ว
     </div>
@@ -163,6 +167,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       </div>
     </section>
   </div>
+
+  </main>
 </div>
 
 <script src="js/config.js"></script>
@@ -318,8 +324,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       addLabel: '➕ เพิ่มสโลแกน',
       itemName: 'สโลแกน',
       fields: [
-        { name:'en', ph:'ภาษาอังกฤษ เช่น Game On. Learn Beyond.' },
-        { name:'th', ph:'ภาษาไทย เช่น เริ่มเกม แล้วก้าวไปไกลกว่าการเรียนรู้เดิม' },
+        { name:'en', lab:'สโลแกนภาษาอังกฤษ', ph:'ภาษาอังกฤษ เช่น Game On. Learn Beyond.' },
+        { name:'th', lab:'สโลแกนภาษาไทย', ph:'ภาษาไทย เช่น เริ่มเกม แล้วก้าวไปไกลกว่าการเรียนรู้เดิม' },
       ],
       fallback: () => (C.SLOGANS || []).slice(),
     },
@@ -327,8 +333,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       addLabel: '➕ เพิ่มคำถาม',
       itemName: 'คำถาม',
       fields: [
-        { name:'q', ph:'คำถาม เช่น นักเรียนเข้าเล่นยังไง ต้องสมัครไหม' },
-        { name:'a', ph:'คำตอบ · ขึ้นบรรทัดใหม่ได้ · ใส่ลิงก์แบบ [สนับสนุน](support.html)', tag:'textarea', rows:3 },
+        { name:'q', lab:'คำถาม', ph:'คำถาม เช่น นักเรียนเข้าเล่นยังไง ต้องสมัครไหม' },
+        { name:'a', lab:'คำตอบ', ph:'คำตอบ · ขึ้นบรรทัดใหม่ได้ · ใส่ลิงก์แบบ [สนับสนุน](support.html)', tag:'textarea', rows:3 },
       ],
       fallback: () => [],
     },
@@ -344,11 +350,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const sp = LIST_SPEC[key];
     const inputs = sp.fields.map(function (f) {
       const val = G.esc((item && item[f.name]) || '');
+      const al = ' aria-label="' + G.esc((f.lab || f.name) + ' ลำดับที่ ' + (i + 1)) + '"';
       if (f.tag === 'textarea') {
-        return '<textarea rows="' + (f.rows || 3) + '" data-lfield="' + f.name + '"'
+        return '<textarea rows="' + (f.rows || 3) + '" data-lfield="' + f.name + '"' + al
              + ' placeholder="' + G.esc(f.ph) + '">' + val + '</textarea>';
       }
-      return '<input type="text" data-lfield="' + f.name + '" value="' + val + '"'
+      return '<input type="text" data-lfield="' + f.name + '"' + al + ' value="' + val + '"'
            + ' placeholder="' + G.esc(f.ph) + '">';
     }).join('');
     return '<div class="slogan-row" data-i="' + i + '">'
@@ -458,16 +465,16 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       if (f.type === 'list') {
         input = listEditor(f.key, v);
       } else if (f.type === 'textarea') {
-        input = '<textarea data-key="' + f.key + '">' + G.esc(v) + '</textarea>';
+        input = '<textarea data-key="' + f.key + '" aria-label="' + G.esc(f.label) + '">' + G.esc(v) + '</textarea>';
       } else if (f.type === 'select') {
-        input = '<select data-key="' + f.key + '">'
+        input = '<select data-key="' + f.key + '" aria-label="' + G.esc(f.label) + '">'
           + f.options.map(function (o) {
               return '<option value="' + G.esc(o[0]) + '"'
                 + ((v || f.options[0][0]) === o[0] ? ' selected' : '') + '>' + G.esc(o[1]) + '</option>';
             }).join('')
           + '</select>';
       } else {
-        input = '<input type="text" data-key="' + f.key + '" value="' + G.esc(v) + '"'
+        input = '<input type="text" data-key="' + f.key + '" aria-label="' + G.esc(f.label) + '" value="' + G.esc(v) + '"'
           + (f.type === 'image' ? ' placeholder="วาง URL รูป หรือกดอัปโหลดด้านล่าง"' : '') + '>';
       }
       return '<div style="padding:12px 0;border-top:1px solid var(--grid)">'
@@ -704,23 +711,23 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   function renderGames() {
     const noFilters = games.length && games[0].is_featured === null;
     $('games-table').innerHTML =
-      '<thead><tr><th>เกม</th><th>สถานะ</th><th style="text-align:center">แนะนำ</th>'
-      + '<th style="text-align:center">ลำดับ</th><th></th></tr></thead><tbody>'
+      '<thead><tr><th scope="col">เกม</th><th scope="col">สถานะ</th><th scope="col" style="text-align:center">แนะนำ</th>'
+      + '<th scope="col" style="text-align:center">ลำดับ</th><th scope="col" aria-label="การจัดการ"></th></tr></thead><tbody>'
       + games.map(function (g) {
           return '<tr>'
             + '<td><b>' + G.esc(g.name) + '</b><div class="muted small">' + G.esc(g.code) + '</div></td>'
-            + '<td><select data-game="' + g.id + '" data-field="status" style="width:auto;min-width:130px">'
+            + '<td><select data-game="' + g.id + '" data-field="status" aria-label="' + G.esc('สถานะของ ' + g.name) + '" style="width:auto;min-width:130px">'
             +   Object.keys(STATUS_TH).map((s) => '<option value="' + s + '"'
                   + (g.status === s ? ' selected' : '') + '>' + STATUS_TH[s] + '</option>').join('')
             + '</select></td>'
             + '<td style="text-align:center">'
             +   (noFilters ? '<span class="muted small">—</span>'
-                : '<label class="switch"><input type="checkbox" data-game="' + g.id + '" data-field="is_featured"'
+                : '<label class="switch"><input type="checkbox" data-game="' + g.id + '" data-field="is_featured" aria-label="' + G.esc('ปักเป็นเกมแนะนำ: ' + g.name) + '"'
                   + (g.is_featured ? ' checked' : '') + '><i></i></label>')
             + '</td>'
             + '<td style="text-align:center">'
             +   (noFilters ? '<span class="muted small">—</span>'
-                : '<input type="text" inputmode="numeric" data-game="' + g.id + '" data-field="sort_order"'
+                : '<input type="text" inputmode="numeric" data-game="' + g.id + '" data-field="sort_order" aria-label="' + G.esc('ลำดับของ ' + g.name) + '"'
                   + ' value="' + (g.sort_order == null ? '' : g.sort_order) + '"'
                   + ' style="width:64px;text-align:center">')
             + '</td>'
@@ -741,24 +748,24 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             +           'ชื่อนี้เก็บอยู่ในทะเบียนเกมของเว็บกลาง <b>ไม่ได้ดึงมาจากตัวเกม</b> — '
             +           'ตัวเกมส่งมาแค่รหัส <code>' + G.esc(g.code) + '</code> เท่านั้น จึงตั้งใหม่ได้ตามใจ'
             +         '</div>'
-            +         '<input type="text" data-game="' + g.id + '" data-field="name" value="' + G.esc(g.name || '') + '">'
+            +         '<input type="text" data-game="' + g.id + '" data-field="name" aria-label="ชื่อเกมที่แสดงบนเว็บ — ' + G.esc(g.name) + '" value="' + G.esc(g.name || '') + '">'
             +       '</div>'
             +       '<div>'
             +         '<label class="f" style="margin-top:0;font-weight:600;color:var(--ink)">ชื่อภาษาอังกฤษ</label>'
             +         '<div class="form-hint" style="margin:0 0 8px">ใช้ตอนแชร์ต่างประเทศหรืองานวิชาการ · เว้นว่างได้</div>'
-            +         '<input type="text" data-game="' + g.id + '" data-field="name_en"'
+            +         '<input type="text" data-game="' + g.id + '" data-field="name_en" aria-label="ชื่อเกมภาษาอังกฤษ — ' + G.esc(g.name) + '"'
             +           ' value="' + G.esc(g.name_en || '') + '" placeholder="Kanchanaburi Adventure">'
             +       '</div>'
             +     '</div>'
             +     '<label class="f" style="font-weight:600;color:var(--ink)">คำอธิบายสั้น</label>'
             +     '<div class="form-hint" style="margin:0 0 8px">1–2 บรรทัดใต้ชื่อเกมบนการ์ด — บอกครูว่าเกมนี้ทำอะไร</div>'
-            +     '<textarea rows="2" data-game="' + g.id + '" data-field="description">'
+            +     '<textarea rows="2" data-game="' + g.id + '" data-field="description" aria-label="คำอธิบายสั้น — ' + G.esc(g.name) + '">'
             +       G.esc(g.description || '') + '</textarea>'
 
             +     '<div class="grid cols-3" style="align-items:start;margin-top:4px">'
             +       '<div>'
             +         '<label class="f" style="font-weight:600;color:var(--ink)">แนวเกม</label>'
-            +         '<select data-game="' + g.id + '" data-field="genre">'
+            +         '<select data-game="' + g.id + '" data-field="genre" aria-label="แนวเกม — ' + G.esc(g.name) + '">'
             +           '<option value="">— ยังไม่ระบุ —</option>'
             +           GENRES.map(function (x) {
                           return '<option value="' + x[0] + '"' + (g.genre === x[0] ? ' selected' : '') + '>'
@@ -769,10 +776,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             +         '<label class="f" style="font-weight:600;color:var(--ink)">ระดับชั้น</label>'
             +         '<div style="display:flex;gap:6px;align-items:center">'
             +           '<input type="number" min="1" max="12" style="width:70px" data-game="' + g.id + '"'
-            +             ' data-field="minimum_grade" value="' + (g.minimum_grade == null ? '' : g.minimum_grade) + '">'
+            +             ' data-field="minimum_grade" aria-label="ระดับชั้นต่ำสุด — ' + G.esc(g.name) + '" value="' + (g.minimum_grade == null ? '' : g.minimum_grade) + '">'
             +           '<span class="muted small">ถึง</span>'
             +           '<input type="number" min="1" max="12" style="width:70px" data-game="' + g.id + '"'
-            +             ' data-field="maximum_grade" value="' + (g.maximum_grade == null ? '' : g.maximum_grade) + '">'
+            +             ' data-field="maximum_grade" aria-label="ระดับชั้นสูงสุด — ' + G.esc(g.name) + '" value="' + (g.maximum_grade == null ? '' : g.maximum_grade) + '">'
             +         '</div>'
             +         '<div class="form-hint">ป.1–6 ใส่ 1–6 · ม.1 ใส่ 7</div>'
             +       '</div>'
@@ -780,7 +787,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             +         '<label class="f" style="font-weight:600;color:var(--ink)">เวลาเล่นโดยประมาณ</label>'
             +         '<div style="display:flex;gap:6px;align-items:center">'
             +           '<input type="number" min="0" max="600" style="width:90px" data-game="' + g.id + '"'
-            +             ' data-field="play_minutes" value="' + (g.play_minutes == null ? '' : g.play_minutes) + '">'
+            +             ' data-field="play_minutes" aria-label="เวลาเล่นโดยประมาณ (นาที) — ' + G.esc(g.name) + '" value="' + (g.play_minutes == null ? '' : g.play_minutes) + '">'
             +           '<span class="muted small">นาที</span>'
             +         '</div>'
             +         '<div class="form-hint" data-hint-for="' + g.id + '">' + playHint(g.play_minutes) + '</div>'
@@ -791,13 +798,13 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             +       '<div>'
             +         '<label class="f" style="font-weight:600;color:var(--ink)">วิชา (ตามที่โรงเรียนเรียก)</label>'
             +         '<div class="form-hint" style="margin:0 0 8px">เช่น "สังคมศึกษา ป.4" — ต่างจากกลุ่มสาระซึ่งเป็นรหัสตามหลักสูตร</div>'
-            +         '<input type="text" data-game="' + g.id + '" data-field="subject_note"'
+            +         '<input type="text" data-game="' + g.id + '" data-field="subject_note" aria-label="วิชาตามที่โรงเรียนเรียก — ' + G.esc(g.name) + '"'
             +           ' value="' + G.esc(g.subject_note || '') + '">'
             +       '</div>'
             +       '<div>'
             +         '<label class="f" style="font-weight:600;color:var(--ink)">แท็ก</label>'
             +         '<div class="form-hint" style="margin:0 0 8px">คั่นด้วยจุลภาค — ครูใช้ค้นหา เช่น กาญจนบุรี, ประวัติศาสตร์</div>'
-            +         '<input type="text" data-game="' + g.id + '" data-field="tags"'
+            +         '<input type="text" data-game="' + g.id + '" data-field="tags" aria-label="แท็ก คั่นด้วยจุลภาค — ' + G.esc(g.name) + '"'
             +           ' value="' + G.esc((g.tags || []).join(', ')) + '">'
             +       '</div>'
             +     '</div>'
@@ -819,7 +826,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             +       '<div class="form-hint" style="margin:0 0 8px">'
             +         'ใช้ภาพหน้าแรกของเกม — แคปหน้าจอแล้วอัปโหลดที่นี่ · แนวนอน อัตราส่วนประมาณ 16:9'
             +       '</div>'
-            +       '<input type="text" data-game="' + g.id + '" data-field="cover_url"'
+            +       '<input type="text" data-game="' + g.id + '" data-field="cover_url" aria-label="URL รูปปกเกม — ' + G.esc(g.name) + '"'
             +         ' value="' + G.esc(g.cover_url || '') + '" placeholder="วาง URL รูป หรือกดอัปโหลด">'
             +       '<div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap">'
             +         '<label class="btn btn-sm" style="cursor:pointer">📤 อัปโหลดรูปปก'
@@ -830,7 +837,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             +     '<div>'
             +       '<label class="f" style="margin-top:0;font-weight:600;color:var(--ink)">ชื่อเรื่อง / หัวข้อการเรียนรู้</label>'
             +       '<div class="form-hint" style="margin:0 0 8px">แสดงบนการ์ดในแคตตาล็อก เช่น "ประวัติศาสตร์และภูมิศาสตร์กาญจนบุรี"</div>'
-            +       '<input type="text" data-game="' + g.id + '" data-field="topic" value="' + G.esc(g.topic || '') + '">'
+            +       '<input type="text" data-game="' + g.id + '" data-field="topic" aria-label="ชื่อเรื่อง / หัวข้อการเรียนรู้ — ' + G.esc(g.name) + '" value="' + G.esc(g.topic || '') + '">'
             +       (g.cover_url
                       ? '<div style="margin-top:12px"><img src="' + G.esc(g.cover_url) + '" alt=""'
                         + ' style="width:100%;max-width:260px;border-radius:12px;border:1px solid var(--border)"></div>'

@@ -14,9 +14,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 <link rel="stylesheet" href="css/gp.css">
 </head>
 <body>
+<a class="skip-link" href="#content">ข้ามไปเนื้อหาหลัก</a>
 <div class="wrap">
 
-  <div class="topbar">
+  <header class="topbar" role="banner">
     <a class="brand" href="./" style="color:inherit;text-decoration:none">
       <span class="logo">ก</span>
       <span class="bname"><span class="th" id="brand-th">เกมเพลิน</span><span class="en">GamePlearn</span></span>
@@ -29,7 +30,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <a href="contact.html" class="on">ติดต่อ / แจ้งปัญหา</a>
     </nav>
     <a class="btn btn-primary" id="auth-btn" href="teacher.html">👩‍🏫 เข้าสู่ระบบครู</a>
-  </div>
+  </header>
+
+  <main id="content">
 
   <div class="crumb"><a href="./">หน้าแรก</a> › ติดต่อ / แจ้งปัญหา</div>
 
@@ -49,12 +52,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <h2 style="margin:0 0 6px;font-size:19px">📮 ส่งข้อความถึงเรา</h2>
       <div class="muted small" style="margin-bottom:6px">ช่องที่มี * ต้องกรอก · ไม่ต้องเข้าสู่ระบบก็ส่งได้</div>
 
-      <div class="err-box" id="err"></div>
-      <div id="ok" class="hidden"></div>
+      <div class="err-box" id="err" role="alert"></div>
+      <div id="ok" class="hidden" role="status"></div>
 
       <form id="fb-form">
-        <label class="f" for="kind">เรื่องที่ติดต่อ *</label>
-        <div class="chiprow" id="kindrow" style="margin-top:2px">
+        <span class="f" id="kind-label" style="display:block">เรื่องที่ติดต่อ *</span>
+        <div class="chiprow" id="kindrow" role="group" aria-labelledby="kind-label" style="margin-top:2px">
           <button class="chip" type="button" data-kind="question" aria-pressed="true">❓ สอบถามข้อมูล</button>
           <button class="chip" type="button" data-kind="bug" aria-pressed="false">🐛 แจ้งบัค</button>
           <button class="chip" type="button" data-kind="idea" aria-pressed="false">💡 เสนอแนะ</button>
@@ -65,9 +68,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         <select id="game"><option value="">— ไม่เกี่ยวกับเกมใดเกมหนึ่ง —</option></select>
 
         <label class="f" for="msg">รายละเอียด *</label>
-        <textarea id="msg" maxlength="2000"
+        <textarea id="msg" maxlength="2000" aria-describedby="msg-hint"
           placeholder="เล่าให้ละเอียดหน่อยนะ เช่น กดปุ่มไหน แล้วเกิดอะไรขึ้น ใช้มือถือหรือคอม"></textarea>
-        <div class="form-hint"><span id="msg-count">0</span>/2000 ตัวอักษร</div>
+        <!-- รอบ ข: role=status ที่ตัวเลข — โปรแกรมอ่านจอได้ยินตัวนับโดยไม่ต้องเลื่อนมาดู -->
+        <div class="form-hint" id="msg-hint"><span id="msg-count" role="status">0</span>/2000 ตัวอักษร</div>
 
         <label class="f" for="name">ชื่อของคุณ</label>
         <input type="text" id="name" maxlength="80" placeholder="เช่น ครูสมชาย · เว้นว่างได้">
@@ -124,7 +128,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         <details style="border-top:1px solid var(--grid);padding:10px 0">
           <summary style="cursor:pointer;font-weight:600">เกมใช้ฟรีจริงไหม</summary>
           <div class="muted small" style="margin-top:8px">
-            ฟรีทั้งหมด ไม่มีค่าใช้จ่ายและไม่มีโฆษณา
+            ฟรีทั้งหมด ไม่มีค่าใช้จ่าย
             ถ้าอยากช่วยค่าเซิร์ฟเวอร์ ดูได้ที่หน้า <a href="support.html">สนับสนุน</a>
           </div>
         </details>
@@ -145,6 +149,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       </div>
     </div>
   </div>
+
+  </main>
 
   <footer class="sitefoot">
     <div class="col">
@@ -174,7 +180,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   const C = window.GP_CONFIG, G = window.GP, SL = window.GP_SLOGAN;
   const $ = (id) => document.getElementById(id);
   document.getElementById('brand-th').textContent = C.BRAND_TH;
-  $('foot-slogan').textContent = SL.en + ' — ' + SL.th;
+  $('foot-slogan').innerHTML =
+    '<span class="fs-en">' + G.esc(SL.en) + '</span><span class="fs-th">' + G.esc(SL.th) + '</span>';
 
   let kind = 'question';
   const KIND_TH = { question: 'สอบถามข้อมูล', bug: 'แจ้งบัค', idea: 'ข้อเสนอแนะ', other: 'อื่น ๆ' };

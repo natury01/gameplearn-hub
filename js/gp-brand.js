@@ -194,11 +194,16 @@
   }
 
   function paintSlogan(sl) {
-    var pairs = [['slogan-en', sl.en], ['slogan-th', sl.th],
-                 ['foot-slogan', sl.en && sl.th ? sl.en + ' — ' + sl.th : (sl.en || sl.th)]];
-    for (var i = 0; i < pairs.length; i++) {
-      var el = document.getElementById(pairs[i][0]);
-      if (el && pairs[i][1]) el.textContent = pairs[i][1];
+    var en = (sl.en || '').trim(), th = (sl.th || '').trim();
+    var el = document.getElementById('slogan-en'); if (el && en) el.textContent = en;
+    el = document.getElementById('slogan-th');     if (el && th) el.textContent = th;
+    /* ท้ายหน้า: อังกฤษบรรทัดหนึ่ง ไทยอีกบรรทัด — ต่อกันด้วย " — " แล้วคอลัมน์แคบ
+       จะหักบรรทัดกลางประโยค อ่านแล้วเหมือนพิมพ์ตก (ครูทักมาจริง)
+       ข้อความมาจากฐานข้อมูล จึงต้องผ่าน esc ก่อนเสมอ */
+    el = document.getElementById('foot-slogan');
+    if (el && (en || th)) {
+      el.innerHTML = (en ? '<span class="fs-en">' + G.esc(en) + '</span>' : '')
+                   + (th ? '<span class="fs-th">' + G.esc(th) + '</span>' : '');
     }
   }
 
@@ -211,15 +216,28 @@
     paintSlogan(list[0]);
     if (list.length < 2 || still) return;
 
+    /* รอบ ข (WCAG 2.2.2): เนื้อหาเลื่อนเองต้องหยุดได้ —
+       ชี้เมาส์/พาโฟกัสมาที่ข้อความ = หยุดชั่วคราวให้อ่านทัน
+       และหมุนครบ 3 รอบแล้วหยุดถาวร ไม่ดึงสายตาคนอ่านช้าไปตลอด */
     var ids = ['slogan-en', 'slogan-th', 'foot-slogan'];
+    var paused = false;
+    function hold() { paused = true; }
+    function release() { paused = false; }
     ids.forEach(function (id) {
       var el = document.getElementById(id);
-      if (el) el.classList.add('slogan-fx');
+      if (!el) return;
+      el.classList.add('slogan-fx');
+      el.setAttribute('data-slogan-pause', '1');
+      el.addEventListener('mouseenter', hold);
+      el.addEventListener('mouseleave', release);
+      el.addEventListener('focusin', hold);
+      el.addEventListener('focusout', release);
     });
 
-    var i = 0;
+    var i = 0, swaps = 0;
+    var maxSwaps = list.length * 3;   /* 3 รอบเต็ม */
     slogTimer = setInterval(function () {
-      if (document.hidden) return;          /* แท็บถูกซ่อนอยู่ ไม่ต้องสลับให้เปลืองเปล่า */
+      if (document.hidden || paused) return; /* แท็บถูกซ่อน/ผู้ใช้กำลังอ่าน ไม่สลับ */
       i = (i + 1) % list.length;
       ids.forEach(function (id) {
         var el = document.getElementById(id);
@@ -232,7 +250,9 @@
           if (el) el.classList.remove('is-out');
         });
       }, 320);
-    }, SLOG_MS);
+      swaps++;
+      if (swaps >= maxSwaps && slogTimer) { clearInterval(slogTimer); slogTimer = null; }
+    }, window.__gpSloganMs || SLOG_MS);   /* __gpSloganMs = ช่องเร่งเวลาสำหรับชุดทดสอบเท่านั้น */
   }
 
   /* โลโก้แยกตามโหมด — โลโก้สีเข้มมักจมหายบนพื้นมืด */

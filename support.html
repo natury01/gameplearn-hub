@@ -14,9 +14,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 <link rel="stylesheet" href="css/gp.css">
 </head>
 <body>
+<a class="skip-link" href="#content">ข้ามไปเนื้อหาหลัก</a>
 <div class="wrap">
 
-  <div class="topbar">
+  <header class="topbar" role="banner">
     <a class="brand" href="./" style="color:inherit;text-decoration:none">
       <span class="logo">ก</span>
       <span class="bname"><span class="th" id="brand-th">เกมเพลิน</span><span class="en">GamePlearn</span></span>
@@ -29,7 +30,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
     </nav>
     <a class="btn btn-primary" id="auth-btn" href="teacher.html">👩‍🏫 เข้าสู่ระบบครู</a>
-  </div>
+  </header>
+
+  <main id="content">
 
   <div class="crumb"><a href="./">หน้าแรก</a> › สนับสนุน</div>
 
@@ -86,6 +89,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     <div class="muted small" id="sp-usage" style="white-space:pre-line">ค่าเซิร์ฟเวอร์และฐานข้อมูลที่เก็บผลการเรียนของนักเรียน · ค่าโดเมน gameplearn.com · ค่าเครื่องมือสำหรับสร้างภาพ เสียง และเนื้อหาในเกม · เวลาในการพัฒนาเกมใหม่และดูแลระบบให้ใช้ได้ตลอด</div>
   </div>
 
+  </main>
+
   <footer class="sitefoot">
     <div class="col">
       <b>เกมเพลิน (GamePlearn)</b>
@@ -113,7 +118,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 (function () {
   const C = window.GP_CONFIG, G = window.GP, SL = window.GP_SLOGAN;
   document.getElementById('brand-th').textContent = C.BRAND_TH;
-  document.getElementById('foot-slogan').textContent = SL.en + ' — ' + SL.th;
+  document.getElementById('foot-slogan').innerHTML =
+    '<span class="fs-en">' + G.esc(SL.en) + '</span><span class="fs-th">' + G.esc(SL.th) + '</span>';
 
   /* ---------- ปุ่มแชร์เว็บ ----------
      มือถือ/แท็บเล็ต: เปิดแผงแชร์ของเครื่อง ส่งเข้าไลน์ได้ตรง ๆ (navigator.share)

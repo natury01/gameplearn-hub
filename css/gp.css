@@ -17,7 +17,7 @@
   --surface: #fcfcfb;
   --ink: #0b0b0b;
   --ink-2: #52514e;
-  --muted: #898781;
+  --muted: #6d6b66;          /* รอบ ก: เดิม #898781 = 3.6:1 → 5.3:1 */
   --grid: #e1e0d9;
   --baseline: #c3c2b7;
   --border: rgba(11, 11, 11, 0.10);
@@ -31,6 +31,16 @@
   --shadow: 0 1px 2px rgba(11, 11, 11, 0.05);
   --base-size: 15.5px;
   --border-w: 1px;
+
+  /* รอบ ก (W3C 41_W3C_AUDIT.md): โทเคนคอนทราสต์
+     --on-accent      = สีตัวอักษรบนพื้น accent-strong (โหมดมืดกลับขั้วเป็นตัวเข้ม)
+     --on-brand-orange= สีตัวอักษรบนปุ่มส้ม "เล่นเกม" (contrast สว่างใช้ขาว · โหมดมืดกลับเป็นตัวเข้มทุกสกิน)
+     --btn-play-bg    = พื้นปุ่ม "เล่นเกม" (ปกติ = ส้มแบรนด์ · สกิน warm ใช้ส้มเข้มพิเศษเพราะส้มเดิมไม่ผ่านกับสีตัวอักษรใดเลย)
+     --control-border = เส้นขอบช่องกรอก ≥3:1 ตาม WCAG 1.4.11 (ของเดิม --baseline ได้แค่ 1.5:1) */
+  --on-accent: #ffffff;
+  --on-brand-orange: #2a1505;
+  --btn-play-bg: var(--brand-orange);
+  --control-border: #858378;
 
   /* --- สีแบรนด์ (ใช้เป็นสีตกแต่ง/หมวดหมู่เท่านั้น ไม่ใช้กับกราฟ) --- */
   --brand-blue: #2a78d6;
@@ -55,7 +65,7 @@
   --surface: #ffffff;
   --ink: #1b2230;
   --ink-2: #5a657a;
-  --muted: #93a0b5;
+  --muted: #5e6a80;          /* รอบ ก: เดิม 2.7:1 → 5.5:1 */
   --grid: #e6ecf5;
   --baseline: #c6d2e3;
   --border: rgba(27, 34, 48, 0.09);
@@ -90,6 +100,8 @@
   --good-text: #005c00;
   --critical: #b3261e;
   --brand-orange: #b5410f;    /* ส้มเข้มขึ้นให้อ่านออกบนพื้นขาว */
+  --on-brand-orange: #ffffff;  /* รอบ ก: ขาวบนส้มเข้ม = 5.6:1 */
+  --control-border: #5a5a5a;   /* รอบ ก: สกินคมชัดใช้เส้นเข้มพิเศษ (7:1) */
   --tint-blue: #eaf1fa;
   --tint-orange: #fbeee7;
   --tint-teal: #e6f5ef;
@@ -107,7 +119,7 @@
   --surface: #ffffff;
   --ink: #17251b;
   --ink-2: #4a5c50;
-  --muted: #8a9a8f;
+  --muted: #5d6e62;          /* รอบ ก: เดิม 3.0:1 → 5.4:1 */
   --grid: #e2ebe2;
   --baseline: #bfd0c2;
   --border: rgba(23, 37, 27, 0.10);
@@ -130,7 +142,9 @@
   --surface: #ffffff;
   --ink: #2a1f16;
   --ink-2: #6b5647;
-  --muted: #a4907f;
+  --muted: #7a6455;          /* รอบ ก: เดิม 3.1:1 → 5.6:1 */
+  --btn-play-bg: #b04f1b;    /* รอบ ก: ส้ม warm #c2571c ได้แค่ ขาว 4.49 / ตัวเข้ม 3.92 → ปุ่มเล่นใช้ส้มเข้มขึ้น ขาว 5.28:1 */
+  --on-brand-orange: #ffffff;
   --grid: #f0e5d8;
   --baseline: #d9c5b0;
   --border: rgba(42, 31, 22, 0.10);
@@ -154,7 +168,7 @@
   --surface: #ffffff;
   --ink: #10262c;
   --ink-2: #43626b;
-  --muted: #85a2ab;
+  --muted: #567680;          /* รอบ ก: เดิม 2.7:1 → 4.9:1 */
   --grid: #dceaef;
   --baseline: #b4cfd8;
   --border: rgba(16, 38, 44, 0.10);
@@ -177,7 +191,7 @@
   --surface: #ffffff;
   --ink: #1e1830;
   --ink-2: #574c73;
-  --muted: #9288ab;
+  --muted: #655b80;          /* รอบ ก: เดิม 3.3:1 → 6.3:1 */
   --grid: #e9e3f6;
   --baseline: #c9bfe2;
   --border: rgba(30, 24, 48, 0.10);
@@ -225,6 +239,10 @@
   --tint-orange: #3a2118;
   --tint-teal: #123026;
   --tint-yellow: #33260c;
+  --on-accent: #0d1626;       /* รอบ ก: accent-strong โหมดมืดเป็นฟ้าอ่อน → ตัวเข้ม 7.2:1 */
+  --control-border: #7a7975;  /* รอบ ก: 4.0:1 บนพื้นการ์ดมืด */
+  --on-brand-orange: #2a1505; /* รอบ ก: ส้มโหมดมืด #f08256 อ่อน → ตัวเข้ม 6.7:1 (ทับค่าขาวของสกิน contrast) */
+  --btn-play-bg: var(--brand-orange);
   --lift: 0 6px 18px rgba(0, 0, 0, 0.5);
 }
 /* auto = ตามเครื่องของผู้ใช้ */
@@ -252,6 +270,10 @@
     --tint-orange: #3a2118;
     --tint-teal: #123026;
     --tint-yellow: #33260c;
+    --on-accent: #0d1626;       /* รอบ ก: accent-strong โหมดมืดเป็นฟ้าอ่อน → ตัวเข้ม 7.2:1 */
+    --control-border: #7a7975;  /* รอบ ก: 4.0:1 บนพื้นการ์ดมืด */
+    --on-brand-orange: #2a1505; /* รอบ ก: ส้มโหมดมืด #f08256 อ่อน → ตัวเข้ม 6.7:1 (ทับค่าขาวของสกิน contrast) */
+    --btn-play-bg: var(--brand-orange);
     --lift: 0 6px 18px rgba(0, 0, 0, 0.5);
   }
 }
@@ -415,20 +437,20 @@ table.gol td.num { font-variant-numeric: tabular-nums; text-align: right; }
 /* display:inline-block จำเป็น — <label> เป็น inline โดยปริยาย ซึ่ง width/height ไม่มีผล
    ทำให้สวิตช์ยุบเหลือ 0×0 และกดไม่ได้เมื่อวางนอกกล่อง flex (เช่นในตารางหน้า Admin) */
 .switch { position: relative; display: inline-block; vertical-align: middle;
-  width: 38px; height: 22px; flex: none; }
+  width: 44px; height: 24px; flex: none; }  /* รอบ ข: เดิม 38×22 — เป้ากด ≥24px ตาม WCAG 2.5.8 */
 .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; position: absolute; z-index: 2; }
 .switch i { position: absolute; inset: 0; border-radius: 999px; background: var(--baseline); transition: background .15s; }
-.switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+.switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
   border-radius: 50%; background: #fff; transition: left .15s; }
 .switch input:checked + i { background: var(--good); }
-.switch input:checked + i::after { left: 19px; }
+.switch input:checked + i::after { left: 23px; }
 .assign-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--grid); }
 .assign-row:first-of-type { border-top: 0; }
 
 /* ---------- ฟอร์ม ---------- */
 input[type=text], input[type=password], input[type=email], select, textarea {
   font-family: inherit; font-size: 14.5px; color: var(--ink);
-  background: var(--surface); border: var(--border-w) solid var(--baseline); border-radius: var(--r-sm);
+  background: var(--surface); border: var(--border-w) solid var(--control-border); border-radius: var(--r-sm);
   padding: 8px 11px; width: 100%;
 }
 textarea { min-height: 92px; resize: vertical; }
@@ -481,10 +503,10 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
 .joinhero.compact .lede { margin: 0; font-size: 14px; }
 .joinhero.compact .eyebrow { font-size: 12.5px; }
 .joinhero.compact .joinbox { align-items: center; }
-.joinhero.compact .joinhint { margin: 0; font-size: 13px; }
+/* บรรทัดที่ 3 — ครูขอให้คำใบ้แยกบรรทัดของตัวเอง ไม่เบียดข้างปุ่ม */
+.joinhero.compact .joinhint { margin: 8px 2px 0; font-size: 13px; }
 @media (max-width: 760px) {
   .joinhero.compact .eyebrow { display: none; }   /* สโลแกนอังกฤษยังอยู่ท้ายหน้า */
-  .joinhero.compact .joinhint { flex-basis: 100%; }
 }
 
 .joinbox { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
@@ -662,7 +684,7 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
 /* ---------- โซนครู / ลิงก์ปลายหน้า ---------- */
 .zone { border-radius: var(--r-lg); border: 1px solid var(--border); padding: 20px 22px;
   background: linear-gradient(135deg, var(--tint-teal), var(--surface) 70%); }
-.zone h2 { margin: 0 0 4px; font-size: 19px; }
+.zone h3 { margin: 0 0 4px; font-size: 19px; }  /* รอบ ข: เดิม h2 — ลดชั้นให้อยู่ใต้หัวข้อหมวด */
 .zone .lede { color: var(--ink-2); font-size: 14px; margin-bottom: 16px; }
 .zcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
 .zcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
@@ -679,6 +701,9 @@ button.zcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
   display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; color: var(--muted); font-size: 13px; }
 .sitefoot .col { flex: 1 1 190px; }
 .sitefoot .col b { display: block; color: var(--ink-2); font-size: 13px; margin-bottom: 6px; }
+/* สโลแกนท้ายหน้า — สองบรรทัด ไม่หักกลางประโยค */
+.sitefoot .fs-en { display: block; font-weight: 600; color: var(--ink-2); }
+.sitefoot .fs-th { display: block; margin-top: 2px; }
 .sitefoot a { display: block; padding: 2px 0; color: var(--ink-2); }
 .sitefoot a:hover { color: var(--accent-strong); }
 
@@ -749,3 +774,93 @@ button.zcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
 .ginfo dd { margin: 0; color: var(--ink-2); }
 .ginfo .gsub { color: var(--muted); font-size: 12px; margin-top: 2px; line-height: 1.45; }
 @media (max-width: 380px) { .ginfo { grid-template-columns: 60px 1fr; } }
+
+
+/* ============================================================
+   รอบ ก — แก้คอนทราสต์ตาม 41_W3C_AUDIT.md (WCAG 1.4.3 / 1.4.11)
+   หลักการ: พื้นทึบสีเน้นใช้ accent-strong เสมอ (ทุกสกินคำนวณแล้ว 5.8–10.7:1)
+   โหมดมืด accent-strong เป็นสีอ่อน จึงกลับขั้วตัวอักษรด้วย --on-accent
+   รวมไว้ท้ายไฟล์ที่เดียวให้ตรวจย้อนง่าย — อย่าแทรกกฎสีทับหลังบรรทัดนี้
+   ============================================================ */
+.btn-primary {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: var(--on-accent);
+}
+.btn-primary:hover { filter: brightness(1.08); background: var(--accent-strong); color: var(--on-accent); }
+
+.brand .logo { background: var(--accent-strong); color: var(--on-accent); }
+
+.chip[aria-pressed="true"] {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: var(--on-accent);
+}
+
+.modeswitch a[aria-current="page"] { background: var(--accent-strong); color: var(--on-accent); }
+
+/* ปุ่มเล่นเกม — เดิมตัวขาวบนส้ม 2.6–3.2:1 · ตัวเข้ม #2a1505 ผ่านทุกสกินสว่างและโหมดมืด
+   ยกเว้น warm/contrast ที่ส้มเข้มพอให้ตัวขาวผ่าน (ตั้งไว้ในโทเคนรายสกินแล้ว) */
+.btn-play { background: var(--btn-play-bg); border-color: var(--btn-play-bg); color: var(--on-brand-orange); }
+.btn-play:hover { background: var(--btn-play-bg); border-color: var(--btn-play-bg);
+  color: var(--on-brand-orange); filter: brightness(1.06); }
+
+/* ป้าย ⭐ แนะนำ บนปกเกม — ลอกแบบป้าย "ภาค 2" ที่วัดแล้วผ่าน 8.8:1 อยู่แล้ว */
+.gcover .ribbon { background: rgba(11, 11, 11, 0.62); }
+
+/* ═══════════ รอบ ข — โครงหน้าและเป้ากด ตาม 41_W3C_AUDIT.md ข้อ 4.4–4.7 ═══════════ */
+
+/* ลิงก์ "ข้ามไปเนื้อหาหลัก" — ซ่อนนอกจอ โผล่เมื่อโฟกัสด้วยคีย์บอร์ด (WCAG 2.4.1) */
+.skip-link { position: absolute; left: -9999px; top: 0; z-index: 120;
+  background: var(--accent-strong); color: var(--on-accent);
+  padding: 10px 18px; border-radius: 0 0 var(--r-md) 0; font-weight: 700; text-decoration: none; }
+.skip-link:focus { left: 0; }
+
+/* ซ่อนจากสายตาแต่โปรแกรมอ่านจอยังเห็น — ต่างจาก .hidden ที่หายไปทั้งคู่ */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* h2.section-title ต้องหน้าตาเหมือน div เดิมทุกประการ (คลาสกำหนด font-size/margin อยู่แล้ว) */
+h2.section-title { line-height: inherit; }
+
+/* เป้ากด ≥24px (WCAG 2.5.8) */
+.crumb a { display: inline-flex; align-items: center; min-height: 24px; }
+input[type=number], input[inputmode="numeric"] { min-height: 26px; }
+
+/* แถวแท็บ Admin พับบรรทัดได้ — เดิมดันหน้ากว้าง 436px บนจอ 320px (WCAG 1.4.10) */
+.tabs { flex-wrap: wrap; }
+
+/* ═══════════ รอบ ค — เกินเกณฑ์ ตาม 41_W3C_AUDIT.md ข้อ 5 ═══════════ */
+
+/* วงโฟกัสคีย์บอร์ดสีตามสกิน — ชัดกว่า outline ค่าเริ่มต้นของเบราว์เซอร์
+   :focus-visible = ขึ้นเฉพาะตอนใช้คีย์บอร์ด ไม่รบกวนการคลิกเมาส์
+   ใช้ --accent-strong ซึ่งทุกสกิน (และโหมดมืด) ผ่าน ≥3:1 กับพื้นอยู่แล้วโดยนิยาม */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+/* พิมพ์ออกกระดาษ — ครูปริ้นต์ตารางคะแนนส่งฝ่ายวิชาการ
+   ซ่อนส่วนที่เป็นเปลือกเว็บ เหลือเนื้อหา/ตารางเต็มหน้า หมึกน้อย อ่านง่าย */
+@media print {
+  .skip-link, .topbar, .sitefoot, .crumb, .tabs, .filterbar, .joinhero,
+  button, .btn, input, select, textarea,
+  .err-box, .warn-note, #saved, .zone, .theme-btn { display: none !important; }
+  /* การ์ด "สร้างห้องเรียนใหม่" เหลือแต่ป้ายว่างหลังซ่อนช่องกรอก — ซ่อนทั้งใบ */
+  .card:has(#nr-name) { display: none !important; }
+
+  body { background: #fff !important; color: #000 !important; }
+  .wrap { max-width: none; padding: 0; }
+  .card { box-shadow: none !important; border: 1px solid #999; break-inside: avoid; }
+  .table-scroll { overflow: visible !important; }
+  table.gol { width: 100%; font-size: 12px; }
+  table.gol th, table.gol td { border-bottom: 1px solid #bbb; }
+  tr { break-inside: avoid; }
+  thead { display: table-header-group; }   /* หัวตารางซ้ำทุกหน้ากระดาษ */
+  a { color: inherit; text-decoration: none; }
+  h2.section-title { margin-top: 14px; }
+
+  /* สีป้ายระดับ/แถบสัดส่วนต้องติดหมึก — ไม่งั้นครูเห็นแต่กล่องว่าง */
+  .lvpill, .lvbar > div, .lvkey, .meter, .meter > i, .gp-lv {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

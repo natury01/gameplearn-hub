@@ -18,10 +18,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 <link rel="stylesheet" href="css/gp.css">
 </head>
 <body>
+<a class="skip-link" href="#content">ข้ามไปเนื้อหาหลัก</a>
 <div class="wrap">
 
   <!-- ==================== หัวเว็บ + เมนูหลัก ==================== -->
-  <div class="topbar">
+  <header class="topbar" role="banner">
     <a class="brand" href="./" style="color:inherit;text-decoration:none">
       <span class="logo">ก</span>
       <span class="bname"><span class="th" id="brand-th">เกมเพลิน</span><span class="en">GamePlearn</span></span>
@@ -34,7 +35,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
     </nav>
     <a class="btn btn-primary" id="auth-btn" href="teacher.html">👩‍🏫 เข้าสู่ระบบครู</a>
-  </div>
+  </header>
+
+  <main id="content">
 
   <!-- ==================== นักเรียนมาก่อน: กรอกรหัสห้องเรียน ==================== -->
   <!-- ย่อเหลือ 2 บรรทัด: หัวข้อ+สโลแกน / ช่องกรอก+ปุ่ม
@@ -52,26 +55,29 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
              autocapitalize="characters" spellcheck="false"
              inputmode="text" placeholder="ABC123" aria-describedby="join-hint">
       <button class="btn btn-primary btn-lg" id="join-go">🏫 เข้าห้องเรียน</button>
-      <span class="joinhint" id="join-hint">ยังไม่มีโค้ดก็เล่นได้ — เลื่อนดูเกมด้านล่าง</span>
     </div>
 
-    <div class="err-box" id="join-err" style="margin-top:10px"></div>
+    <!-- บรรทัดที่ 3 — แยกออกจากแถวช่องกรอกตามที่ครูสั่ง อ่านง่ายกว่าเบียดข้างปุ่ม -->
+    <div class="joinhint" id="join-hint">ยังไม่มีโค้ดก็เล่นได้ — เลื่อนดูเกมด้านล่าง</div>
+
+    <div class="err-box" id="join-err" role="alert" style="margin-top:10px"></div>
 
     <div id="room-result"></div>
   </section>
 
   <!-- ==================== เกมแนะนำ ==================== -->
-  <div class="section-title" id="featured-title" style="display:none">
+  <!-- รอบ ข: หัวข้อหมวดเปลี่ยนจาก div เป็น h2 — โครงหัวข้อไล่ h1→h2→h3 ไม่กระโดด -->
+  <h2 class="section-title" id="featured-title" style="display:none">
     ⭐ เกมแนะนำ <span class="sub">คัดมาให้เริ่มเล่นได้เลย</span>
-  </div>
+  </h2>
   <div id="featured" class="strip fit-3"></div>
 
   <!-- ==================== เกมทั้งหมด + ตัวกรอง ==================== -->
-  <div class="section-title" id="games">
+  <h2 class="section-title" id="games">
     🎮 เกมทั้งหมด <span class="sub" id="game-count"></span>
-  </div>
+  </h2>
 
-  <div class="err-box" id="cat-err"></div>
+  <div class="err-box" id="cat-err" role="alert"></div>
   <div class="warn-note hidden" id="basic-note" style="margin-bottom:14px"></div>
 
   <div class="filterbar" id="filterbar" style="display:none">
@@ -99,9 +105,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   </div>
 
   <!-- ==================== โซนครู ==================== -->
-  <div class="section-title" id="teacher-zone">👩‍🏫 สำหรับคุณครู</div>
+  <h2 class="section-title" id="teacher-zone">👩‍🏫 สำหรับคุณครู</h2>
   <section class="zone">
-    <h2>ดูผลนักเรียนทุกเกม ในที่เดียว</h2>
+    <h3>ดูผลนักเรียนทุกเกม ในที่เดียว</h3>
     <div class="lede">
       สร้างห้องเรียน แจกโค้ดให้นักเรียน แล้วดูทั้ง<b>ผลสัมฤทธิ์</b>และ<b>สมรรถนะหลัก</b>
       ของทุกเกมรวมกัน — ไม่ต้องเปิดหลายเว็บ ไม่ต้องคีย์คะแนนเอง
@@ -131,11 +137,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   </section>
 
   <!-- ==================== ปลายหน้า ==================== -->
+  </main>
+
   <footer class="sitefoot">
     <div class="col">
       <b>เกมเพลิน (GamePlearn)</b>
       <span id="foot-slogan">Game On. Learn Beyond.</span>
-      <span style="display:block;margin-top:6px">ศูนย์รวมเกมการเรียนรู้สำหรับโรงเรียนไทย</span>
     </div>
     <div class="col">
       <b>เมนู</b>
@@ -169,7 +176,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   document.getElementById('brand-th').textContent = C.BRAND_TH;
   $('slogan-en').textContent = SL.en;
   $('slogan-th').textContent = SL.th;
-  $('foot-slogan').textContent = SL.en + ' — ' + SL.th;
+  $('foot-slogan').innerHTML =
+    '<span class="fs-en">' + G.esc(SL.en) + '</span><span class="fs-th">' + G.esc(SL.th) + '</span>';
 
   /* ไอคอนสำรองต่อเกม (ใช้ตอนยังไม่มี cover_url และยังไม่ได้ตั้ง genre) */
   const FALLBACK_ICON = { kanchanaburi2050: '🗺️', 'kanchanaburi2050-2': '🛡️', typing: '⌨️' };
@@ -297,7 +305,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             const on = sel[d.key] === o.value;
             return '<button class="chip" type="button" role="button" aria-pressed="' + (on ? 'true' : 'false') + '"'
               + ' data-dim="' + G.esc(d.key) + '" data-val="' + G.esc(o.value) + '">'
-              + G.esc(o.label) + ' <span class="n">' + o.count + '</span></button>';
+              + G.esc(o.label) + ' <span class="n">(' + o.count + ')</span></button>';
           }).join('')
         + '</div></div>';
     }).join('');

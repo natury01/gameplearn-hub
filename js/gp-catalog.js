@@ -18,6 +18,19 @@
   };
   const STATUS_TH = { published: 'เปิดใช้งาน', maintenance: 'ปิดปรับปรุงชั่วคราว', testing: 'รุ่นทดสอบ' };
 
+  /* ชื่อย่อสมรรถนะหลัก 6 ด้าน (CBE) — ชื่อเต็มยาวเกินกว่าจะใส่บนการ์ดได้ทั้ง 6 */
+  const COMP_SHORT = {
+    SM: 'จัดการตนเอง', HOT: 'คิดขั้นสูง', CM: 'สื่อสาร',
+    TW: 'ทำงานเป็นทีม', CZ: 'พลเมืองเข้มแข็ง', SN: 'อยู่กับธรรมชาติ',
+  };
+  const CBE_TOTAL = 6;
+
+  /* ชื่อย่อกลุ่มสาระ — ชื่อเต็มตามหลักสูตรยาวมาก */
+  const SUBJ_SHORT = {
+    TH: 'ภาษาไทย', MA: 'คณิตศาสตร์', SC: 'วิทยาศาสตร์ฯ', SO: 'สังคมศึกษาฯ',
+    PE: 'สุขศึกษาฯ', AR: 'ศิลปะ', OC: 'การงานอาชีพ', FL: 'ภาษาต่างประเทศ',
+  };
+
   /* ช่วงชั้นแบบกว้าง — ต้องให้ผลเหมือน grade_band ใน v_game_catalog เป๊ะ ๆ */
   function gradeBand(g) {
     const lo = g.minimum_grade, hi = g.maximum_grade;
@@ -76,6 +89,7 @@
     const genre = g.genre || null;
     return {
       id: g.id, code: g.code, name: g.name, description: g.description || '',
+      topic: g.topic || '',
       launch_url: g.launch_url, dashboard_url: g.dashboard_url, cover_url: g.cover_url,
       minimum_grade: g.minimum_grade, maximum_grade: g.maximum_grade,
       status: g.status, current_version: g.current_version,
@@ -134,7 +148,7 @@
   /* ---------- คัดกรอง ---------- */
   function matches(g, sel, q) {
     if (q) {
-      const hay = [g.name, g.description, g.series, g.genre_name]
+      const hay = [g.name, g.description, g.topic, g.series, g.genre_name]
         .concat(g.tags, g.subject_areas, g.competencies).join(' ').toLowerCase();
       if (hay.indexOf(q.toLowerCase()) < 0) return false;
     }
@@ -164,5 +178,5 @@
   }
 
   window.GPCatalog = { loadCatalog, buildFilters, apply, matches, SORTS, DIMENSIONS,
-    GENRE_ICON, GENRE_TH, STATUS_TH, gradeBand, gradeText };
+    GENRE_ICON, GENRE_TH, STATUS_TH, COMP_SHORT, SUBJ_SHORT, CBE_TOTAL, gradeBand, gradeText };
 })();

@@ -23,7 +23,6 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     </a>
     <div class="sp"></div>
     <span class="who" id="who"></span>
-    <a class="btn" href="teacher.html">📊 Dashboard ครู</a>
     <button class="btn hidden" id="logout">ออกจากระบบ</button>
   </div>
 
@@ -181,9 +180,13 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         hint: 'เลือก "ตามเครื่อง" แล้วเครื่องนักเรียนที่ตั้งโหมดมืดไว้จะเห็นเว็บเป็นสีดำ '
             + 'ซึ่งอาจไม่ตรงกับที่ครูเห็นตอนเตรียมสอน · "สว่างเสมอ" ปลอดภัยที่สุดสำหรับโปรเจกเตอร์' },
       { key: 'site_skin', label: 'ชุดสีของเว็บ', type: 'select',
-        options: [['playful', '🎨 สนุกสดใส — สีสด มุมมน เหมาะกับเด็ก'],
-                  ['soft', '🫧 นุ่มตา — สีอ่อน สบายตา เหมาะกับใช้งานนาน'],
-                  ['contrast', '🔍 คมชัด — ตัวอักษรใหญ่ เส้นขอบหนา อ่านง่ายบนโปรเจกเตอร์เก่า']],
+        options: [['playful', '🎨 สนุกสดใส — น้ำเงิน-ส้ม สีสด เหมาะกับเด็ก'],
+                  ['soft', '🫧 นุ่มตา — ฟ้าอ่อน สบายตา เหมาะกับใช้งานนาน'],
+                  ['contrast', '🔍 คมชัด — ตัวอักษรใหญ่ เส้นขอบหนา อ่านง่ายบนโปรเจกเตอร์เก่า'],
+                  ['nature', '🌿 ธรรมชาติ — เขียวใบไม้ สงบ เข้ากับเนื้อหาสิ่งแวดล้อม'],
+                  ['warm', '🧡 อบอุ่น — ครีม-ส้ม เป็นมิตร เหมาะกับเด็กเล็ก'],
+                  ['ocean', '🌊 ทะเล — ฟ้าอมเขียว สดชื่น'],
+                  ['creative', '💜 สร้างสรรค์ — ม่วง ทันสมัย']],
         hint: 'เปลี่ยนแล้วเห็นผลทันทีในหน้านี้ ลองสลับดูได้เลย' },
     ],
     announce: [
@@ -191,6 +194,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         hint: 'เช่น "ปิดปรับปรุงระบบ 20 ส.ค. 22:00–23:00 น." · เว้นว่าง = ไม่แสดงแถบ' },
     ],
     support: [
+      { key: 'support_headline', label: 'พาดหัวหน้าสนับสนุน', type: 'text',
+        hint: 'เว้นว่าง = "ช่วยให้เกมเพลินเปิดให้โรงเรียนใช้ฟรีต่อไป"' },
+      { key: 'support_lede', label: 'ข้อความใต้พาดหัว', type: 'textarea',
+        hint: 'อธิบายว่าทำไมต้องขอการสนับสนุน · ขึ้นบรรทัดใหม่ได้ · เว้นว่าง = ใช้ข้อความมาตรฐาน' },
+      { key: 'support_usage_text', label: 'เงินสนับสนุนถูกใช้ทำอะไรบ้าง', type: 'textarea',
+        hint: 'กล่องล่างสุดของหน้า · ยิ่งบอกละเอียดยิ่งน่าเชื่อถือ · เว้นว่าง = ใช้ข้อความมาตรฐาน' },
       { key: 'support_qr_url', label: 'รูป QR สำหรับรับการสนับสนุน', type: 'image',
         hint: 'บันทึก QR จากแอปธนาคารเป็นรูป แล้วอัปโหลดที่นี่' },
       { key: 'support_promptpay', label: 'เบอร์/เลขพร้อมเพย์', type: 'text' },
@@ -238,6 +247,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     }
 
     $('who').textContent = me.email || me.display_name || 'ผู้ดูแล';
+    if (G.refreshModeSwitch) G.refreshModeSwitch();   /* ปุ่มสลับโหมดผู้ดูแล/ครู */
     $('gate').classList.add('hidden');
     $('logout').classList.remove('hidden');
     $('app').classList.remove('hidden');
@@ -387,23 +397,34 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   function renderQrPreview() {
     const qr = settings.support_qr_url;
-    $('qr-preview').innerHTML = qr
+    const head = settings.support_headline || 'ช่วยให้เกมเพลินเปิดให้โรงเรียนใช้ฟรีต่อไป';
+    const lede = settings.support_lede
+      || 'เกมเพลินสร้างโดยครู เพื่อครูและนักเรียนไทย ทุกเกมเปิดให้ใช้ฟรี '
+       + 'การสนับสนุนของคุณช่วยจ่ายค่าเซิร์ฟเวอร์ ค่าโดเมน และช่วยให้มีเกมใหม่เพิ่มขึ้นเรื่อย ๆ';
+    const headHtml = '<div style="text-align:left;padding:14px 16px;border-radius:var(--r-md);'
+      + 'background:var(--tint-blue);margin-bottom:14px">'
+      + '<div style="font-size:11.5px;font-weight:700;color:var(--accent-strong);letter-spacing:.4px">SUPPORT</div>'
+      + '<div style="font-weight:700;font-size:16px;margin:3px 0 5px">' + G.esc(head) + '</div>'
+      + '<div class="muted small" style="white-space:pre-line">' + G.esc(lede) + '</div>'
+      + '</div>';
+    $('qr-preview').innerHTML = headHtml + (qr
       ? '<img src="' + G.esc(qr) + '" alt="" style="width:100%;max-width:230px;border-radius:14px;'
         + 'border:1px solid var(--border)">'
         + '<div class="muted small" style="margin-top:10px">' + G.esc(settings.support_text || '') + '</div>'
         + (settings.support_promptpay ? '<div class="joinkey" style="margin-top:6px">'
             + G.esc(settings.support_promptpay) + '</div>' : '')
         + (settings.support_bank_note ? '<div class="muted small">' + G.esc(settings.support_bank_note) + '</div>' : '')
-      : '<div class="muted small" style="padding:30px 0">ยังไม่ได้ตั้งค่า QR — อัปโหลดรูปทางซ้าย</div>';
+      : '<div class="muted small" style="padding:30px 0">ยังไม่ได้ตั้งค่า QR — อัปโหลดรูปทางซ้าย</div>');
   }
 
   /* ============ ทะเบียนเกม ============ */
   async function loadGames() {
-    games = await G.get('/rest/v1/games?select=id,code,name,status,is_featured,sort_order,launch_url&order=sort_order,name')
+    games = await G.get('/rest/v1/games?select=id,code,name,status,is_featured,sort_order,'
+      + 'launch_url,cover_url,topic&order=sort_order,name')
       .catch(async function () {
         /* ยังไม่ได้รัน 14_GAME_FILTERS.sql → ยังไม่มีคอลัมน์ is_featured/sort_order */
         const rows = await G.get('/rest/v1/games?select=id,code,name,status,launch_url&order=name');
-        return rows.map((g) => Object.assign({ is_featured: null, sort_order: null }, g));
+        return rows.map((g) => Object.assign({ is_featured: null, sort_order: null, cover_url: null, topic: '' }, g));
       });
     renderGames();
   }
@@ -431,10 +452,40 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
                   + ' value="' + (g.sort_order == null ? '' : g.sort_order) + '"'
                   + ' style="width:64px;text-align:center">')
             + '</td>'
-            + '<td>' + (g.launch_url
-                ? '<a class="btn btn-sm" href="' + G.esc(g.launch_url) + '" target="_blank" rel="noopener">เปิด</a>'
-                : '') + '</td>'
-            + '</tr>';
+            + '<td style="white-space:nowrap">'
+            +   '<button class="btn btn-sm" data-edit="' + g.id + '">✏️ แก้ไข</button> '
+            +   (g.launch_url
+                  ? '<a class="btn btn-sm" href="' + G.esc(g.launch_url) + '" target="_blank" rel="noopener">เปิด</a>'
+                  : '')
+            + '</td>'
+            + '</tr>'
+            /* แถวขยาย — รูปปกและชื่อเรื่อง (ซ่อนไว้จนกดแก้ไข) */
+            + '<tr class="hidden" id="edit-' + g.id + '"><td colspan="5" style="background:var(--page)">'
+            +   '<div class="grid cols-2" style="align-items:start;padding:6px 2px">'
+            +     '<div>'
+            +       '<label class="f" style="margin-top:0;font-weight:600;color:var(--ink)">รูปปกเกม</label>'
+            +       '<div class="form-hint" style="margin:0 0 8px">'
+            +         'ใช้ภาพหน้าแรกของเกม — แคปหน้าจอแล้วอัปโหลดที่นี่ · แนวนอน อัตราส่วนประมาณ 16:9'
+            +       '</div>'
+            +       '<input type="text" data-game="' + g.id + '" data-field="cover_url"'
+            +         ' value="' + G.esc(g.cover_url || '') + '" placeholder="วาง URL รูป หรือกดอัปโหลด">'
+            +       '<div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap">'
+            +         '<label class="btn btn-sm" style="cursor:pointer">📤 อัปโหลดรูปปก'
+            +           '<input type="file" accept="image/*" data-upload-cover="' + g.id + '" style="display:none"></label>'
+            +         '<span class="muted small" data-upstat="cover-' + g.id + '"></span>'
+            +       '</div>'
+            +     '</div>'
+            +     '<div>'
+            +       '<label class="f" style="margin-top:0;font-weight:600;color:var(--ink)">ชื่อเรื่อง / หัวข้อการเรียนรู้</label>'
+            +       '<div class="form-hint" style="margin:0 0 8px">แสดงบนการ์ดในแคตตาล็อก เช่น "ประวัติศาสตร์และภูมิศาสตร์กาญจนบุรี"</div>'
+            +       '<input type="text" data-game="' + g.id + '" data-field="topic" value="' + G.esc(g.topic || '') + '">'
+            +       (g.cover_url
+                      ? '<div style="margin-top:12px"><img src="' + G.esc(g.cover_url) + '" alt=""'
+                        + ' style="width:100%;max-width:260px;border-radius:12px;border:1px solid var(--border)"></div>'
+                      : '<div class="panel-note">ยังไม่มีรูปปก — การ์ดจะใช้ไอคอนตามแนวเกมแทน</div>')
+            +     '</div>'
+            +   '</div>'
+            + '</td></tr>';
         }).join('')
       + '</tbody>';
 
@@ -455,6 +506,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let val;
     if (field === 'is_featured') val = el.checked;
     else if (field === 'sort_order') { val = parseInt(el.value, 10); if (isNaN(val)) val = 0; el.value = val; }
+    else if (field === 'cover_url' || field === 'topic') val = el.value.trim() || null;
     else val = el.value;
 
     const body = {}; body[field] = val;
@@ -469,6 +521,52 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + ' — ถ้าขึ้นว่าไม่มีสิทธิ์ ให้รัน 22_ADMIN_SETUP.sql ส่วนที่ 3');
       loadGames();
     }
+  });
+
+  /* เปิด/ปิดแถวแก้ไขรายเกม */
+  document.addEventListener('click', function (ev) {
+    const b = ev.target.closest('[data-edit]');
+    if (!b) return;
+    const row = document.getElementById('edit-' + b.getAttribute('data-edit'));
+    if (!row) return;
+    const open = row.classList.toggle('hidden') === false;
+    b.textContent = open ? '✕ ปิด' : '✏️ แก้ไข';
+  });
+
+  /* อัปโหลดรูปปกเกม — เก็บที่ bucket เดียวกับโลโก้ */
+  document.addEventListener('change', async function (ev) {
+    const inp = ev.target.closest('[data-upload-cover]');
+    if (!inp || !inp.files || !inp.files[0]) return;
+    const id = inp.getAttribute('data-upload-cover');
+    const file = inp.files[0];
+    const stat = document.querySelector('[data-upstat="cover-' + id + '"]');
+    if (file.size > 3 * 1024 * 1024) {
+      if (stat) stat.textContent = 'ไฟล์ใหญ่เกิน 3MB — ย่อรูปก่อน'; inp.value = ''; return;
+    }
+    if (stat) stat.textContent = 'กำลังอัปโหลด…';
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const path = 'cover-' + id + '-' + Date.now() + '.' + ext;
+    const sess = G.session();
+    try {
+      const r = await fetch(C.SB_URL + '/storage/v1/object/brand/' + path, {
+        method: 'POST',
+        headers: { apikey: C.SB_ANON, Authorization: 'Bearer ' + (sess && sess.access_token),
+          'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true' },
+        body: file });
+      if (!r.ok) throw new Error(r.status + ' ' + (await r.text()).slice(0, 140));
+      const url = C.SB_URL + '/storage/v1/object/public/brand/' + path;
+      await G.api('/rest/v1/games?id=eq.' + id, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ cover_url: url }) });
+      toast();
+      await loadGames();
+      const row = document.getElementById('edit-' + id);
+      if (row) row.classList.remove('hidden');   /* เปิดแถวเดิมค้างไว้ให้เห็นผล */
+    } catch (e) {
+      if (stat) stat.textContent = '';
+      showErr('อัปโหลดรูปปกไม่สำเร็จ: ' + e.message
+        + ' — ถ้ายังไม่ได้สร้างที่เก็บรูป ให้รัน 22_ADMIN_SETUP.sql ส่วนที่ 4');
+    } finally { inp.value = ''; }
   });
 
   /* ============ กล่องข้อความ ============ */

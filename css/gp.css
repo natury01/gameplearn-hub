@@ -100,6 +100,101 @@
   --shadow: none;
 }
 
+
+/* ---------- สกิน ง · ธรรมชาติ (Nature) — เขียวใบไม้ สงบ เหมาะกับเนื้อหาสิ่งแวดล้อม ---------- */
+[data-skin="nature"] {
+  --page: #f6f8f3;
+  --surface: #ffffff;
+  --ink: #17251b;
+  --ink-2: #4a5c50;
+  --muted: #8a9a8f;
+  --grid: #e2ebe2;
+  --baseline: #bfd0c2;
+  --border: rgba(23, 37, 27, 0.10);
+  --accent: #2f7d4f;
+  --accent-strong: #1f5c39;
+  --meter-track: #d3ead9;
+  --brand-blue: #2f7d4f;
+  --brand-orange: #d9772e;
+  --brand-teal: #189a86;
+  --brand-yellow: #d2a11a;
+  --tint-blue: #e8f3ec;
+  --tint-orange: #fbf0e6;
+  --tint-teal: #e4f4f1;
+  --tint-yellow: #faf3e0;
+}
+
+/* ---------- สกิน จ · อบอุ่น (Warm) — ครีม-ส้ม เป็นมิตร เหมาะกับเด็กเล็ก ---------- */
+[data-skin="warm"] {
+  --page: #fdf8f2;
+  --surface: #ffffff;
+  --ink: #2a1f16;
+  --ink-2: #6b5647;
+  --muted: #a4907f;
+  --grid: #f0e5d8;
+  --baseline: #d9c5b0;
+  --border: rgba(42, 31, 22, 0.10);
+  --accent: #c2571c;
+  --accent-strong: #9c4314;
+  --meter-track: #f7ddc9;
+  --brand-blue: #2f6fb5;
+  --brand-orange: #c2571c;
+  --brand-teal: #1f9b83;
+  --brand-yellow: #c98f10;
+  --tint-blue: #eaf1fa;
+  --tint-orange: #fcece0;
+  --tint-teal: #e6f5f2;
+  --tint-yellow: #fbf2df;
+  --r-sm: 11px; --r-md: 17px; --r-lg: 24px; --r-xl: 30px;
+}
+
+/* ---------- สกิน ฉ · ทะเล (Ocean) — ฟ้าอมเขียว สดชื่น ---------- */
+[data-skin="ocean"] {
+  --page: #f2f8fa;
+  --surface: #ffffff;
+  --ink: #10262c;
+  --ink-2: #43626b;
+  --muted: #85a2ab;
+  --grid: #dceaef;
+  --baseline: #b4cfd8;
+  --border: rgba(16, 38, 44, 0.10);
+  --accent: #0b7285;
+  --accent-strong: #075462;
+  --meter-track: #cbe6ed;
+  --brand-blue: #0b7285;
+  --brand-orange: #d2691e;
+  --brand-teal: #12a594;
+  --brand-yellow: #c99a10;
+  --tint-blue: #e3f2f6;
+  --tint-orange: #fbeee3;
+  --tint-teal: #e2f6f3;
+  --tint-yellow: #faf3e0;
+}
+
+/* ---------- สกิน ช · สร้างสรรค์ (Creative) — ม่วง ทันสมัย เหมาะกับเกมแนวคิดสร้างสรรค์ ---------- */
+[data-skin="creative"] {
+  --page: #f8f6fd;
+  --surface: #ffffff;
+  --ink: #1e1830;
+  --ink-2: #574c73;
+  --muted: #9288ab;
+  --grid: #e9e3f6;
+  --baseline: #c9bfe2;
+  --border: rgba(30, 24, 48, 0.10);
+  --accent: #6741b8;
+  --accent-strong: #4d2f8f;
+  --meter-track: #e0d6f7;
+  --brand-blue: #6741b8;
+  --brand-orange: #d95f8c;
+  --brand-teal: #1f9b96;
+  --brand-yellow: #c9931a;
+  --tint-blue: #efeafc;
+  --tint-orange: #fbe9f0;
+  --tint-teal: #e4f5f4;
+  --tint-yellow: #faf2e0;
+  --r-sm: 11px; --r-md: 17px; --r-lg: 24px; --r-xl: 30px;
+}
+
 /* ---------- โหมดมืด ---------- */
 /* ใช้กับทุกสกิน — คงสีเน้นของสกินนั้นไว้ เปลี่ยนแค่พื้นหลังและตัวอักษร */
 [data-theme="dark"],
@@ -516,3 +611,26 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
   transition: background .12s, border-color .12s;
 }
 .theme-btn:hover { border-color: var(--baseline); background: var(--tint-blue); }
+
+/* ---------- ปุ่มสลับโหมดผู้ดูแล / ครู (เห็นเฉพาะบัญชี admin) ---------- */
+.modeswitch {
+  display: inline-flex; border: var(--border-w) solid var(--border);
+  border-radius: 999px; overflow: hidden; background: var(--surface); flex: none;
+}
+.modeswitch a {
+  padding: 7px 14px; font-size: 13.5px; color: var(--ink-2);
+  text-decoration: none; white-space: nowrap; line-height: 1.4;
+}
+.modeswitch a:hover { background: var(--tint-blue); color: var(--accent-strong); text-decoration: none; }
+.modeswitch a[aria-current="page"] { background: var(--accent); color: #fff; font-weight: 600; }
+@media (max-width: 720px) { .modeswitch a { padding: 7px 10px; font-size: 12.5px; } }
+
+/* ---------- แถวข้อมูลบนการ์ดเกม (กลุ่มสาระ · เรื่อง · การประเมิน) ---------- */
+.ginfo {
+  margin: 4px 0 0; padding: 10px 0 0; border-top: 1px dashed var(--grid);
+  display: grid; grid-template-columns: 68px 1fr; gap: 4px 10px; font-size: 13px;
+}
+.ginfo dt { color: var(--muted); font-size: 12.5px; }
+.ginfo dd { margin: 0; color: var(--ink-2); }
+.ginfo .gsub { color: var(--muted); font-size: 12px; margin-top: 2px; line-height: 1.45; }
+@media (max-width: 380px) { .ginfo { grid-template-columns: 60px 1fr; } }

@@ -35,11 +35,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   <section class="joinhero" style="text-align:center">
     <div class="eyebrow">SUPPORT</div>
-    <h1>ช่วยให้เกมเพลินเปิดให้โรงเรียนใช้ฟรีต่อไป</h1>
-    <div class="lede" style="max-width:620px;margin:0 auto">
-      เกมเพลินสร้างโดยครู เพื่อครูและนักเรียนไทย ทุกเกมเปิดให้ใช้ฟรี
-      การสนับสนุนของคุณช่วยจ่ายค่าเซิร์ฟเวอร์ ค่าโดเมน และช่วยให้มีเกมใหม่เพิ่มขึ้นเรื่อย ๆ
-    </div>
+    <h1 id="sp-headline">ช่วยให้เกมเพลินเปิดให้โรงเรียนใช้ฟรีต่อไป</h1>
+    <div class="lede" id="sp-lede" style="max-width:620px;margin:0 auto;white-space:pre-line">เกมเพลินสร้างโดยครู เพื่อครูและนักเรียนไทย ทุกเกมเปิดให้ใช้ฟรี การสนับสนุนของคุณช่วยจ่ายค่าเซิร์ฟเวอร์ ค่าโดเมน และช่วยให้มีเกมใหม่เพิ่มขึ้นเรื่อย ๆ</div>
   </section>
 
   <div class="grid cols-2" style="margin-top:18px;align-items:start">
@@ -84,10 +81,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   <div class="card" style="margin-top:16px">
     <h2 style="margin:0 0 8px;font-size:17px">เงินสนับสนุนถูกใช้ทำอะไรบ้าง</h2>
-    <div class="muted small">
-      ค่าเซิร์ฟเวอร์และฐานข้อมูลที่เก็บผลการเรียนของนักเรียน · ค่าโดเมน gameplearn.com ·
-      ค่าเครื่องมือสำหรับสร้างภาพ เสียง และเนื้อหาในเกม · เวลาในการพัฒนาเกมใหม่และดูแลระบบให้ใช้ได้ตลอด
-    </div>
+    <div class="muted small" id="sp-usage" style="white-space:pre-line">ค่าเซิร์ฟเวอร์และฐานข้อมูลที่เก็บผลการเรียนของนักเรียน · ค่าโดเมน gameplearn.com · ค่าเครื่องมือสำหรับสร้างภาพ เสียง และเนื้อหาในเกม · เวลาในการพัฒนาเกมใหม่และดูแลระบบให้ใช้ได้ตลอด</div>
   </div>
 
   <footer class="sitefoot">
@@ -121,7 +115,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   /* รูป QR และข้อความ อ่านจากตาราง site_settings (แก้ได้จากหน้า Admin โดยไม่ต้องแก้โค้ด)
      ถ้ายังไม่ได้ตั้งค่า จะขึ้นคำแนะนำว่าต้องทำอะไร — ไม่ปล่อยหน้าว่างเปล่า */
-  G.get('/rest/v1/site_settings?select=key,value&key=in.(support_qr_url,support_text,support_promptpay)')
+  G.get('/rest/v1/site_settings?select=key,value&key=in.(support_qr_url,support_text,support_promptpay,support_bank_note,support_headline,support_lede,support_usage_text)')
     .then(function (rows) {
       const s = {};
       (rows || []).forEach(function (r) { s[r.key] = r.value; });
@@ -130,6 +124,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     .catch(function () { render({}); });
 
   function render(s) {
+    /* ข้อความบนหน้านี้แก้ได้จากหน้า Admin — เว้นว่าง = ใช้ข้อความมาตรฐานที่เขียนไว้ใน HTML */
+    const put = (id, val) => { if (val && val.trim()) document.getElementById(id).textContent = val.trim(); };
+    put('sp-headline', s.support_headline);
+    put('sp-lede', s.support_lede);
+    put('sp-usage', s.support_usage_text);
+
     const slot = document.getElementById('qr-slot');
     const note = document.getElementById('qr-note');
     if (s.support_qr_url) {
@@ -147,6 +147,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     }
     if (s.support_promptpay) {
       note.innerHTML += '<br>พร้อมเพย์: <b class="joinkey">' + G.esc(s.support_promptpay) + '</b>';
+    }
+    if (s.support_bank_note) {
+      note.innerHTML += '<br>' + G.esc(s.support_bank_note);
     }
   }
 })();

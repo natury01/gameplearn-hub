@@ -159,7 +159,6 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 <script src="js/gp-core.js"></script>
 <script src="js/gp-brand.js"></script>
 <script src="js/gp-catalog.js"></script>
-<script src="js/gp-standards-panel.js"></script>
 <script>
 (function () {
   const C = window.GP_CONFIG, G = window.GP, K = window.GPCatalog, SL = window.GP_SLOGAN;
@@ -191,23 +190,44 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     return '<div class="gfacts">' + f.join('') + '</div>';
   }
 
-  /* ป้ายบนการ์ด — จำกัดไว้ 4 ป้ายพอ ไม่งั้นการ์ดรกจนอ่านชื่อเกมไม่ทัน
-     และไม่ให้ป้ายซ้ำข้ามหมวด (เช่น "ภาษาไทย" เป็นทั้งกลุ่มสาระและหัวข้อ) */
-  function tags(g) {
-    const seen = {}, out = [];
-    function add(list, cls, max) {
-      let n = 0;
-      for (const s of list) {
-        if (out.length >= 4 || n >= max) break;
-        if (!s || seen[s]) continue;
-        seen[s] = 1; n++;
-        out.push('<span class="tag' + (cls ? ' ' + cls : '') + '">' + G.esc(s) + '</span>');
-      }
+  /* แถวข้อมูลบนการ์ด — ครูต้องตอบได้ใน 3 วินาทีว่า "เกมนี้สอนอะไร วัดอะไร"
+     จึงใช้หัวข้อกำกับชัด ๆ แทนป้ายลอย ๆ ที่ไม่รู้ว่าอันไหนคืออะไร */
+  function infoRows(g) {
+    const rows = [];
+
+    /* กลุ่มสาระ — ใช้ชื่อย่อ ชื่อเต็มตามหลักสูตรยาวเกินการ์ด */
+    if (g.subject_codes.length || g.subject_areas.length) {
+      const subs = g.subject_codes.length
+        ? g.subject_codes.map((c) => K.SUBJ_SHORT[c] || c)
+        : g.subject_areas;
+      rows.push(['กลุ่มสาระ', G.esc(subs.join(' · '))]);
     }
-    add(g.subject_areas, 'subj', 1);
-    add(g.competencies, 'comp', 2);
-    add(g.tags, '', 2);
-    return out.length ? '<div class="tagrow">' + out.join('') + '</div>' : '';
+
+    if (g.topic) rows.push(['เรื่อง', G.esc(g.topic)]);
+
+    /* รูปแบบการประเมิน — บอกทั้งว่าวัด 2 มิติไหน และสมรรถนะด้านใดบ้าง */
+    const modes = [];
+    if (g.subject_areas.length) modes.push('ผลสัมฤทธิ์');
+    const nc = g.competency_codes.length || g.competencies.length;
+    if (nc) {
+      modes.push(nc >= K.CBE_TOTAL ? 'สมรรถนะหลักครบ ' + K.CBE_TOTAL + ' ด้าน'
+                                   : 'สมรรถนะหลัก ' + nc + ' ด้าน');
+    }
+    if (modes.length) {
+      let detail = '';
+      if (g.competency_codes.length) {
+        detail = '<div class="gsub">' + G.esc(g.competency_codes
+          .map((c) => K.COMP_SHORT[c] || c).join(' · ')) + '</div>';
+      } else if (g.competencies.length) {
+        detail = '<div class="gsub">' + G.esc(g.competencies.join(' · ')) + '</div>';
+      }
+      rows.push(['ประเมิน', modes.join(' · ') + detail]);
+    }
+
+    if (!rows.length) return '';
+    return '<dl class="ginfo">' + rows.map(function (r) {
+      return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>';
+    }).join('') + '</dl>';
   }
 
   function card(g) {
@@ -220,16 +240,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       +   facts(g)
       +   (g.status !== 'published'
             ? '<div><span class="badge ' + G.esc(g.status) + '">' + G.esc(g.status_th) + '</span></div>' : '')
-      +   tags(g)
-      +   '<div class="std-slot hidden" id="std-' + G.esc(g.code) + '"></div>'
+      +   infoRows(g)
       + '</div>'
       + '<div class="gfoot">'
       +   (g.launch_url
-            ? '<a class="btn btn-play' + (off ? ' ' : '') + '" href="' + G.esc(g.launch_url) + '"'
+            ? '<a class="btn btn-play" href="' + G.esc(g.launch_url) + '"'
               + (off ? ' aria-disabled="true" style="pointer-events:none;opacity:.5"' : '')
               + ' target="_blank" rel="noopener">▶ เล่นเกม</a>'
             : '')
-      +   '<button class="btn btn-sm" data-std="' + G.esc(g.code) + '">📋 มาตรฐานที่วัด</button>'
       + '</div>'
       + '</article>';
   }
@@ -385,28 +403,6 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     qt = setTimeout(function () { q = v.trim(); renderList(); }, 160);
   });
   $('sort').addEventListener('change', function (e) { sortKey = e.target.value; renderList(); });
-
-  /* ================= แผง "มาตรฐานที่เกมนี้วัด" ================= */
-  document.addEventListener('click', function (ev) {
-    const b = ev.target.closest('[data-std]');
-    if (!b) return;
-    const code = b.getAttribute('data-std');
-    const slot = document.getElementById('std-' + code);
-    if (!slot) return;
-    if (!slot.classList.contains('hidden')) {
-      slot.classList.add('hidden'); b.textContent = '📋 มาตรฐานที่วัด'; return;
-    }
-    slot.classList.remove('hidden');
-    b.textContent = '📋 ซ่อนมาตรฐาน';
-    if (!slot.dataset.loaded) {
-      slot.dataset.loaded = '1';
-      window.GPStandards.render(slot, { sbUrl: C.SB_URL, sbAnon: C.SB_ANON, gameCode: code })
-        .catch(function () {
-          slot.innerHTML = '<div class="panel-note">ยังไม่ได้บันทึกมาตรฐานของเกมนี้ '
-            + '(รัน 08_ASSESSMENT_CORE.sql แล้วลงทะเบียนตัวชี้วัด/สมรรถนะของเกม)</div>';
-        });
-    }
-  });
 
   /* ================= นักเรียนเข้าห้องเรียน ================= */
   const codeInput = $('join-code');

@@ -75,6 +75,39 @@
     if (last) bar.insertBefore(b, last); else bar.appendChild(b);
   }
 
+  /* ============ ปุ่มสลับโหมดผู้ดูแล / โหมดครู ============
+     แสดงเฉพาะบัญชีที่เป็น admin เท่านั้น · ครูทั่วไปไม่เห็นและกดไม่ได้
+     เรียกซ้ำได้ — หน้าที่เพิ่งล็อกอินเสร็จให้เรียก GP.refreshModeSwitch() */
+  var modeChecked = false;
+  async function renderModeSwitch(force) {
+    if (modeChecked && !force) return;
+    var bar = document.querySelector('.topbar');
+    if (!bar) return;
+    try {
+      if (!(await G.ensure())) return;
+      var uid = G.session() && G.session().user_id;
+      if (!uid) return;
+      var rows = await G.get('/rest/v1/teachers?id=eq.' + uid + '&select=role');
+      if (!rows || !rows[0] || rows[0].role !== 'admin') { modeChecked = true; return; }
+    } catch (e) { return; }
+    modeChecked = true;
+    if (document.getElementById('gp-mode-switch')) return;
+
+    var here = (location.pathname.split('/').pop() || '').toLowerCase();
+    var onAdmin = here.indexOf('admin') === 0;
+    var wrap = document.createElement('div');
+    wrap.id = 'gp-mode-switch';
+    wrap.className = 'modeswitch';
+    wrap.setAttribute('role', 'group');
+    wrap.setAttribute('aria-label', 'สลับโหมดการใช้งาน');
+    wrap.innerHTML =
+      '<a href="admin.html"' + (onAdmin ? ' aria-current="page"' : '') + '>🛠 ผู้ดูแลระบบ</a>'
+      + '<a href="teacher.html"' + (!onAdmin ? ' aria-current="page"' : '') + '>👩‍🏫 ครู</a>';
+    var sp = bar.querySelector('.sp');
+    if (sp && sp.nextSibling) bar.insertBefore(wrap, sp.nextSibling);
+    else bar.appendChild(wrap);
+  }
+
   /* โลโก้แยกตามโหมด — โลโก้สีเข้มมักจมหายบนพื้นมืด */
   var LOGOS = {};
   function logoForTheme() {
@@ -183,6 +216,7 @@
     window.GP_SETTINGS = s || {};
     addThemeButton();      /* ต้องมีปุ่มเสมอ แม้โหลดค่ากลางไม่สำเร็จ */
     paintTheme();
+    renderModeSwitch();    /* ขึ้นเฉพาะบัญชี admin */
     apply(window.GP_SETTINGS);
     ready(window.GP_SETTINGS);
   }
@@ -201,6 +235,9 @@
       })
       .catch(function () { finish({}); /* ยังไม่ได้รัน 15_SITE_PAGES.sql — ใช้ของเดิมในหน้าเว็บ */ });
   }
+
+  /* ให้หน้าที่เพิ่งล็อกอินเสร็จสั่งตรวจสิทธิ์ใหม่ได้ */
+  G.refreshModeSwitch = function () { return renderModeSwitch(true); };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();

@@ -80,6 +80,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     $('btn-logout').classList.remove('hidden');
     try {
       S.teacher = await G.ensureTeacherRow();
+      if (G.refreshModeSwitch) G.refreshModeSwitch();   /* ปุ่มสลับโหมด (เฉพาะ admin) */
       $('who').textContent = 'ครู: ' + ((S.teacher && S.teacher.display_name) || '') + (S.teacher && S.teacher.email ? ' (' + S.teacher.email + ')' : '');
       await loadAll();
       route();

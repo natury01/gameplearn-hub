@@ -112,6 +112,27 @@
     for (let i = 0; i < 6; i++) s += A[buf[i] % A.length];
     return s;
   }
+  /* เรียงเลขที่นักเรียนแบบ "จำนวนนับ" ไม่ใช่แบบข้อความ
+     student_number เก็บเป็น text (เพราะบางโรงเรียนใช้ 01, ก1, 4/12)
+     ถ้าปล่อยให้ฐานข้อมูลเรียงจะได้ 1, 10, 11, … , 2, 20 ซึ่งครูอ่านไม่รู้เรื่อง
+     กติกา: เป็นตัวเลขล้วนทั้งคู่ → เทียบค่าตัวเลข · นอกนั้นเทียบแบบไทย
+             เลขมาก่อนข้อความเสมอ · ไม่มีเลขที่ไปอยู่ท้ายสุด */
+  function cmpStudentNo(a, b) {
+    const sa = (a == null ? '' : String(a)).trim();
+    const sb = (b == null ? '' : String(b)).trim();
+    if (!sa && !sb) return 0;
+    if (!sa) return 1;
+    if (!sb) return -1;
+    const na = /^\d+$/.test(sa) ? parseInt(sa, 10) : null;
+    const nb = /^\d+$/.test(sb) ? parseInt(sb, 10) : null;
+    if (na !== null && nb !== null) return na - nb;
+    if (na !== null) return -1;
+    if (nb !== null) return 1;
+    /* ปนตัวเลขกับตัวอักษร เช่น "ก1" กับ "ก10" — ใช้ numeric ของ localeCompare */
+    return sa.localeCompare(sb, 'th', { numeric: true, sensitivity: 'base' });
+  }
+  const byStudentNo = (a, b) => cmpStudentNo(a && a.student_number, b && b.student_number);
+
   const timeAgo = (iso) => {
     if (!iso) return '–';
     const d = (Date.now() - new Date(iso).getTime()) / 60000;
@@ -122,5 +143,6 @@
 
   window.GP = { loadSess, ensure, session: () => sess, api, get, rpc, countRows,
     loginGoogle, captureOAuthReturn, anonSignup, recoverTeacher, logout,
-    ensureTeacherRow, jwtPayload, esc, fmt, fmtInt, joinKeyGen, timeAgo };
+    ensureTeacherRow, jwtPayload, esc, fmt, fmtInt, joinKeyGen, timeAgo,
+    cmpStudentNo, byStudentNo };
 })();

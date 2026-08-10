@@ -272,11 +272,17 @@ a:hover { text-decoration: underline; }
 .wrap { max-width: 1080px; margin: 0 auto; padding: 0 18px 56px; }
 
 /* ---------- header ---------- */
+/* หัวเว็บ — ของในแถวนี้เพิ่มขึ้นตามสิทธิ์ผู้ใช้
+   ครูทั่วไปเห็น 6 ชิ้น · แต่ผู้ดูแลระบบเห็นถึง 8 ชิ้น (มีปุ่มสลับโหมดเพิ่ม)
+   ถ้าไม่กำหนดการตัดบรรทัดไว้ ข้อความในปุ่มจะถูกบีบจนขึ้นบรรทัดใหม่กลางคำ
+   จึงใช้วิธี: ห้ามตัดคำในทุกชิ้น แล้วให้ "เมนูหลัก" ยกไปทั้งแถวเมื่อที่ไม่พอ */
 .topbar {
-  display: flex; align-items: center; gap: 12px;
-  padding: 14px 0; margin-bottom: 18px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
+  padding: 12px 0; margin-bottom: 18px;
   border-bottom: 1px solid var(--grid);
 }
+.topbar > * { flex: none; }
+.topbar .btn, .topbar .theme-btn { white-space: nowrap; }
 .brand { font-weight: 700; font-size: 19px; color: var(--ink); display: flex; align-items: center; gap: 9px; }
 .brand .logo { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); color: #fff;
   display: inline-flex; align-items: center; justify-content: center; font-size: 15px; flex: none; }
@@ -284,26 +290,59 @@ a:hover { text-decoration: underline; }
 /* ชื่อไทยเป็นบรรทัดหลัก ชื่ออังกฤษเป็นบรรทัดรอง — เรียงซ้อนกัน ไม่ใช่ต่อกันเป็นแถวเดียว
    เพราะเรียงต่อกันแล้วอ่านเหมือนเป็นชื่อเดียวกันยาว ๆ และแย่งสายตากับโลโก้ */
 .brand .bname { display: flex; flex-direction: column; justify-content: center; line-height: 1.15; }
-.brand .bname .th { font-size: 18px; font-weight: 700; }
-.brand .bname .en { font-size: 11.5px; font-weight: 500; color: var(--muted); letter-spacing: .02em; }
+/* nowrap สำคัญ — ไม่งั้นพอหัวเว็บแน่น "เกมเพลิน" จะถูกหักเป็น "เกม" / "เพลิน" */
+.brand .bname .th { font-size: 18px; font-weight: 700; white-space: nowrap; }
+.brand .bname .en { font-size: 11.5px; font-weight: 500; color: var(--muted);
+  letter-spacing: .02em; white-space: nowrap; }
 /* โลโก้ที่อัปโหลดมักมีคำว่า GamePlearn อยู่ในภาพแล้ว — ซ่อนบรรทัดอังกฤษไม่ให้ซ้ำ */
 .brand[data-haslogo="1"] .bname .en { display: none; }
 @media (max-width: 560px) { .brand .bname .en { display: none; } }
 .topbar .sp { flex: 1; }
-.topbar .who { color: var(--ink-2); font-size: 14px; }
+/* ชื่อผู้ใช้บนหัวเว็บ — ยอมให้ย่อได้ (flex-shrink 1 + min-width 0)
+   เป็นชิ้นเดียวในแถวที่ยอมเสียพื้นที่ได้ เพราะชื่อเต็มอยู่ใน tooltip อยู่แล้ว
+   ถ้าตั้ง flex:none เหมือนชิ้นอื่น ปุ่มออกจากระบบจะถูกดันตกบรรทัด */
+.topbar .who { color: var(--ink-2); font-size: 14px; max-width: 190px;
+  flex: 0 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 720px) { .topbar .who { max-width: 120px; } }
 
 /* เมนูหลักบนหัวเว็บ */
-.navlinks { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+/* nowrap — ให้เมนูยกไปทั้งก้อน ดีกว่าปล่อยให้หักกลางรายการ
+   ("ติดต่อ / แจ้งปัญหา" เคยตกไปอยู่บรรทัดล่างตัวเดียว ดูเหมือนหน้าเว็บพัง) */
+.navlinks { display: flex; align-items: center; gap: 2px; flex-wrap: nowrap; }
 .navlinks a {
   color: var(--ink-2); font-size: 14.5px; padding: 7px 11px; border-radius: var(--r-sm);
   text-decoration: none; white-space: nowrap;
 }
 .navlinks a:hover { background: var(--tint-blue); color: var(--accent-strong); text-decoration: none; }
 .navlinks a.on { color: var(--accent-strong); font-weight: 600; background: var(--tint-blue); }
+/* หน้าครู/ผู้ดูแล มีชื่อผู้ใช้เพิ่มมาอีกชิ้น รวมแล้วกว้างเกินความกว้างสูงสุดของ .wrap เสมอ
+   ไม่ว่าจอจะกว้างแค่ไหน — จึงให้เมนูอยู่แถวล่างตายตัว ดูตั้งใจกว่าปล่อยให้ปุ่มหล่นทีละตัว */
+.topbar-app .navlinks {
+  order: 10; flex-basis: 100%; width: 100%;
+  overflow-x: auto; padding: 6px 0 0; margin-top: 2px;
+  border-top: 1px dashed var(--grid); scrollbar-width: thin;
+}
+.topbar-app .navlinks a:first-child { padding-left: 4px; }
+
+/* จอกลาง — ของในหัวเว็บเริ่มไม่พอที่ (โดยเฉพาะบัญชีผู้ดูแลที่มีปุ่มสลับโหมดเพิ่มมา)
+   ยกเมนูหลักลงไปเป็นแถวที่สองทั้งก้อน แถวบนเหลือ แบรนด์ · สลับโหมด · ปุ่มบัญชี */
+@media (max-width: 1180px) {
+  .topbar .navlinks {
+    order: 10; flex-basis: 100%; width: 100%;
+    overflow-x: auto; padding: 6px 0 0; margin-top: 2px;
+    border-top: 1px dashed var(--grid);
+    scrollbar-width: thin;
+  }
+  /* ไม่ตัด padding ซ้ายของลิงก์แรก — สระหน้าอย่าง "เ" กินพื้นที่เลยกรอบตัวอักษร
+     พอกล่องมี overflow-x หัวอักษรจะโดนเฉือนหายไปครึ่งตัว */
+  .topbar .navlinks a:first-child { padding-left: 4px; }
+}
+
 @media (max-width: 720px) {
-  .topbar { flex-wrap: wrap; row-gap: 8px; }
+  .topbar { row-gap: 8px; padding: 10px 0; }
   .topbar .sp { flex-basis: 100%; height: 0; }
-  .navlinks { order: 3; width: 100%; overflow-x: auto; padding-bottom: 2px; }
+  .brand .bname .th { font-size: 16.5px; }
 }
 
 /* ---------- ปุ่ม ---------- */
@@ -483,6 +522,17 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
 .fselect { font-size: 13px; padding: 5px 10px; max-width: 280px; width: 100%; }
 
 /* สโลแกนสลับวน — จางออกแล้วจางเข้า ไม่ให้ข้อความกระตุกเปลี่ยนทันที */
+/* ช่องติ๊กกลุ่มสาระ/สมรรถนะในหน้า Admin */
+.ckrow { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 6px; }
+.ck { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px 5px 8px;
+  font-size: 13px; background: var(--page); user-select: none; }
+.ck:hover { border-color: var(--baseline); }
+.ck input { margin: 0; width: 15px; height: 15px; flex: none; cursor: pointer; }
+.ck:has(input:checked) { background: var(--tint-blue); border-color: var(--accent);
+  color: var(--accent-strong); font-weight: 600; }
+.ck:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+
 /* ตัวแก้สโลแกนในหน้า Admin */
 .slogan-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; }
 .slogan-row + .slogan-row { border-top: 1px dashed var(--grid); }
@@ -536,11 +586,16 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
   transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
 }
 .gcard:hover { transform: translateY(-3px); box-shadow: var(--lift); border-color: var(--baseline); }
+/* ปกเกมเป็น 16:9 เสมอ — ปกทุกใบสูงเท่ากัน การ์ดในแถวเดียวกันจึงเรียงตรง
+   ใช้ aspect-ratio แทนความสูงตายตัว เพราะการ์ดกว้างไม่เท่ากันในแต่ละขนาดจอ */
 .gcover {
-  height: 128px; display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 16 / 9; width: 100%;
+  display: flex; align-items: center; justify-content: center;
   font-size: 50px; position: relative; flex: none;
   background: linear-gradient(135deg, var(--tint-blue), #86b6ef);
 }
+/* เบราว์เซอร์เก่าที่ยังไม่รู้จัก aspect-ratio — ยังได้ความสูงเดิมไปก่อน */
+@supports not (aspect-ratio: 16 / 9) { .gcover { height: 128px; } }
 .gcover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .gcover.g-adventure  { background: linear-gradient(135deg, #ffe1b8, #f2a25c); }
 .gcover.g-drill      { background: linear-gradient(135deg, #cde2fb, #7fb0eb); }
@@ -583,6 +638,9 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
 .zcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
   padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; text-decoration: none; color: var(--ink); }
 .zcard:hover { border-color: var(--accent); text-decoration: none; box-shadow: var(--lift); }
+/* การ์ดที่เป็นปุ่ม (เช่น ปุ่มแชร์) — เบราว์เซอร์ใส่สไตล์ปุ่มมาเอง ต้องล้างให้เหมือนการ์ดอื่น */
+button.zcard { font: inherit; text-align: left; cursor: pointer; width: 100%; }
+button.zcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .zcard .ic { font-size: 24px; }
 .zcard .t { font-weight: 700; font-size: 15px; }
 .zcard .d { color: var(--ink-2); font-size: 13px; }

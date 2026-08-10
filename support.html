@@ -55,26 +55,28 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     <div class="card">
       <h2 style="margin:0 0 12px;font-size:19px">🤝 สนับสนุนแบบไม่ใช้เงินก็ได้</h2>
       <div class="zcards" style="grid-template-columns:1fr">
-        <div class="zcard" style="border-style:dashed">
+        <button class="zcard" type="button" id="share-btn" style="border-style:dashed;text-align:left;font-family:inherit">
           <span class="ic">📣</span>
           <span class="t">บอกต่อเพื่อนครู</span>
-          <span class="d">แชร์ gameplearn.com ในกลุ่มไลน์โรงเรียน — คนใช้เยอะขึ้น เกมก็พัฒนาเร็วขึ้น</span>
-        </div>
-        <div class="zcard" style="border-style:dashed">
+          <span class="d" id="share-msg">แชร์ gameplearn.com ในกลุ่มไลน์โรงเรียน — คนใช้เยอะขึ้น เกมก็พัฒนาเร็วขึ้น</span>
+        </button>
+        <!-- 3 ใบนี้เป็นลิงก์ไปหน้าติดต่อ พร้อมเลือกประเภทเรื่องให้ล่วงหน้า
+             (contact.html อ่าน ?kind= แล้วกดชิปให้เอง ครูไม่ต้องเลือกซ้ำ) -->
+        <a class="zcard" style="border-style:dashed" href="contact.html?kind=bug#form">
           <span class="ic">🐛</span>
           <span class="t">แจ้งบัคที่เจอ</span>
-          <span class="d">เจอจุดที่เกมพัง บอกเราได้ที่หน้า <a href="contact.html">ติดต่อ / แจ้งปัญหา</a></span>
-        </div>
-        <div class="zcard" style="border-style:dashed">
+          <span class="d">เจอจุดที่เกมพัง บอกเราได้ที่หน้า ติดต่อ / แจ้งปัญหา</span>
+        </a>
+        <a class="zcard" style="border-style:dashed" href="contact.html?kind=idea#form">
           <span class="ic">💡</span>
           <span class="t">เสนอเกมที่อยากได้</span>
           <span class="d">อยากได้เกมวิชาไหน ระดับชั้นไหน บอกมาได้เลย เราเก็บไว้วางแผนจริง</span>
-        </div>
-        <div class="zcard" style="border-style:dashed">
+        </a>
+        <a class="zcard" style="border-style:dashed" href="contact.html?kind=other#form">
           <span class="ic">🏫</span>
           <span class="t">ใช้ในห้องเรียนจริง</span>
           <span class="d">แล้วเล่าให้ฟังว่านักเรียนเป็นยังไง — ข้อมูลนี้มีค่ากับเรามาก</span>
-        </div>
+        </a>
       </div>
     </div>
   </div>
@@ -97,7 +99,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     </div>
     <div class="col">
       <b>ช่วยเหลือ</b>
-      <a href="contact.html">ติดต่อ / แจ้งบัค</a>
+      <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
       <a href="contact.html#faq">คำถามที่พบบ่อย</a>
       <a href="admin.html">ผู้ดูแลระบบ</a>
     </div>
@@ -112,6 +114,42 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   const C = window.GP_CONFIG, G = window.GP, SL = window.GP_SLOGAN;
   document.getElementById('brand-th').textContent = C.BRAND_TH;
   document.getElementById('foot-slogan').textContent = SL.en + ' — ' + SL.th;
+
+  /* ---------- ปุ่มแชร์เว็บ ----------
+     มือถือ/แท็บเล็ต: เปิดแผงแชร์ของเครื่อง ส่งเข้าไลน์ได้ตรง ๆ (navigator.share)
+     คอมพิวเตอร์: ส่วนใหญ่ยังไม่มีแผงแชร์ → คัดลอกลิงก์ให้แทน แล้วบอกว่าคัดลอกแล้ว
+     กันพลาด: ถ้าคัดลอกไม่ได้ (บางเบราว์เซอร์บล็อก) จะเลือกข้อความให้ครูกด Ctrl+C เอง */
+  (function () {
+    const btn = document.getElementById('share-btn');
+    if (!btn) return;
+    const msg = document.getElementById('share-msg');
+    const original = msg.textContent;
+    const url = 'https://gameplearn.com/';
+    const text = 'เกมเพลิน — ศูนย์รวมเกมการเรียนรู้สำหรับโรงเรียนไทย ใช้ฟรีทุกเกม';
+
+    function say(t, revert) {
+      msg.textContent = t;
+      if (revert) setTimeout(function () { msg.textContent = original; }, 3500);
+    }
+
+    btn.addEventListener('click', async function () {
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'เกมเพลิน (GamePlearn)', text: text, url: url });
+          return;                                  /* แชร์สำเร็จ ไม่ต้องขึ้นข้อความอะไร */
+        } catch (e) {
+          if (e && e.name === 'AbortError') return; /* ผู้ใช้กดยกเลิกเอง ไม่ใช่ปัญหา */
+          /* แชร์ไม่ได้ด้วยเหตุอื่น → ตกไปใช้วิธีคัดลอกด้านล่าง */
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(text + ' ' + url);
+        say('✓ คัดลอกลิงก์แล้ว — วางในกลุ่มไลน์ได้เลย', true);
+      } catch (e) {
+        say('คัดลอกอัตโนมัติไม่ได้ — ลิงก์คือ ' + url);
+      }
+    });
+  })();
 
   /* รูป QR และข้อความ อ่านจากตาราง site_settings (แก้ได้จากหน้า Admin โดยไม่ต้องแก้โค้ด)
      ถ้ายังไม่ได้ตั้งค่า จะขึ้นคำแนะนำว่าต้องทำอะไร — ไม่ปล่อยหน้าว่างเปล่า */

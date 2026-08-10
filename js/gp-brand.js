@@ -72,8 +72,11 @@
       saveTheme(t);
       paintTheme();
     });
-    var last = bar.querySelector('.btn-primary');
-    if (last) bar.insertBefore(b, last); else bar.appendChild(b);
+    /* วางไว้หน้าปุ่มบัญชีตัวแรกที่เจอ — แต่ละหน้ามีปุ่มไม่เหมือนกัน
+       (หน้าแรกมี .btn-primary · หน้าครูมี #btn-logout · หน้า Admin มี #logout)
+       ถ้าไม่เจอเลยแล้ว appendChild ต่อท้าย ปุ่มจะไปตกบรรทัดใหม่ตัวเดียวโดด ๆ */
+    var anchor = bar.querySelector('.btn-primary, #auth-home, #auth-btn, #btn-logout, #logout');
+    if (anchor) bar.insertBefore(b, anchor); else bar.appendChild(b);
   }
 
   /* ============ ปุ่มสลับโหมดผู้ดูแล / โหมดครู ============
@@ -104,9 +107,12 @@
     wrap.innerHTML =
       '<a href="admin.html"' + (onAdmin ? ' aria-current="page"' : '') + '>🛠 ผู้ดูแลระบบ</a>'
       + '<a href="teacher.html"' + (!onAdmin ? ' aria-current="page"' : '') + '>👩‍🏫 ครู</a>';
+    /* วางไว้ติดกับแบรนด์ (ก่อน .sp) — เป็นตัวบอก "ตอนนี้อยู่โหมดไหน"
+       ควรอยู่ต้นแถวคู่กับชื่อเว็บ ไม่ใช่ปะปนกับปุ่มบัญชีท้ายแถว */
     var sp = bar.querySelector('.sp');
-    if (sp && sp.nextSibling) bar.insertBefore(wrap, sp.nextSibling);
+    if (sp) bar.insertBefore(wrap, sp);
     else bar.appendChild(wrap);
+    syncAuthHome();
   }
 
   /* ============ ปุ่มเข้าสู่ระบบ / ออกจากระบบ บนหัวเว็บ ============
@@ -116,6 +122,15 @@
 
      ทำที่นี่ที่เดียวเพราะทุกหน้าโหลดไฟล์นี้ — ไม่ต้องไล่แก้ทีละหน้า
      หน้า teacher.html / admin.html มีปุ่มออกจากระบบของตัวเองอยู่แล้ว จึงข้าม */
+  /* ซ่อน "ห้องเรียนของฉัน" เมื่อมีปุ่มสลับโหมดแล้ว (ทำหน้าที่เดียวกัน)
+     เรียกได้ทั้งจาก renderAuthButton และ renderModeSwitch เพราะสองตัวนี้
+     เสร็จไม่พร้อมกัน — ใครเสร็จทีหลังก็เรียกอีกที ผลลัพธ์เหมือนกัน */
+  function syncAuthHome() {
+    var home = document.getElementById('auth-home');
+    if (!home) return;
+    home.classList.toggle('hidden', !!document.getElementById('gp-mode-switch'));
+  }
+
   async function renderAuthButton() {
     var btn = document.getElementById('auth-btn');
     if (!btn) return;
@@ -123,7 +138,8 @@
     try { loggedIn = !!(await G.ensure()); } catch (e) { loggedIn = false; }
     if (!loggedIn) return;                       /* ยังไม่ล็อกอิน = ปล่อยตามเดิม */
 
-    /* ลิงก์เข้าห้องเรียน แทรกไว้ก่อนปุ่มออกจากระบบ ไม่งั้นครูจะกลับเข้าหน้าครูไม่ได้ */
+    /* ลิงก์เข้าห้องเรียน แทรกไว้ก่อนปุ่มออกจากระบบ ไม่งั้นครูจะกลับเข้าหน้าครูไม่ได้
+       ยกเว้นบัญชีผู้ดูแล — ปุ่มสลับโหมดมีปุ่ม "👩‍🏫 ครู" อยู่แล้ว ใส่ซ้ำจะเบียดหัวเว็บเปล่า ๆ */
     if (!document.getElementById('auth-home')) {
       var go = document.createElement('a');
       go.id = 'auth-home';
@@ -132,6 +148,7 @@
       go.textContent = '👩‍🏫 ห้องเรียนของฉัน';
       btn.parentNode.insertBefore(go, btn);
     }
+    syncAuthHome();
 
     btn.textContent = 'ออกจากระบบ';
     btn.classList.remove('btn-primary');

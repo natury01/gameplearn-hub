@@ -24,6 +24,8 @@
     TW: 'ทำงานเป็นทีม', CZ: 'พลเมืองเข้มแข็ง', SN: 'อยู่กับธรรมชาติ',
   };
   const CBE_TOTAL = 6;
+  /* ค่าเทียมสำหรับตัวกรอง "ครบ 6 ด้าน" — ขึ้นต้นด้วย __ กันชนกับรหัสสมรรถนะจริง */
+  const ALL6 = '__ALL6';
 
   /* ชื่อย่อกลุ่มสาระ — ชื่อเต็มตามหลักสูตรยาวมาก */
   const SUBJ_SHORT = {
@@ -129,18 +131,42 @@
    * กลุ่มสาระ/สมรรถนะกรองด้วย "รหัส" ไม่ใช่ชื่อเต็ม เพราะชื่อเต็มตามหลักสูตรยาวมาก
    * (เช่น "การอยู่ร่วมกับธรรมชาติและวิทยาการอย่างยั่งยืน") ชิปจะล้นจอ
    * ถ้าเกมยังไม่มีรหัส (ฐานข้อมูลเก่า) จะถอยไปใช้ชื่อเต็มให้เอง */
+  /* ระดับชั้นทีละชั้น ไม่ใช่เป็นช่วง
+     เกมที่ระบุ ป.4–6 ต้องเจอทั้งตอนกรอง ป.4 · ป.5 และ ป.6
+     ครูสอนห้องเดียว เขาค้นด้วยชั้นที่ตัวเองสอน ไม่ได้ค้นด้วยชื่อช่วง */
+  function gradeList(g) {
+    const lo = Number(g.minimum_grade), hi = Number(g.maximum_grade);
+    if (!lo && !hi) return [];
+    const a = lo || hi, b = hi || lo;
+    if (!a || !b || b < a || b - a > 12) return [];
+    const out = [];
+    for (let i = a; i <= b; i++) out.push(String(i));
+    return out;
+  }
+  const gradeLabel = (n) => (Number(n) >= 7 ? 'ม.' + (Number(n) - 6) : 'ป.' + n);
+
   const DIMENSIONS = [
-    { key: 'grade_band',  label: 'ระดับชั้น', ui: 'chips',
-      pick: (g) => (g.grade_band ? [g.grade_band] : []) },
+    { key: 'grade',       label: 'ระดับชั้น', ui: 'chips',
+      pick: gradeList,
+      labelOf: (v) => gradeLabel(v),
+      sortBy: (o) => Number(o.value) },
     { key: 'genre',       label: 'แนวเกม', ui: 'chips',
       pick: (g) => (g.genre ? [g.genre] : []),
       labelOf: (v, g) => (g.genre_icon ? g.genre_icon + ' ' : '') + (g.genre_name || v) },
     { key: 'subject',     label: 'กลุ่มสาระ', ui: 'chips',
       pick: (g) => (g.subject_codes.length ? g.subject_codes : g.subject_areas),
       labelOf: (v) => SUBJ_SHORT[v] || v },
-    { key: 'competency',  label: 'สมรรถนะ', ui: 'chips',
-      pick: (g) => (g.competency_codes.length ? g.competency_codes : g.competencies),
-      labelOf: (v) => COMP_SHORT[v] || String(v).replace(/^สมรรถนะ/, '') },
+    { key: 'competency',  label: 'สมรรถนะหลัก', ui: 'chips',
+      /* ALL6 = ตัวเลือกพิเศษ "ครบ 6 ด้าน" สำหรับเกมที่ประเมินได้ทุกด้าน
+         ครูที่อยากได้เกมประเมินรอบด้านจะได้กดทีเดียว ไม่ต้องไล่กดทีละด้าน */
+      pick: function (g) {
+        const codes = g.competency_codes.length ? g.competency_codes : g.competencies;
+        return codes.length >= CBE_TOTAL ? [ALL6].concat(codes) : codes;
+      },
+      labelOf: (v) => (v === ALL6 ? '⭐ ครบ ' + CBE_TOTAL + ' ด้าน'
+                                  : (COMP_SHORT[v] || String(v).replace(/^สมรรถนะ/, ''))),
+      /* ให้ "ครบ 6 ด้าน" อยู่หัวแถวเสมอ ไม่ปนกับด้านย่อย */
+      sortBy: (o) => (o.value === ALL6 ? -1 : 0) },
     { key: 'series',      label: 'ชุดเกม', ui: 'select',
       pick: (g) => (g.series ? [g.series] : []) },
     { key: 'tag',         label: 'หัวข้อ', ui: 'select',
@@ -157,8 +183,11 @@
           seen[v].count++;
         });
       });
+      const rank = d.sortBy || (() => 0);
       const options = Object.keys(seen).map((k) => seen[k])
-        .sort((a, b) => b.count - a.count || String(a.label).localeCompare(String(b.label), 'th'));
+        .sort((a, b) => rank(a) - rank(b)
+          || b.count - a.count
+          || String(a.label).localeCompare(String(b.label), 'th'));
       return { key: d.key, label: d.label, ui: d.ui || 'chips', options: options };
     }).filter((d) => d.options.length > 0);
   }
@@ -171,13 +200,17 @@
       if (hay.indexOf(q.toLowerCase()) < 0) return false;
     }
     const has = (list, v) => list.indexOf(v) >= 0;
-    if (sel.grade_band && g.grade_band !== sel.grade_band) return false;
+    /* เกม ป.4–6 ต้องผ่านทั้งตอนเลือก ป.4 · ป.5 และ ป.6 */
+    if (sel.grade && !has(gradeList(g), String(sel.grade))) return false;
     if (sel.genre && g.genre !== sel.genre) return false;
     if (sel.series && g.series !== sel.series) return false;
     /* ค่าที่เลือกอาจเป็นรหัส (SC) หรือชื่อเต็ม แล้วแต่ว่าเกมมีรหัสไหม — รับทั้งสองแบบ */
     if (sel.subject && !has(g.subject_codes, sel.subject) && !has(g.subject_areas, sel.subject)) return false;
-    if (sel.competency && !has(g.competency_codes, sel.competency)
-        && !has(g.competencies, sel.competency)) return false;
+    if (sel.competency) {
+      const codes = g.competency_codes.length ? g.competency_codes : g.competencies;
+      if (sel.competency === ALL6) { if (codes.length < CBE_TOTAL) return false; }
+      else if (!has(g.competency_codes, sel.competency) && !has(g.competencies, sel.competency)) return false;
+    }
     if (sel.tag && !has(g.tags, sel.tag)) return false;
     return true;
   }
@@ -198,5 +231,6 @@
   }
 
   window.GPCatalog = { loadCatalog, buildFilters, apply, matches, SORTS, DIMENSIONS,
-    GENRE_ICON, GENRE_TH, STATUS_TH, COMP_SHORT, SUBJ_SHORT, CBE_TOTAL, gradeBand, gradeText };
+    GENRE_ICON, GENRE_TH, STATUS_TH, COMP_SHORT, SUBJ_SHORT, CBE_TOTAL, ALL6,
+    gradeBand, gradeText, gradeList, gradeLabel };
 })();

@@ -16,7 +16,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 <body>
 <div class="wrap">
 
-  <div class="topbar">
+  <div class="topbar topbar-app">
     <a class="brand" href="./" style="color:inherit;text-decoration:none">
       <span class="logo">ก</span>
       <span class="bname"><span class="th" id="brand-th">เกมเพลิน</span><span class="en">GamePlearn · ผู้ดูแลระบบ</span></span>
@@ -153,6 +153,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         </div>
         <div id="contact-fields"></div>
       </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2 style="margin:0 0 4px;font-size:18px">คำถามที่พบบ่อย (Q&amp;A)</h2>
+        <div class="muted small" style="margin-bottom:14px">
+          เพิ่ม ลบ แก้ได้ตามใจ — เรียงตามลำดับที่เห็นตรงนี้
+        </div>
+        <div id="faq-fields"></div>
+      </div>
     </section>
   </div>
 </div>
@@ -198,8 +206,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         hint: 'เปลี่ยนแล้วเห็นผลทันทีในหน้านี้ ลองสลับดูได้เลย' },
     ],
     slogans: [
-      { key: 'site_slogans', label: 'สโลแกนของเว็บ', type: 'slogans',
+      { key: 'site_slogans', label: 'สโลแกนของเว็บ', type: 'list',
         hint: 'ใส่ได้หลายอัน — หน้าเว็บจะสลับวนให้เองทุก 7 วินาที · มีอันเดียวจะแสดงนิ่ง ๆ ไม่สลับ' },
+    ],
+    faq: [
+      { key: 'site_faq', label: 'คำถามที่พบบ่อย', type: 'list',
+        hint: 'แสดงที่หน้า <a href="contact.html#faq" target="_blank">ติดต่อ / แจ้งปัญหา</a> · '
+            + 'เว้นว่างทั้งหมด = ใช้ชุดคำถามมาตรฐานที่เขียนไว้ในหน้าเว็บ · '
+            + 'ใส่ลิงก์ในคำตอบได้ด้วยรูปแบบ <code>[ข้อความ](support.html)</code>' },
     ],
     announce: [
       { key: 'site_announcement', label: 'ข้อความประกาศ', type: 'textarea',
@@ -285,6 +299,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     renderFields('theme-fields', FIELDS.theme);
     renderFields('slogan-fields', FIELDS.slogans);
     renderFields('announce-fields', FIELDS.announce);
+    renderFields('faq-fields', FIELDS.faq);
     renderFields('support-fields', FIELDS.support);
     renderFields('contact-fields', FIELDS.contact);
     renderQrPreview();
@@ -293,85 +308,140 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   /* ============ ตัวแก้สโลแกน (เพิ่ม/ลบได้) ============
      เก็บลงฐานข้อมูลเป็น JSON ก้อนเดียว: [{"en":"...","th":"..."}, ...]
      หน้าเว็บจะสลับวนให้เองถ้ามีมากกว่า 1 อัน */
-  function parseSlogans(v) {
+  /* ============ ตัวแก้ "รายการที่เพิ่ม/ลบได้" (ใช้ร่วมกันหลายที่) ============
+     เก็บลงฐานข้อมูลเป็น JSON array ก้อนเดียว  เช่น
+       สโลแกน → [{"en":"...","th":"..."}]
+       คำถาม  → [{"q":"...","a":"..."}]
+     LIST_SPEC บอกว่าแต่ละรายการมีช่องอะไรบ้าง เพิ่มชนิดใหม่ = เพิ่ม 1 บล็อก */
+  const LIST_SPEC = {
+    site_slogans: {
+      addLabel: '➕ เพิ่มสโลแกน',
+      itemName: 'สโลแกน',
+      fields: [
+        { name:'en', ph:'ภาษาอังกฤษ เช่น Game On. Learn Beyond.' },
+        { name:'th', ph:'ภาษาไทย เช่น เริ่มเกม แล้วก้าวไปไกลกว่าการเรียนรู้เดิม' },
+      ],
+      fallback: () => (C.SLOGANS || []).slice(),
+    },
+    site_faq: {
+      addLabel: '➕ เพิ่มคำถาม',
+      itemName: 'คำถาม',
+      fields: [
+        { name:'q', ph:'คำถาม เช่น นักเรียนเข้าเล่นยังไง ต้องสมัครไหม' },
+        { name:'a', ph:'คำตอบ · ขึ้นบรรทัดใหม่ได้ · ใส่ลิงก์แบบ [สนับสนุน](support.html)', tag:'textarea', rows:3 },
+      ],
+      fallback: () => [],
+    },
+  };
+
+  function parseList(key, v) {
     if (v) { try { const p = JSON.parse(v); if (Array.isArray(p)) return p; } catch (e) {} }
-    return (C.SLOGANS || []).slice();   /* ยังไม่เคยตั้ง → ใช้ค่าใน config.js เป็นตัวตั้งต้น */
+    const sp = LIST_SPEC[key];
+    return sp && sp.fallback ? sp.fallback() : [];
   }
 
-  function sloganRow(i, s) {
+  function listRow(key, i, item) {
+    const sp = LIST_SPEC[key];
+    const inputs = sp.fields.map(function (f) {
+      const val = G.esc((item && item[f.name]) || '');
+      if (f.tag === 'textarea') {
+        return '<textarea rows="' + (f.rows || 3) + '" data-lfield="' + f.name + '"'
+             + ' placeholder="' + G.esc(f.ph) + '">' + val + '</textarea>';
+      }
+      return '<input type="text" data-lfield="' + f.name + '" value="' + val + '"'
+           + ' placeholder="' + G.esc(f.ph) + '">';
+    }).join('');
     return '<div class="slogan-row" data-i="' + i + '">'
       + '<span class="slogan-no">' + (i + 1) + '</span>'
-      + '<div class="slogan-in">'
-      +   '<input type="text" data-slogan="en" value="' + G.esc((s && s.en) || '') + '"'
-      +     ' placeholder="ภาษาอังกฤษ เช่น Game On. Learn Beyond.">'
-      +   '<input type="text" data-slogan="th" value="' + G.esc((s && s.th) || '') + '"'
-      +     ' placeholder="ภาษาไทย เช่น เริ่มเกม แล้วก้าวไปไกลกว่าการเรียนรู้เดิม">'
+      + '<div class="slogan-in">' + inputs + '</div>'
+      + '<button class="btn btn-sm" type="button" data-list-del="1"'
+      +   ' title="ลบ' + G.esc(sp.itemName) + 'นี้">🗑</button>'
+      + '</div>';
+  }
+
+  function listEditor(key, v) {
+    const sp = LIST_SPEC[key];
+    const list = parseList(key, v);
+    /* ห้ามส่ง listRow เข้า map ตรง ๆ — map ให้ (ตัวข้อมูล, ลำดับ) สลับกับที่ listRow รับ
+       เคยพลาดมาแล้วจนป้ายลำดับกลายเป็น [object Object] */
+    return '<div class="listbox" data-list-key="' + key + '">'
+      + '<div class="list-rows">'
+      +   list.map(function (item, i) { return listRow(key, i, item); }).join('')
       + '</div>'
-      + '<button class="btn btn-sm" type="button" data-slogan-del="' + i + '" title="ลบสโลแกนนี้">🗑</button>'
+      + '<button class="btn btn-sm" type="button" data-list-add="1" style="margin-top:8px">'
+      +   G.esc(sp.addLabel) + '</button>'
       + '</div>';
   }
 
-  function sloganEditor(key, v) {
-    const list = parseSlogans(v);
-    return '<div id="slogan-box" data-slogan-key="' + key + '">'
-      + '<div id="slogan-rows">' + list.map(sloganRow).join('') + '</div>'
-      + '<button class="btn btn-sm" type="button" id="slogan-add" style="margin-top:8px">➕ เพิ่มสโลแกน</button>'
-      + '</div>';
+  function readList(box) {
+    const key = box.getAttribute('data-list-key');
+    const sp = LIST_SPEC[key];
+    return Array.from(box.querySelectorAll('.list-rows > .slogan-row')).map(function (r) {
+      const o = {};
+      sp.fields.forEach(function (f) {
+        const el = r.querySelector('[data-lfield="' + f.name + '"]');
+        o[f.name] = el ? el.value.trim() : '';
+      });
+      return o;
+    }).filter(function (o) { return sp.fields.some(function (f) { return o[f.name]; }); });
   }
 
-  function readSlogans() {
-    return Array.from(document.querySelectorAll('#slogan-rows .slogan-row')).map(function (r) {
-      return { en: r.querySelector('[data-slogan="en"]').value.trim(),
-               th: r.querySelector('[data-slogan="th"]').value.trim() };
-    }).filter(function (s) { return s.en || s.th; });
+  function renumber(box) {
+    Array.from(box.querySelectorAll('.list-rows > .slogan-row')).forEach(function (r, i) {
+      r.setAttribute('data-i', i);
+      r.querySelector('.slogan-no').textContent = i + 1;
+    });
   }
 
-  async function saveSlogans() {
-    const box = document.getElementById('slogan-box');
+  async function saveList(box) {
     if (!box) return;
-    const key = box.getAttribute('data-slogan-key');
-    const val = JSON.stringify(readSlogans());
+    const key = box.getAttribute('data-list-key');
+    const val = JSON.stringify(readList(box));
     if ((settings[key] || '') === val) return;
     try {
       showErr('');
       await saveSetting(key, val);
       settings[key] = val;
       toast();
-    } catch (e) { showErr('บันทึกสโลแกนไม่สำเร็จ: ' + e.message); }
+    } catch (e) { showErr('บันทึก "' + LIST_SPEC[key].itemName + '" ไม่สำเร็จ: ' + e.message); }
   }
 
   document.addEventListener('click', function (ev) {
-    if (ev.target.closest('#slogan-add')) {
-      const rows = document.getElementById('slogan-rows');
-      rows.insertAdjacentHTML('beforeend', sloganRow(rows.children.length, null));
-      rows.lastElementChild.querySelector('input').focus();
+    const add = ev.target.closest('[data-list-add]');
+    if (add) {
+      const box = add.closest('.listbox');
+      const rows = box.querySelector('.list-rows');
+      rows.insertAdjacentHTML('beforeend',
+        listRow(box.getAttribute('data-list-key'), rows.children.length, null));
+      const first = rows.lastElementChild.querySelector('input, textarea');
+      if (first) first.focus();
       return;
     }
-    const del = ev.target.closest('[data-slogan-del]');
+    const del = ev.target.closest('[data-list-del]');
     if (del) {
-      const rows = document.getElementById('slogan-rows');
-      if (rows.children.length <= 1) { showErr('ต้องเหลือสโลแกนอย่างน้อย 1 อัน'); return; }
+      const box = del.closest('.listbox');
+      const rows = box.querySelector('.list-rows');
+      if (rows.children.length <= 1) {
+        showErr('ต้องเหลืออย่างน้อย 1 ' + LIST_SPEC[box.getAttribute('data-list-key')].itemName);
+        return;
+      }
       del.closest('.slogan-row').remove();
-      /* เรียงเลขใหม่ให้ตรง หลังลบตรงกลาง */
-      Array.from(rows.children).forEach(function (r, i) {
-        r.setAttribute('data-i', i);
-        r.querySelector('.slogan-no').textContent = i + 1;
-        r.querySelector('[data-slogan-del]').setAttribute('data-slogan-del', i);
-      });
-      saveSlogans();
+      renumber(box);
+      saveList(box);
     }
   });
 
   document.addEventListener('change', function (ev) {
-    if (ev.target.closest('[data-slogan]')) saveSlogans();
+    const f = ev.target.closest('[data-lfield]');
+    if (f) saveList(f.closest('.listbox'));
   });
 
   function renderFields(slotId, list) {
     $(slotId).innerHTML = list.map(function (f) {
       const v = settings[f.key] || '';
       let input;
-      if (f.type === 'slogans') {
-        input = sloganEditor(f.key, v);
+      if (f.type === 'list') {
+        input = listEditor(f.key, v);
       } else if (f.type === 'textarea') {
         input = '<textarea data-key="' + f.key + '">' + G.esc(v) + '</textarea>';
       } else if (f.type === 'select') {
@@ -511,16 +581,91 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   /* ============ ทะเบียนเกม ============ */
+
+  /* รหัสกลุ่มสาระ/สมรรถนะที่ติ๊กได้ — ชื่อย่อไว้ให้ช่องติ๊กไม่ล้น */
+  const SUBJECTS = [['TH','ภาษาไทย'],['MA','คณิตศาสตร์'],['SC','วิทยาศาสตร์ฯ'],['SO','สังคมศึกษาฯ'],
+                    ['PE','สุขศึกษาฯ'],['AR','ศิลปะ'],['OC','การงานอาชีพ'],['FL','ภาษาต่างประเทศ']];
+  const COMPS    = [['SM','จัดการตนเอง'],['HOT','คิดขั้นสูง'],['CM','สื่อสาร'],
+                    ['TW','ทำงานเป็นทีม'],['CZ','พลเมืองเข้มแข็ง'],['SN','อยู่กับธรรมชาติ']];
+  const GENRES   = [['adventure','ผจญภัย / สำรวจ'],['quiz','ตอบคำถาม / แข่งตอบ'],['simulation','จำลองสถานการณ์'],
+                    ['puzzle','ปริศนา / ตรรกะ'],['drill','ฝึกทักษะ'],['story','เล่าเรื่อง / ตัดสินใจ'],
+                    ['creative','สร้างสรรค์ / ออกแบบ'],['board','เกมกระดาน / ผลัดกันเล่น']];
+
+  /* itemId['SC'] = uuid ของตัวชี้วัด — ต้องมีก่อนถึงจะบันทึกการติ๊กได้ */
+  let itemId = {}, gameItems = {};
+
+  async function loadFrameworkItems() {
+    try {
+      const rows = await G.get('/rest/v1/framework_items?select=id,code,depth&depth=eq.1');
+      itemId = {};
+      (rows || []).forEach((r) => { itemId[r.code] = r.id; });
+      const links = await G.get('/rest/v1/game_framework_items?select=game_id,item_id');
+      gameItems = {};
+      (links || []).forEach((l) => {
+        (gameItems[l.game_id] = gameItems[l.game_id] || []).push(l.item_id);
+      });
+    } catch (e) {
+      /* ยังไม่ได้รัน 08_ASSESSMENT_CORE.sql — ซ่อนส่วนติ๊กไป ไม่ทำให้หน้าพัง */
+      itemId = {}; gameItems = {};
+    }
+  }
+
+  const codeOf = (id) => Object.keys(itemId).find((k) => itemId[k] === id);
+  const codesOfGame = (gid) => (gameItems[gid] || []).map(codeOf).filter(Boolean);
+
   async function loadGames() {
-    games = await G.get('/rest/v1/games?select=id,code,name,description,status,is_featured,sort_order,'
-      + 'launch_url,cover_url,topic&order=sort_order,name')
+    await loadFrameworkItems();
+    games = await G.get('/rest/v1/games?select=id,code,name,name_en,description,subject_note,status,'
+      + 'is_featured,sort_order,launch_url,cover_url,topic,genre,minimum_grade,maximum_grade,'
+      + 'play_minutes,tags&order=sort_order,name')
       .catch(async function () {
-        /* ยังไม่ได้รัน 14_GAME_FILTERS.sql → ยังไม่มีคอลัมน์ is_featured/sort_order */
+        /* ยังไม่ได้รัน 14/37 → คอลัมน์ยังไม่ครบ ใช้เท่าที่มี */
         const rows = await G.get('/rest/v1/games?select=id,code,name,description,status,launch_url&order=name');
-        return rows.map((g) => Object.assign({ is_featured: null, sort_order: null, cover_url: null, topic: '', description: '' }, g));
+        return rows.map((g) => Object.assign({ is_featured: null, sort_order: null, cover_url: null,
+          topic: '', description: '', name_en: '', subject_note: '', genre: null,
+          minimum_grade: null, maximum_grade: null, play_minutes: null, tags: [] }, g));
       });
     renderGames();
   }
+
+  /* ---- ติ๊กกลุ่มสาระ / สมรรถนะ → เขียนลง game_framework_items ---- */
+  function checkRow(gid, kind, list) {
+    const on = codesOfGame(gid);
+    return '<div class="ckrow">' + list.map(function (c) {
+      const checked = on.indexOf(c[0]) >= 0 ? ' checked' : '';
+      const dis = itemId[c[0]] ? '' : ' disabled';
+      return '<label class="ck"><input type="checkbox" data-fw="' + gid + '"'
+        + ' data-kind="' + kind + '" data-code="' + c[0] + '"' + checked + dis + '>'
+        + '<span>' + G.esc(c[1]) + '</span></label>';
+    }).join('') + '</div>';
+  }
+
+  document.addEventListener('change', async function (ev) {
+    const cb = ev.target.closest('[data-fw]');
+    if (!cb) return;
+    const gid = cb.getAttribute('data-fw'), code = cb.getAttribute('data-code');
+    const iid = itemId[code];
+    if (!iid) return;
+    cb.disabled = true;
+    try {
+      showErr('');
+      if (cb.checked) {
+        await G.api('/rest/v1/game_framework_items?on_conflict=game_id,item_id', {
+          method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' },
+          body: JSON.stringify([{ game_id: gid, item_id: iid, weight: 1.0, max_score: 100 }]) });
+        (gameItems[gid] = gameItems[gid] || []).push(iid);
+      } else {
+        await G.api('/rest/v1/game_framework_items?game_id=eq.' + gid + '&item_id=eq.' + iid,
+          { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        gameItems[gid] = (gameItems[gid] || []).filter((x) => x !== iid);
+      }
+      toast();
+    } catch (e) {
+      cb.checked = !cb.checked;
+      showErr('บันทึกไม่สำเร็จ: ' + e.message + ' — ถ้าเพิ่งเพิ่มช่องนี้ ให้รัน 37_GAME_ADMIN_FIELDS.sql ก่อน');
+    }
+    cb.disabled = false;
+  });
 
   function renderGames() {
     const noFilters = games.length && games[0].is_featured === null;
@@ -555,16 +700,84 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             /* แถวขยาย — ชื่อเกม คำอธิบาย รูปปก ชื่อเรื่อง (ซ่อนไว้จนกดแก้ไข) */
             + '<tr class="hidden" id="edit-' + g.id + '"><td colspan="5" style="background:var(--page)">'
             +   '<div style="padding:6px 2px 0">'
-            +     '<label class="f" style="margin-top:0;font-weight:600;color:var(--ink)">ชื่อเกมที่แสดงบนเว็บ</label>'
-            +     '<div class="form-hint" style="margin:0 0 8px">'
-            +       'ชื่อนี้เก็บอยู่ในทะเบียนเกมของเว็บกลาง <b>ไม่ได้ดึงมาจากตัวเกม</b> — '
-            +       'ตัวเกมส่งมาแค่รหัส <code>' + G.esc(g.code) + '</code> เท่านั้น จึงตั้งใหม่ได้ตามใจ'
+            +     '<div class="grid cols-2" style="align-items:start">'
+            +       '<div>'
+            +         '<label class="f" style="margin-top:0;font-weight:600;color:var(--ink)">ชื่อเกมที่แสดงบนเว็บ</label>'
+            +         '<div class="form-hint" style="margin:0 0 8px">'
+            +           'ชื่อนี้เก็บอยู่ในทะเบียนเกมของเว็บกลาง <b>ไม่ได้ดึงมาจากตัวเกม</b> — '
+            +           'ตัวเกมส่งมาแค่รหัส <code>' + G.esc(g.code) + '</code> เท่านั้น จึงตั้งใหม่ได้ตามใจ'
+            +         '</div>'
+            +         '<input type="text" data-game="' + g.id + '" data-field="name" value="' + G.esc(g.name || '') + '">'
+            +       '</div>'
+            +       '<div>'
+            +         '<label class="f" style="margin-top:0;font-weight:600;color:var(--ink)">ชื่อภาษาอังกฤษ</label>'
+            +         '<div class="form-hint" style="margin:0 0 8px">ใช้ตอนแชร์ต่างประเทศหรืองานวิชาการ · เว้นว่างได้</div>'
+            +         '<input type="text" data-game="' + g.id + '" data-field="name_en"'
+            +           ' value="' + G.esc(g.name_en || '') + '" placeholder="Kanchanaburi Adventure">'
+            +       '</div>'
             +     '</div>'
-            +     '<input type="text" data-game="' + g.id + '" data-field="name" value="' + G.esc(g.name || '') + '">'
             +     '<label class="f" style="font-weight:600;color:var(--ink)">คำอธิบายสั้น</label>'
             +     '<div class="form-hint" style="margin:0 0 8px">1–2 บรรทัดใต้ชื่อเกมบนการ์ด — บอกครูว่าเกมนี้ทำอะไร</div>'
             +     '<textarea rows="2" data-game="' + g.id + '" data-field="description">'
             +       G.esc(g.description || '') + '</textarea>'
+
+            +     '<div class="grid cols-3" style="align-items:start;margin-top:4px">'
+            +       '<div>'
+            +         '<label class="f" style="font-weight:600;color:var(--ink)">แนวเกม</label>'
+            +         '<select data-game="' + g.id + '" data-field="genre">'
+            +           '<option value="">— ยังไม่ระบุ —</option>'
+            +           GENRES.map(function (x) {
+                          return '<option value="' + x[0] + '"' + (g.genre === x[0] ? ' selected' : '') + '>'
+                            + G.esc(x[1]) + '</option>'; }).join('')
+            +         '</select>'
+            +       '</div>'
+            +       '<div>'
+            +         '<label class="f" style="font-weight:600;color:var(--ink)">ระดับชั้น</label>'
+            +         '<div style="display:flex;gap:6px;align-items:center">'
+            +           '<input type="number" min="1" max="12" style="width:70px" data-game="' + g.id + '"'
+            +             ' data-field="minimum_grade" value="' + (g.minimum_grade == null ? '' : g.minimum_grade) + '">'
+            +           '<span class="muted small">ถึง</span>'
+            +           '<input type="number" min="1" max="12" style="width:70px" data-game="' + g.id + '"'
+            +             ' data-field="maximum_grade" value="' + (g.maximum_grade == null ? '' : g.maximum_grade) + '">'
+            +         '</div>'
+            +         '<div class="form-hint">ป.1–6 ใส่ 1–6 · ม.1 ใส่ 7</div>'
+            +       '</div>'
+            +       '<div>'
+            +         '<label class="f" style="font-weight:600;color:var(--ink)">เวลาเล่นโดยประมาณ</label>'
+            +         '<div style="display:flex;gap:6px;align-items:center">'
+            +           '<input type="number" min="0" max="600" style="width:90px" data-game="' + g.id + '"'
+            +             ' data-field="play_minutes" value="' + (g.play_minutes == null ? '' : g.play_minutes) + '">'
+            +           '<span class="muted small">นาที</span>'
+            +         '</div>'
+            +         '<div class="form-hint">' + (g.play_minutes ? 'ประมาณ ' + (g.play_minutes / 60).toFixed(1) + ' ชั่วโมง' : 'ครูใช้วางแผนคาบเรียน') + '</div>'
+            +       '</div>'
+            +     '</div>'
+
+            +     '<div class="grid cols-2" style="align-items:start">'
+            +       '<div>'
+            +         '<label class="f" style="font-weight:600;color:var(--ink)">วิชา (ตามที่โรงเรียนเรียก)</label>'
+            +         '<div class="form-hint" style="margin:0 0 8px">เช่น "สังคมศึกษา ป.4" — ต่างจากกลุ่มสาระซึ่งเป็นรหัสตามหลักสูตร</div>'
+            +         '<input type="text" data-game="' + g.id + '" data-field="subject_note"'
+            +           ' value="' + G.esc(g.subject_note || '') + '">'
+            +       '</div>'
+            +       '<div>'
+            +         '<label class="f" style="font-weight:600;color:var(--ink)">แท็ก</label>'
+            +         '<div class="form-hint" style="margin:0 0 8px">คั่นด้วยจุลภาค — ครูใช้ค้นหา เช่น กาญจนบุรี, ประวัติศาสตร์</div>'
+            +         '<input type="text" data-game="' + g.id + '" data-field="tags"'
+            +           ' value="' + G.esc((g.tags || []).join(', ')) + '">'
+            +       '</div>'
+            +     '</div>'
+
+            +     (Object.keys(itemId).length
+                    ? '<label class="f" style="font-weight:600;color:var(--ink)">กลุ่มสาระการเรียนรู้ที่วัด</label>'
+                      + '<div class="form-hint" style="margin:0 0 6px">ติ๊กแล้วการ์ดจะขึ้น "กลุ่มสาระ" และ "ผลสัมฤทธิ์" ทันที</div>'
+                      + checkRow(g.id, 'subject', SUBJECTS)
+                      + '<label class="f" style="font-weight:600;color:var(--ink)">สมรรถนะหลักที่ประเมิน</label>'
+                      + '<div class="form-hint" style="margin:0 0 6px">'
+                      + '⚠️ ต้องตรงกับที่เกมวัดจริง — ถามเจ้าของเกมก่อน อย่าเดา · ครบ 6 ด้านจะขึ้นป้าย "ครบ 6 ด้าน"</div>'
+                      + checkRow(g.id, 'competency', COMPS)
+                    : '<div class="panel-note">ยังติ๊กกลุ่มสาระ/สมรรถนะไม่ได้ — ต้องรัน '
+                      + '<code>08_ASSESSMENT_CORE.sql</code> และ <code>37_GAME_ADMIN_FIELDS.sql</code> ก่อน</div>')
             +   '</div>'
             +   '<div class="grid cols-2" style="align-items:start;padding:6px 2px">'
             +     '<div>'
@@ -611,7 +824,19 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let val;
     if (field === 'is_featured') val = el.checked;
     else if (field === 'sort_order') { val = parseInt(el.value, 10); if (isNaN(val)) val = 0; el.value = val; }
-    else if (field === 'cover_url' || field === 'topic' || field === 'description') val = el.value.trim() || null;
+    else if (field === 'minimum_grade' || field === 'maximum_grade' || field === 'play_minutes') {
+      val = parseInt(el.value, 10);
+      if (isNaN(val) || val < 0) { val = null; el.value = ''; }
+    }
+    /* แท็กเก็บเป็น text[] ในฐานข้อมูล แต่ให้ครูพิมพ์เป็นข้อความคั่นจุลภาค */
+    else if (field === 'tags') {
+      val = el.value.split(',').map((s) => s.trim()).filter(Boolean);
+      el.value = val.join(', ');
+    }
+    else if (field === 'cover_url' || field === 'topic' || field === 'description'
+             || field === 'name_en' || field === 'subject_note' || field === 'genre') {
+      val = el.value.trim() || null;
+    }
     else if (field === 'name') {
       /* ชื่อเกมว่างไม่ได้ — การ์ดจะกลายเป็นช่องเปล่าบนหน้าแรก */
       val = el.value.trim();

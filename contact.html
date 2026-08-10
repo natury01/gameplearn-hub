@@ -45,7 +45,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   <div class="grid cols-2" style="margin-top:18px;align-items:start">
 
     <!-- ================= ฟอร์ม ================= -->
-    <div class="card">
+    <div class="card" id="form">
       <h2 style="margin:0 0 6px;font-size:19px">📮 ส่งข้อความถึงเรา</h2>
       <div class="muted small" style="margin-bottom:6px">ช่องที่มี * ต้องกรอก · ไม่ต้องเข้าสู่ระบบก็ส่งได้</div>
 
@@ -87,6 +87,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <div class="card" id="faq">
         <h2 style="margin:0 0 12px;font-size:19px">❓ คำถามที่พบบ่อย</h2>
 
+        <!-- ถ้าตั้งค่า site_faq ไว้ในหน้า Admin จะถูกแทนที่ทั้งก้อน
+             ข้อความด้านล่างคือชุดมาตรฐานที่ใช้เมื่อยังไม่เคยตั้งค่า -->
+        <div id="faq-list">
         <details style="border-top:1px solid var(--grid);padding:10px 0">
           <summary style="cursor:pointer;font-weight:600">นักเรียนเข้าเล่นยังไง ต้องสมัครไหม</summary>
           <div class="muted small" style="margin-top:8px">
@@ -133,6 +136,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             ไม่เก็บเลขบัตรประชาชน ที่อยู่ หรือข้อมูลส่วนตัวอื่น
           </div>
         </details>
+        </div>
       </div>
 
       <div class="warn-note" style="margin-top:14px">
@@ -155,7 +159,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     </div>
     <div class="col">
       <b>ช่วยเหลือ</b>
-      <a href="contact.html">ติดต่อ / แจ้งบัค</a>
+      <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
       <a href="contact.html#faq">คำถามที่พบบ่อย</a>
       <a href="admin.html">ผู้ดูแลระบบ</a>
     </div>
@@ -188,6 +192,43 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       ? 'เกิดอะไรขึ้น · กดปุ่มไหนก่อนหน้านั้น · ใช้มือถือหรือคอม · เกิดตอนประมาณกี่โมง'
       : 'เล่าให้ละเอียดหน่อยนะ';
   });
+
+  /* มาจากลิงก์ที่ระบุประเภทเรื่องมาแล้ว เช่น contact.html?kind=bug
+     กดชิปให้เลย ครูจะได้ไม่ต้องเลือกซ้ำ (ใช้กับการ์ดในหน้าสนับสนุน) */
+  (function () {
+    const want = new URLSearchParams(location.search).get('kind');
+    if (!want || !KIND_TH[want]) return;
+    const b = $('kindrow').querySelector('.chip[data-kind="' + want + '"]');
+    if (b) b.click();
+  })();
+
+  /* ---------- คำถามที่พบบ่อย — แก้ได้จากหน้า Admin ----------
+     เว้นว่าง/ยังไม่ได้รัน SQL → ใช้ชุดมาตรฐานที่เขียนไว้ใน HTML ไม่มีอะไรพัง */
+  G.get('/rest/v1/site_settings?select=key,value&key=eq.site_faq')
+    .then(function (rows) {
+      const raw = rows && rows[0] && rows[0].value;
+      if (!raw) return;
+      let list;
+      try { list = JSON.parse(raw); } catch (e) { return; }
+      if (!Array.isArray(list)) return;
+      list = list.filter(function (x) { return x && x.q; });
+      if (!list.length) return;
+      $('faq-list').innerHTML = list.map(function (x) {
+        return '<details style="border-top:1px solid var(--grid);padding:10px 0">'
+          + '<summary style="cursor:pointer;font-weight:600">' + G.esc(x.q) + '</summary>'
+          + '<div class="muted small" style="margin-top:8px;white-space:pre-line">'
+          + linkify(x.a || '') + '</div></details>';
+      }).join('');
+    }).catch(function () {});
+
+  /* รองรับลิงก์แบบ [ข้อความ](ที่อยู่) เท่านั้น — ไม่ปล่อย HTML ดิบเข้ามา
+     เพราะข้อความก้อนนี้มาจากฐานข้อมูล ถ้าใส่ HTML ได้จะกลายเป็นช่องโจมตี */
+  function linkify(s) {
+    return G.esc(s).replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (m, text, url) {
+      if (!/^(https?:\/\/|\/|[\w.-]+\.html)/i.test(url)) return text;
+      return '<a href="' + url + '">' + text + '</a>';
+    });
+  }
 
   /* รายชื่อเกมในดรอปดาวน์ — อ่านจากทะเบียนเกม ไม่ hard-code */
   G.get('/rest/v1/games?select=code,name&status=in.(published,maintenance,testing)&order=name')

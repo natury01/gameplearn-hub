@@ -53,6 +53,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <button class="tab" role="tab" data-tab="support"  aria-selected="false">💙 หน้าสนับสนุน</button>
       <button class="tab" role="tab" data-tab="games"    aria-selected="false">🎮 ทะเบียนเกม</button>
       <button class="tab" role="tab" data-tab="inbox"    aria-selected="false">💬 กล่องข้อความ <span id="inbox-badge"></span></button>
+      <button class="tab" role="tab" data-tab="rooms"    aria-selected="false">🏫 ห้องเรียนทั้งระบบ</button>
+      <button class="tab" role="tab" data-tab="stats"    aria-selected="false">📈 สถิติการใช้งาน</button>
       <button class="tab" role="tab" data-tab="contact"  aria-selected="false">⚙️ ช่องทางติดต่อ</button>
     </div>
 
@@ -164,6 +166,43 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           เพิ่ม ลบ แก้ได้ตามใจ — เรียงตามลำดับที่เห็นตรงนี้
         </div>
         <div id="faq-fields"></div>
+      </div>
+    </section>
+
+    <!-- ห้องเรียนทั้งระบบ — มุมมองผู้ดูแล แยกจาก "ห้องเรียนของฉัน" ในหน้าครูโดยเจตนา
+         หน้าครูคือห้องที่บัญชีนั้นเป็นเจ้าของเท่านั้น ส่วนหน้านี้คือภาพรวมของทั้งโรงเรียน/ระบบ -->
+    <section class="panel hidden" id="panel-rooms">
+      <div class="card">
+        <h2 style="margin:0 0 4px;font-size:18px">ห้องเรียนทั้งระบบ</h2>
+        <div class="muted small" style="margin-bottom:12px">
+          รวมห้องของครูทุกคน — <b>อ่านอย่างเดียว</b> หน้านี้ไม่แก้ ไม่ปิด ไม่ลบห้องของใคร
+          ครูเจ้าของห้องแก้ได้เองที่หน้าครู · ห้องของครูคนอื่นจะไม่โผล่ในหน้า "ห้องเรียนของฉัน" อีกแล้ว
+        </div>
+        <div class="f">
+          <label for="rm-q">ค้นหา</label>
+          <input id="rm-q" type="search" placeholder="ชื่อห้อง · โรงเรียน · โค้ดห้อง · อีเมลครู"
+                 autocomplete="off">
+        </div>
+        <div id="rm-stat" class="muted small" style="margin:10px 0" role="status"></div>
+        <div id="rm-wrap"><span class="loading"></span> กำลังโหลด…</div>
+      </div>
+    </section>
+
+    <!-- สถิติการใช้งาน (52_VISIT_STATS.sql) -->
+    <section class="panel hidden" id="panel-stats">
+      <div class="card">
+        <h2 style="margin:0 0 4px;font-size:18px">สถิติการใช้งาน</h2>
+        <div class="muted small" style="margin-bottom:12px">
+          เริ่มนับตั้งแต่วันที่รัน <code>52_VISIT_STATS.sql</code> — ก่อนหน้านั้นไม่มีข้อมูลเก็บไว้เลย
+          จึงย้อนหลังไม่ได้ · เก็บเป็นตัวนับรายวันล้วน ๆ ไม่มีข้อมูลส่วนบุคคลของใคร
+        </div>
+        <div class="tabs" id="st-range" role="tablist" style="margin-bottom:12px">
+          <button class="tab" role="tab" data-range="7"  aria-selected="true">7 วัน</button>
+          <button class="tab" role="tab" data-range="30" aria-selected="false">30 วัน</button>
+          <button class="tab" role="tab" data-range="90" aria-selected="false">90 วัน</button>
+        </div>
+        <div id="st-tiles" class="tiles"></div>
+        <div id="st-body"><span class="loading"></span> กำลังโหลด…</div>
       </div>
     </section>
   </div>
@@ -1030,10 +1069,189 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     Array.prototype.forEach.call(this.querySelectorAll('.tab'), function (x) {
       x.setAttribute('aria-selected', x === t ? 'true' : 'false');
     });
-    ['brand', 'support', 'games', 'inbox', 'contact'].forEach(function (p) {
+    ['brand', 'support', 'games', 'inbox', 'contact', 'rooms', 'stats'].forEach(function (p) {
       $('panel-' + p).classList.toggle('hidden', p !== name);
     });
+    if (name === 'rooms') loadRooms();
+    if (name === 'stats') loadStats();
   });
+
+  /* ============ ห้องเรียนทั้งระบบ (ผู้ดูแล · อ่านอย่างเดียว) ============
+     โหลดครั้งเดียวตอนเปิดแท็บ — ไม่ดึงมาตั้งแต่เข้าหน้า เพราะผู้ดูแลส่วนใหญ่เข้ามาทำอย่างอื่น
+     ไม่ดึงชื่อ-นามสกุลนักเรียนมาเลย (PDPA) — นับหัวอย่างเดียวก็พอสำหรับงานดูแลระบบ */
+  let RM = null;
+  async function loadRooms() {
+    if (RM) return;
+    try {
+      const [rooms, schools, teachers, counts] = await Promise.all([
+        G.get('/rest/v1/classrooms?select=*&order=created_at.desc'),
+        G.get('/rest/v1/schools?select=id,name').catch(() => []),
+        G.get('/rest/v1/teachers?select=id,email,display_name').catch(() => []),
+        G.get('/rest/v1/students?select=classroom_id,is_active').catch(() => []),
+      ]);
+      const sc = {}; schools.forEach((x) => { sc[x.id] = x.name; });
+      const tc = {}; teachers.forEach((x) => { tc[x.id] = x.display_name || x.email || ''; });
+      const n = {};
+      counts.forEach(function (x) {
+        const c = n[x.classroom_id] || (n[x.classroom_id] = { on: 0, off: 0 });
+        if (x.is_active === false) c.off++; else c.on++;
+      });
+      RM = rooms.map((r) => Object.assign({}, r, {
+        _school: sc[r.school_id] || '', _teacher: tc[r.teacher_id] || '',
+        _on: (n[r.id] || {}).on || 0, _off: (n[r.id] || {}).off || 0 }));
+      drawRooms();
+      $('rm-q').oninput = drawRooms;
+    } catch (e) {
+      $('rm-wrap').innerHTML = '<div class="muted">โหลดไม่สำเร็จ: ' + G.esc(e.message) + '</div>';
+    }
+  }
+  function drawRooms() {
+    const q = ($('rm-q').value || '').trim().toLowerCase();
+    const list = !q ? RM : RM.filter((r) => [r.name, r._school, r.join_key, r._teacher,
+      r.academic_year].join(' ').toLowerCase().indexOf(q) >= 0);
+    const orphan = RM.filter((r) => !r.teacher_id).length;
+    $('rm-stat').textContent = 'ทั้งระบบ ' + RM.length + ' ห้อง · ครู '
+      + new Set(RM.map((r) => r.teacher_id).filter(Boolean)).size + ' คน · นักเรียน '
+      + RM.reduce((a, r) => a + r._on, 0) + ' คน'
+      + (orphan ? ' · ยังไม่มีเจ้าของ ' + orphan + ' ห้อง' : '')
+      + (q ? ' — ตรงกับที่ค้นหา ' + list.length + ' ห้อง' : '');
+    if (!list.length) { $('rm-wrap').innerHTML = '<div class="muted">ไม่พบห้องที่ตรงกับที่ค้นหา</div>'; return; }
+    $('rm-wrap').innerHTML = '<div class="table-scroll"><table class="gol"><thead><tr>'
+      + '<th scope="col">ห้อง</th><th scope="col">โรงเรียน</th><th scope="col">ปีการศึกษา</th>'
+      + '<th scope="col">ครูเจ้าของ</th><th scope="col" class="num">นักเรียน</th>'
+      + '<th scope="col">โค้ด</th><th scope="col">สถานะ</th></tr></thead><tbody>'
+      + list.map((r) => '<tr>'
+          + '<td><b>' + G.esc(r.name || '–') + '</b></td>'
+          + '<td>' + G.esc(r._school || '–') + '</td>'
+          + '<td>' + G.esc(r.academic_year || '–') + '</td>'
+          + '<td>' + (r.teacher_id ? G.esc(r._teacher || r.teacher_id)
+              : '<span class="badge">ยังไม่มีเจ้าของ</span>') + '</td>'
+          + '<td class="num">' + r._on + (r._off ? ' <span class="muted small">(ปิด ' + r._off + ')</span>' : '') + '</td>'
+          + '<td><span class="joinkey" style="font-size:13px">' + G.esc(r.join_key || '–') + '</span></td>'
+          + '<td>' + (r.is_active === false ? '<span class="badge">ปิดอยู่</span>'
+              : '<span class="badge published">เปิด</span>') + '</td>'
+          + '</tr>').join('')
+      + '</tbody></table></div>';
+  }
+
+  /* ============ สถิติการใช้งาน (52_VISIT_STATS.sql) ============
+     ตัวเลขชุดนี้เป็น "ตัวชี้วัดคร่าว ๆ" — ใครถือคีย์ anon (ซึ่งเปิดเผยในหน้าเว็บ) ยิงเพิ่มได้
+     จึงเขียนกำกับไว้บนหน้าจอด้วย ไม่ให้ใครเผลอเอาไปอ้างในรายงานว่าเป็นตัวเลขที่กันการปลอมได้ */
+  let ST = null, ST_RANGE = 7;
+  const PAGE_TH = { home: 'หน้าแรก', games: 'รายชื่อเกม', game: 'กดเล่นเกม',
+    standards: 'มาตรฐานที่แต่ละเกมวัด', teacher: 'หน้าครู', support: 'สนับสนุน',
+    contact: 'ติดต่อ / แจ้งปัญหา', join: 'เข้าห้องด้วยโค้ด', admin: 'หน้าผู้ดูแล' };
+
+  async function loadStats() {
+    if (ST) { drawStats(); return; }
+    try {
+      const [visits, acts] = await Promise.all([
+        G.get('/rest/v1/v_visit_daily?select=*'),
+        G.get('/rest/v1/v_game_activity?select=*').catch(() => []),
+      ]);
+      ST = { visits: visits || [], acts: acts || [] };
+      $('st-range').addEventListener('click', function (ev) {
+        const t = ev.target.closest('.tab'); if (!t) return;
+        ST_RANGE = Number(t.getAttribute('data-range')) || 7;
+        Array.prototype.forEach.call(this.querySelectorAll('.tab'), function (x) {
+          x.setAttribute('aria-selected', x === t ? 'true' : 'false'); });
+        drawStats();
+      });
+      drawStats();
+    } catch (e) {
+      $('st-body').innerHTML = '<div class="card muted">ยังอ่านสถิติไม่ได้: ' + G.esc(e.message)
+        + '<div style="margin-top:8px">ถ้าขึ้นว่าไม่พบตาราง แปลว่ายังไม่ได้รัน '
+        + '<code>52_VISIT_STATS.sql</code> บน Supabase</div></div>';
+      $('st-tiles').innerHTML = '';
+    }
+  }
+
+  function drawStats() {
+    const from = new Date(Date.now() - (ST_RANGE - 1) * 86400e3).toISOString().slice(0, 10);
+    const rows = ST.visits.filter((r) => r.day >= from);
+    const sum = (f) => rows.reduce((a, r) => a + (Number(r[f]) || 0), 0);
+    const pageRows = {}, dev = { mobile: 0, pc: 0, unknown: 0 };
+    rows.forEach(function (r) {
+      const k = r.page;
+      const o = pageRows[k] || (pageRows[k] = { views: 0, visitors: 0, mobile: 0, pc: 0 });
+      const v = Number(r.views) || 0;
+      o.views += v; o.visitors += Number(r.visitors) || 0;
+      if (r.device === 'mobile') o.mobile += v; else if (r.device === 'pc') o.pc += v;
+      dev[r.device === 'mobile' ? 'mobile' : r.device === 'pc' ? 'pc' : 'unknown'] += v;
+    });
+    const tile = (label, value, unit) => '<div class="tile"><div class="label">' + label + '</div>'
+      + '<div class="value">' + value + (unit ? '<span class="unit">' + unit + '</span>' : '') + '</div></div>';
+    const site = Object.keys(pageRows).filter((k) => k !== 'game');
+    $('st-tiles').innerHTML =
+        tile('เปิดหน้าเว็บ', site.reduce((a, k) => a + pageRows[k].views, 0).toLocaleString('th-TH'), 'ครั้ง')
+      + tile('ผู้เยี่ยมชม', site.reduce((a, k) => a + pageRows[k].visitors, 0).toLocaleString('th-TH'), 'เครื่อง')
+      + tile('กดเล่นเกม', ((pageRows.game || {}).views || 0).toLocaleString('th-TH'), 'ครั้ง')
+      + tile('เล่นจนมีผล', ST.acts.reduce((a, g) => a + (Number(g.play_all) || 0), 0).toLocaleString('th-TH'), 'รอบ')
+      + tile('ผู้เล่นสะสม', ST.acts.reduce((a, g) => a + (Number(g.players_all) || 0), 0).toLocaleString('th-TH'), 'คน')
+      + (function () {
+          /* สัดส่วนเครื่อง — คิดจากเฉพาะครั้งที่ระบุชนิดได้ ไม่เอา unknown มาปนตัวหาร
+             ไม่งั้นช่วงแรกที่ยังมีข้อมูลเก่าค้างอยู่ สัดส่วนจะดูเพี้ยนโดยไม่มีเหตุผล */
+          const known = dev.mobile + dev.pc;
+          if (!known) return tile('มือถือ / คอมฯ', '–');
+          return tile('มือถือ', Math.round(dev.mobile / known * 100), '%')
+            + tile('คอมพิวเตอร์', Math.round(dev.pc / known * 100), '%');
+        })();
+
+    let html = '<h3 style="margin:16px 0 8px;font-size:16px">แต่ละหน้าถูกเปิดกี่ครั้ง</h3>';
+    const list = Object.keys(pageRows).sort((a, b) => pageRows[b].views - pageRows[a].views);
+    html += !list.length
+      ? '<div class="card muted">ยังไม่มีข้อมูลในช่วงนี้ — ถ้าเพิ่งรัน 52 ให้ลองเปิดหน้าเว็บสัก 2-3 หน้าแล้วกลับมาดูใหม่</div>'
+      : '<div class="table-scroll"><table class="gol"><thead><tr><th scope="col">หน้า</th>'
+        + '<th scope="col" class="num">เปิด (ครั้ง)</th><th scope="col" class="num">ผู้เยี่ยมชม</th>'
+        + '<th scope="col" class="num">📱 มือถือ</th><th scope="col" class="num">💻 คอมฯ</th>'
+        + '</tr></thead><tbody>'
+        + list.map((k) => '<tr><td>' + G.esc(PAGE_TH[k] || k) + '</td>'
+            + '<td class="num">' + pageRows[k].views.toLocaleString('th-TH') + '</td>'
+            + '<td class="num">' + (k === 'game' ? '<span class="muted small">–</span>'
+                : pageRows[k].visitors.toLocaleString('th-TH')) + '</td>'
+            + '<td class="num">' + pageRows[k].mobile.toLocaleString('th-TH') + '</td>'
+            + '<td class="num">' + pageRows[k].pc.toLocaleString('th-TH') + '</td></tr>').join('')
+        + '</tbody></table>'
+        + (dev.unknown ? '<div class="panel-note">มี ' + dev.unknown.toLocaleString('th-TH')
+            + ' ครั้งที่ยังไม่รู้ชนิดเครื่อง — เป็นข้อมูลที่เก็บก่อนอัปเดตเป็นฉบับแก้ 2 '
+            + 'ไม่ได้นับรวมในช่องมือถือ/คอมฯ และย้อนไปเติมไม่ได้</div>' : '')
+        + '</div>';
+
+    const gclick = {}, gdev = {};
+    rows.filter((r) => r.page === 'game' && r.game_code).forEach(function (r) {
+      const v = Number(r.views) || 0;
+      gclick[r.game_code] = (gclick[r.game_code] || 0) + v;
+      const d = gdev[r.game_code] || (gdev[r.game_code] = { mobile: 0, pc: 0 });
+      if (r.device === 'mobile') d.mobile += v; else if (r.device === 'pc') d.pc += v; });
+    const games = ST.acts.slice().sort((a, b) =>
+      (gclick[b.game_code] || 0) - (gclick[a.game_code] || 0) || (b.play_all - a.play_all));
+    html += '<h3 style="margin:20px 0 8px;font-size:16px">รายเกม</h3>';
+    html += !games.length ? '<div class="card muted">ยังไม่มีเกมในทะเบียน</div>'
+      : '<div class="table-scroll"><table class="gol"><thead><tr><th scope="col">เกม</th>'
+        + '<th scope="col" class="num">กดเล่น (ช่วงนี้)</th>'
+        + '<th scope="col" class="num">📱 มือถือ</th><th scope="col" class="num">💻 คอมฯ</th>'
+        + '<th scope="col" class="num">เล่นจนมีผล</th>'
+        + '<th scope="col" class="num">ผู้เล่น</th></tr></thead><tbody>'
+        + games.map((g) => '<tr><td><b>' + G.esc(g.game_name || g.game_code) + '</b>'
+            + (g.status !== 'published' ? ' <span class="badge">' + G.esc(g.status) + '</span>' : '') + '</td>'
+            + '<td class="num">' + (gclick[g.game_code] || 0).toLocaleString('th-TH') + '</td>'
+            + '<td class="num">' + ((gdev[g.game_code] || {}).mobile || 0).toLocaleString('th-TH') + '</td>'
+            + '<td class="num">' + ((gdev[g.game_code] || {}).pc || 0).toLocaleString('th-TH') + '</td>'
+            + '<td class="num">' + Number(g.play_all || 0).toLocaleString('th-TH') + '</td>'
+            + '<td class="num">' + Number(g.players_all || 0).toLocaleString('th-TH') + '</td></tr>').join('')
+        + '</tbody></table>'
+        + '<div class="panel-note">"กดเล่น" นับตอนคนกดปุ่มเล่นบนเว็บกลาง (นับช่วงที่เลือกไว้ด้านบน) · '
+        + '"เล่นจนมีผล" กับ "ผู้เล่น" นับจากข้อมูลที่เกมส่งกลับมาจริง (สะสมทั้งหมด ไม่ตัดตามช่วง) · '
+        + 'ช่องมือถือ/คอมฯ แยกเฉพาะการกดเล่นบนเว็บกลาง — นักเรียนที่เปิดเกมจากลิงก์โดยตรง '
+        + 'จะไม่ถูกนับในสองช่องนี้ แต่ยังนับใน "เล่นจนมีผล" ตามปกติ · '
+        + 'ส่วนต่างของสองเลขนี้คือคนที่กดเข้าไปแล้วยังไม่ได้เล่นจนจบรอบ</div></div>';
+
+    html += '<div class="panel-note" style="margin-top:14px">⚠️ ตัวเลขการเยี่ยมชมเป็น'
+      + '<b>ตัวชี้วัดคร่าว ๆ</b> ไม่ใช่สถิติที่กันการปลอมได้ — คีย์ anon เปิดเผยอยู่ในหน้าเว็บ '
+      + 'ใครก็ยิงเพิ่มได้ ถ้าต้องใช้ตัวเลขในรายงานที่มีผลจริง ควรใช้บริการวัดผลที่ตรวจสอบได้ '
+      + 'ส่วน "เล่นจนมีผล/ผู้เล่น" เชื่อถือได้มากกว่า เพราะมาจากข้อมูลการเล่นจริงที่ผูกกับนักเรียน</div>';
+    $('st-body').innerHTML = html;
+  }
 
   boot().catch(function (e) { gateErr('เกิดข้อผิดพลาด: ' + e.message); });
 })();

@@ -27,7 +27,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
            จึงไม่ต้องใส่ class="on" ตายตัวให้ "สำหรับครู" อีก (จะไฮไลต์ซ้อนกันสองอัน) -->
       <a href="#/" data-nav="#/">📊 Dashboard</a>
       <a href="#/rooms" data-nav="#/rooms">🏫 สร้างห้องเรียน</a>
-      <a href="#/standards" data-nav="#/standards">📋 มาตรฐาน</a>
+      <a href="standards.html">📋 มาตรฐาน</a>
       <a href="support.html">สนับสนุน</a>
       <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
     </nav>
@@ -103,28 +103,73 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   // ตารางการวัดผล 2 มิติเป็นของใหม่ (08_ASSESSMENT_CORE.sql) — ถ้ายังไม่ได้รัน ให้เว็บทำงานต่อได้ ไม่พัง
   const soft = (p) => G.get(p).catch(() => []);
+  const qs = (p, q) => p + (p.indexOf('?') >= 0 ? '&' : '?') + q;
 
+  /* ดึงโดยจำกัดด้วยรายการ id — แบ่งเป็นก้อนละ 80 เพราะ in.(...) ที่ยาวมาก
+     ทำให้ URL ยาวเกินจนพร็อกซีบางตัวตัดทิ้ง (ห้องละ 40 คน 5 ห้อง = 200 uuid ≈ 7 KB)
+     ไม่มี id เลย = ไม่ต้องยิงคำขอ คืนอาเรย์ว่าง */
+  async function getIn(path, col, ids, isSoft) {
+    if (!ids.length) return [];
+    const jobs = [];
+    for (let i = 0; i < ids.length; i += 80) {
+      const u = qs(path, col + '=in.(' + ids.slice(i, i + 80).join(',') + ')');
+      jobs.push(isSoft ? soft(u) : G.get(u));
+    }
+    const out = [];
+    (await Promise.all(jobs)).forEach((r) => { if (r) out.push.apply(out, r); });
+    return out;
+  }
+  /* นับแบบจำกัดด้วย id เหมือนกัน — ก้อนไม่ทับกัน ผลรวมจึงเท่ากับนับครั้งเดียว
+     ก้อนไหนอ่านไม่ได้ = คืน null ทั้งก้อน (แสดง "–" ไม่ใช่ 0 ที่ดูเหมือนไม่มีข้อมูล) */
+  async function countIn(path, col, ids) {
+    if (!ids.length) return 0;
+    const jobs = [];
+    for (let i = 0; i < ids.length; i += 80) {
+      jobs.push(G.countRows(qs(path, col + '=in.(' + ids.slice(i, i + 80).join(',') + ')'))
+        .catch(() => null));
+    }
+    const parts = await Promise.all(jobs);
+    return parts.some((n) => n == null) ? null : parts.reduce((a, n) => a + n, 0);
+  }
+
+  /* โหลดข้อมูลของ "ห้องที่ฉันเป็นเจ้าของ" เท่านั้น — 3 ระลอกเพราะระลอกหลังต้องใช้ id จากระลอกก่อน
+     ⚠️ กติกาสำคัญ: หน้าครูคือหน้าของ "ห้องฉัน" เสมอ แม้บัญชีนั้นจะเป็นผู้ดูแลระบบ
+     RLS ของ 46 เปิดให้ผู้ดูแลอ่านได้ทุกห้อง (จำเป็นสำหรับงานดูแลระบบ) ถ้าไม่กรอง teacher_id
+     ตรงนี้ ห้องของครูคนอื่นจะไหลเข้ามาอยู่ใต้หัวข้อ "ห้องเรียนของฉัน" — เคยเกิดจริงมาแล้ว
+     และไม่ใช่แค่ชื่อหัวข้อผิด: ยอดนักเรียน ค่าเฉลี่ย และผลสมรรถนะจะกลายเป็นของทั้งระบบ */
   async function loadAll() {
-    const [games, rooms, cg, students, progress, summary, evCount, frameworks, coverage, itemSummary, itemProfile, comp, compDims, achieve, schools] = await Promise.all([
+    const uid = G.session().user_id;
+
+    const [games, rooms, frameworks, coverage, schools] = await Promise.all([
       G.get('/rest/v1/games?select=id,code,name,status,launch_url,dashboard_url,minimum_grade,maximum_grade&order=name'),
-      G.get('/rest/v1/classrooms?select=*&order=created_at.desc'),
-      G.get('/rest/v1/classroom_games?select=*'),
-      /* select=* เพื่อไม่ให้พังถ้าฐานยังไม่ได้รัน 46 (คอลัมน์ is_active/join_pin ยังไม่มี) */
-      G.get('/rest/v1/students?select=*&order=student_number'),
-      G.get('/rest/v1/student_game_progress?select=*'),
-      G.get('/rest/v1/v_classroom_game_summary?select=*'),
-      G.countRows('/rest/v1/events').catch(() => null),
+      G.get('/rest/v1/classrooms?select=*&teacher_id=eq.' + encodeURIComponent(uid) + '&order=created_at.desc'),
       soft('/rest/v1/assessment_frameworks?select=code,kind,name_th,status,level_scale&status=eq.active'),
       soft('/rest/v1/v_framework_coverage?select=*&depth=eq.1'),
-      soft('/rest/v1/v_classroom_item_summary?select=*'),
-      soft('/rest/v1/v_student_item_profile?select=*&is_latest=is.true'),
-      /* ผลสมรรถนะที่ "เกมคิดแล้วส่งลงมา" — เว็บกลางอ่านอย่างเดียว ไม่คิดซ้ำ (38_CENTRAL_DASHBOARD.sql) */
-      soft('/rest/v1/v_student_competency?select=*'),
-      /* ใบรายงานผล 2 ใบ (43_REPORT_CARDS.sql): สมรรถนะรายด้าน 6 ด้าน + ผลสัมฤทธิ์สรุปจากเกม */
-      soft('/rest/v1/v_student_comp_dims?select=*'),
-      soft('/rest/v1/v_student_achievement?select=*'),
       soft('/rest/v1/schools?select=id,name&order=name'),
     ]);
+
+    const rid = rooms.map((r) => r.id);
+    const [cg, students, summary, itemSummary, itemProfile, comp, compDims, achieve] = await Promise.all([
+      getIn('/rest/v1/classroom_games?select=*', 'classroom_id', rid),
+      /* select=* เพื่อไม่ให้พังถ้าฐานยังไม่ได้รัน 46 (คอลัมน์ is_active/join_pin ยังไม่มี) */
+      getIn('/rest/v1/students?select=*&order=student_number', 'classroom_id', rid),
+      getIn('/rest/v1/v_classroom_game_summary?select=*', 'classroom_id', rid),
+      getIn('/rest/v1/v_classroom_item_summary?select=*', 'classroom_id', rid, true),
+      getIn('/rest/v1/v_student_item_profile?select=*&is_latest=is.true', 'classroom_id', rid, true),
+      /* ผลสมรรถนะที่ "เกมคิดแล้วส่งลงมา" — เว็บกลางอ่านอย่างเดียว ไม่คิดซ้ำ (38_CENTRAL_DASHBOARD.sql) */
+      getIn('/rest/v1/v_student_competency?select=*', 'classroom_id', rid, true),
+      /* ใบรายงานผล 2 ใบ (43_REPORT_CARDS.sql): สมรรถนะรายด้าน 6 ด้าน + ผลสัมฤทธิ์สรุปจากเกม */
+      getIn('/rest/v1/v_student_comp_dims?select=*', 'classroom_id', rid, true),
+      getIn('/rest/v1/v_student_achievement?select=*', 'classroom_id', rid, true),
+    ]);
+
+    /* student_game_progress กับ events ไม่มีคอลัมน์ห้อง จึงจำกัดด้วยรายชื่อนักเรียนแทน */
+    const sid = students.map((x) => x.id);
+    const [progress, evCount] = await Promise.all([
+      getIn('/rest/v1/student_game_progress?select=*', 'student_id', sid),
+      countIn('/rest/v1/events', 'student_id', sid),
+    ]);
+
     Object.assign(S, { games, rooms, cg, students, progress, summary, eventsCount: evCount,
       frameworks, coverage, itemSummary, itemProfile, comp,
       compDims: compDims || [], achieve: achieve || [], schools: schools || [] });
@@ -157,8 +202,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      นับเป็น Dashboard เพราะเดินเข้ามาจากหน้านั้น */
   function syncNav() {
     const h = location.hash || '#/';
-    const cur = h.indexOf('#/rooms') === 0 ? '#/rooms'
-      : h.indexOf('#/standards') === 0 ? '#/standards' : '#/';
+    const cur = h.indexOf('#/rooms') === 0 ? '#/rooms' : '#/';
     document.querySelectorAll('.navlinks a[data-nav]').forEach((a) => {
       const on = a.getAttribute('data-nav') === cur;
       a.classList.toggle('on', on);
@@ -171,7 +215,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     syncNav();
     const h = location.hash || '#/';
     if (h.indexOf('#/rooms') === 0) { $('crumb').classList.add('hidden'); return renderRooms(); }
-    if (h.indexOf('#/standards') === 0) { $('crumb').classList.add('hidden'); return renderStandardsPage(); }
+    /* #/standards ย้ายไปหน้า standards.html (เปิดดูได้โดยไม่ต้องล็อกอิน) — ลิงก์เก่าพาไปที่นั่น */
+    if (h.indexOf('#/standards') === 0) { location.replace('standards.html'); return; }
     const mRoom = h.match(/^#\/room\/([0-9a-f-]+)/i);
     const mStu = h.match(/^#\/student\/([0-9a-f-]+)/i);
     $('crumb').classList.toggle('hidden', !(mRoom || mStu));
@@ -552,19 +597,44 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   /* คีย์ที่ขึ้นต้นด้วย _ ในใบผลสัมฤทธิ์ = "รายการประกอบ" ที่เกมส่งมาให้ครูเห็น
      แต่ไม่ได้บวกอยู่ในคะแนนหลัก (เช่นคะแนนสอบด่านบอสของกาญจนบุรี ซึ่งนับซ้ำอยู่ในคะแนนเก็บแล้ว)
      — แยกกลุ่มแสดงเสมอ จะได้ไม่มีใครเผลออ่านว่าเป็นคะแนนอีกก้อน */
-  const UNIT_LABEL = { _boss: 'คะแนนสอบด่านบอส', _cap24: 'ด่านรวบยอด (เต็ม 24)',
+  const UNIT_LABEL = { _boss: 'คะแนนสอบปีศาจข้อสอบ (เต็ม 30)', _cap24: 'ภารกิจกาญ 2050 (ฐานเต็ม 24)',
     _badges: 'ตราที่ได้', _badges_total: 'ตราทั้งหมด' };
-  function unitName(k) {
-    if (String(k).charAt(0) === '_') return UNIT_LABEL[k] || String(k).slice(1);
-    return /^\d+$/.test(String(k)) ? 'ด่าน ' + k : String(k);
+  /* ชื่อด่านของภาค 2 — ชุดนี้ **ภาค 2 ส่งมาให้เอง** (ตอบเอกสาร 50 ข้อ 2)
+     ไม่ใช่เว็บกลางตั้งชื่อแทนเกม ซึ่งยังเป็นข้อห้ามเดิม (45 ข้อ 3)
+     คีย์ที่ไม่อยู่ในตารางนี้ยังแสดงตามที่เกมส่งมาเหมือนเดิม ไม่เดา
+
+     ⚠️ ต้องแยกตาม "ภาค" ไม่ใช่ตามรหัสเกม — ภาค 2 ส่ง game_code เดียวกับภาค 1 โดยตั้งใจ
+     และทั้งสองภาคใช้คีย์ด่านเป็นตัวเลขซ้ำกัน ('1', '3', …) ตัวแยกคือป้ายรุ่นที่มี '-p2-'
+     ถ้าจับด้วยรหัสเกม ด่าน 1 ของภาค 1 จะได้ชื่อด่าน 1 ของภาค 2 ไปเลย */
+  const isP2 = (ver) => /-p2-/.test(String(ver || ''));
+  const STAGE_P2 = {
+    '1': 'นักสืบสะพานแคว (บทนำ)', '3': 'ถ้ำกระแซ สะพานเลียบผา',
+    '4': 'น้ำตกเอราวัณ & เขื่อนศรีนครินทร์', '5': 'เขื่อนวชิราลงกรณ & น้ำพุร้อนหินดาด',
+    '6': 'ต้นจามจุรียักษ์', '7': 'สะพานมอญ & เมืองบาดาล & เจดีย์สามองค์',
+    '8': 'ปีศาจข้อสอบ (แบบทดสอบหลังเรียน)',
+    mg1: 'เรียงเหตุการณ์ประวัติศาสตร์', mg2: 'จัดการน้ำในเขื่อน', mg3: 'จัดวางแผนที่กาญจนบุรี',
+    hellfire: 'ช่องเขาขาด', pilok: 'เหมืองปิล๊อก-อีต่อง', water: 'ปริศนาสายน้ำ (ด่านพิเศษ)',
+    balance2050: 'กาญจนบุรี 2050: พิทักษ์สมดุล'
+  };
+  function unitName(k, ver) {
+    const key = String(k);
+    if (key.charAt(0) === '_') return UNIT_LABEL[key] || key.slice(1);
+    const named = isP2(ver) ? STAGE_P2[key] : null;
+    if (named) return /^\d+$/.test(key) ? 'ด่าน ' + key + ' — ' + named : named;
+    return /^\d+$/.test(key) ? 'ด่าน ' + key : key;
   }
-  function unitRows(us) {
+  function unitRows(us, ver) {
     if (!us || typeof us !== 'object') return '';
     const keys = Object.keys(us);
     const main = keys.filter((k) => String(k).charAt(0) !== '_');
     const extra = keys.filter((k) => String(k).charAt(0) === '_');
-    const row = (k) => '<tr><td class="muted small">' + G.esc(unitName(k)) + '</td>'
-      + '<td class="num">' + G.fmt(us[k]) + '</td></tr>';
+    /* ค่าที่ไม่ใช่ตัวเลขก็มีได้ (เช่นธงจริง/เท็จ) — G.fmt กับ true จะได้ค่าประหลาด
+       จึงแสดงเป็นเครื่องหมายแทน ไม่ปล่อยให้โผล่เป็นตัวเลขลวง */
+    const cell = (v) => (typeof v === 'boolean') ? (v ? '✔' : '–')
+      : (v == null ? '–' : (isNaN(Number(v)) ? G.esc(String(v)) : G.fmt(v)));
+    const row = (k) => '<tr><td class="muted small" title="' + G.esc(String(k)) + '">'
+      + G.esc(unitName(k, ver)) + '</td>'
+      + '<td class="num">' + cell(us[k]) + '</td></tr>';
     if (!main.length && !extra.length) return '';
     return '<table class="gol" style="margin-top:8px"><tbody>'
       + main.map(row).join('')
@@ -1010,33 +1080,6 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   /* หน้ามาตรฐาน — ตารางสรุปเดียวกับหน้าแรก + แผงรายละเอียดต่อเกม (คอมโพเนนต์กลางตัวเดียวกับเกม) */
-  function renderStandardsPage() {
-    clearErr();
-    const games = S.games.filter((g) => g.status !== 'archived');
-    let html = '<h2 class="section-title">📋 มาตรฐานที่แต่ละเกมวัด '
-      + '<span class="sub">ใช้อ้างอิงในแผนการสอนและงานประกันคุณภาพ</span></h2>';
-    if (!games.length) {
-      html += '<div class="card muted">ยังไม่มีเกมในระบบ</div>';
-    } else {
-      /* ตารางสรุปก่อน (ภาพรวมทุกเกมในหน้าเดียว) แล้วค่อยแผงรายละเอียดต่อเกม */
-      html += '<div class="card table-scroll"><table class="gol"><thead><tr>'
-        + '<th scope="col">เกม</th><th scope="col">ระดับชั้น</th><th scope="col">สถานะ</th>'
-        + '</tr></thead><tbody>'
-        + games.map((g) => '<tr><td><b>' + G.esc(g.name) + '</b></td>'
-            + '<td>' + G.esc(g.minimum_grade != null
-                ? 'ป.' + g.minimum_grade + (g.maximum_grade ? '–' + g.maximum_grade : '') : '–') + '</td>'
-            + '<td><span class="badge ' + G.esc(g.status) + '">' + G.esc(g.status) + '</span></td></tr>').join('')
-        + '</tbody></table>'
-        + '<div class="form-hint">รายละเอียดตัวชี้วัดและสมรรถนะของแต่ละเกมอยู่ในแผงด้านล่าง — '
-        + 'ข้อมูลชุดเดียวกับที่แสดงในหน้า Dashboard ของตัวเกม</div></div>'
-        + '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));margin-top:14px">'
-        + games.map((g) => '<div class="std-slot" data-std-game="' + G.esc(g.code) + '"></div>').join('')
-        + '</div>';
-    }
-    $('content').innerHTML = html;
-    mountStandardsPanels();
-  }
-
   async function createRoom() {
     clearErr();
     const v = readRoomForm(); if (!v) return;
@@ -1352,7 +1395,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             })()
           + (ac.progress_percent != null
               ? '<div class="muted small">เล่นไปแล้ว ' + G.fmt(ac.progress_percent) + '% ของเนื้อหา</div>' : '')
-          + unitRows(ac.unit_scores)
+          + unitRows(ac.unit_scores, ac.game_version)
           + (ac.criteria_note ? '<div class="form-hint">' + G.esc(ac.criteria_note) + '</div>' : '')
           + (ac.is_legacy ? '<div class="muted small">ข้อมูลเก่าจากชีต</div>' : '')
           + '</div>';

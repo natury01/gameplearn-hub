@@ -56,6 +56,78 @@
     logoForTheme();
   }
 
+  /* ============ นับการเยี่ยมชม (52_VISIT_STATS.sql) ============
+     เก็บเป็น "ตัวนับรายวัน" ล้วน ๆ — ไม่ส่ง IP ไม่ส่ง user agent ไม่ส่งรหัสประจำตัวใด ๆ
+     ธง "เครื่องนี้เปิดเว็บครั้งแรกของวันนี้แล้ว" เก็บไว้ในเครื่องผู้ใช้เอง (คีย์ gp_seen)
+     เซิร์ฟเวอร์ได้รับแค่ true/false ไม่มีทางรู้ว่าเป็นเครื่องไหน
+     เหตุผล: ผู้ใช้ส่วนใหญ่เป็นเด็กประถม เก็บรอยเท้าดิจิทัลเกินจำเป็นไม่คุ้มกับตัวเลขบนหน้า Admin
+
+     ยิงแบบ "ยิงแล้วลืม" — พังก็เงียบ ไม่มีทางทำให้หน้าเว็บใช้งานไม่ได้
+     (ฐานที่ยังไม่ได้รัน 52 จะได้ 404 ซึ่งถูกกลืนไปเฉย ๆ) */
+  function pageName() {
+    var f = (location.pathname.split('/').pop() || '').toLowerCase();
+    if (!f || f === 'index.html' || f === 'index.htm') return 'home';
+    return f.replace(/\.html?$/, '');
+  }
+  /* มือถือ/แท็บเล็ต หรือ คอมพิวเตอร์ — ดูจาก "ชนิดตัวชี้" ไม่ใช่ user agent
+     UA ปลอมง่ายและเดาผิดบ่อย · โน้ตบุ๊กจอสัมผัสมีทั้ง coarse และ fine → นับเป็น pc ถูกแล้ว
+     โทรศัพท์/แท็บเล็ตมีแต่ coarse → mobile · เบราว์เซอร์เก่าที่ไม่รู้จัก matchMedia ใช้ความกว้างจอแทน */
+  function deviceKind() {
+    try {
+      if (window.matchMedia) {
+        var coarse = window.matchMedia('(pointer: coarse)').matches;
+        var fine   = window.matchMedia('(any-pointer: fine)').matches;
+        if (coarse && !fine) return 'mobile';
+        if (fine) return 'pc';
+      }
+      var w = Math.min(screen.width || 9999, screen.height || 9999);
+      return w < 820 ? 'mobile' : 'pc';
+    } catch (e) { return 'pc'; }
+  }
+  function track(page, gameCode, isNew) {
+    try {
+      if (!G || !G.rpc) return;
+      var body = { p_page: page, p_new: !!isNew, p_device: deviceKind() };
+      if (gameCode) body.p_game_code = String(gameCode);
+      G.rpc('rpc_track_visit', body).catch(function () {});
+    } catch (e) { /* เงียบเสมอ */ }
+  }
+  function trackVisit() {
+    var isNew = false;
+    try {
+      var today = new Date().toISOString().slice(0, 10);
+      isNew = localStorage.getItem('gp_seen') !== today;
+      if (isNew) localStorage.setItem('gp_seen', today);
+    } catch (e) { /* เบราว์เซอร์ปิด localStorage = นับเป็นผู้เยี่ยมชมซ้ำ ไม่ใช่เรื่องใหญ่ */ }
+    track(pageName(), null, isNew);
+
+    /* ปุ่มเล่นเกม — ดักที่ document ครั้งเดียว ใช้ได้กับการ์ดที่วาดทีหลังด้วย */
+    document.addEventListener('click', function (ev) {
+      var a = ev.target && ev.target.closest && ev.target.closest('[data-game-play]');
+      if (!a) return;
+      track('game', a.getAttribute('data-game-play'), false);
+    });
+  }
+
+  /* ============ ป้ายรุ่นของเว็บกลางท้ายหน้า ============
+     ใส่ให้เองทุกหน้า ไม่ต้องไล่แก้ HTML ทีละไฟล์ (และไม่มีวันลืมหน้าใดหน้าหนึ่ง)
+     หน้าไหนมีท้ายเว็บอยู่แล้วก็ต่อท้าย · หน้าไหนไม่มี (หน้าครู/หน้าผู้ดูแล) สร้างแถบเล็ก ๆ ให้
+     เหตุผลที่ต้องมี: เวลาครูแจ้งปัญหาจะได้บอกได้ทันทีว่าเปิดรุ่นไหนอยู่ */
+  function stampVersion() {
+    try {
+      if (document.getElementById('gp-ver')) return;
+      var v = C.HUB_VERSION; if (!v) return;
+      var txt = 'เว็บกลาง ' + v + (C.HUB_BUILD ? ' · build ' + C.HUB_BUILD : '');
+      var d = document.createElement('div');
+      d.id = 'gp-ver';
+      d.className = 'gp-ver';
+      d.textContent = txt;
+      var foot = document.querySelector('.sitefoot, .foot');
+      if (foot) { foot.parentNode.insertBefore(d, foot.nextSibling); return; }
+      (document.querySelector('.wrap') || document.body).appendChild(d);
+    } catch (e) { /* ป้ายรุ่นพังต้องไม่ทำให้หน้าเว็บพัง */ }
+  }
+
   /* ปุ่มสลับสว่าง/มืด — ใส่ให้เองทุกหน้าที่มีแถบหัวเว็บ ไม่ต้องแก้ HTML ทีละหน้า */
   function addThemeButton() {
     if (document.getElementById('gp-theme-btn')) return;
@@ -367,6 +439,8 @@
     renderModeSwitch();    /* ขึ้นเฉพาะบัญชี admin */
     startSlogans(s);       /* สโลแกนสลับวน */
     apply(window.GP_SETTINGS);
+    trackVisit();          /* นับการเยี่ยมชม — ยิงแล้วลืม พังก็ไม่กระทบหน้าเว็บ */
+    stampVersion();        /* ป้ายรุ่นท้ายหน้า */
     ready(window.GP_SETTINGS);
   }
 

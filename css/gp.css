@@ -891,6 +891,11 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
 .c6sub > span:first-child { flex: 0 0 176px; color: var(--ink-2); }
 @media (max-width: 560px) { .c6name, .c6sub > span:first-child { flex-basis: 118px; } }
 
+/* ป้ายรุ่นของเว็บกลาง — เล็ก จาง อยู่ท้ายสุดของทุกหน้า (ใส่โดย gp-brand.js) */
+.gp-ver { text-align: center; color: var(--ink-2); font-size: 12.5px;
+  padding: 14px 0 22px; opacity: .75; letter-spacing: .2px; }
+@media print { .gp-ver { opacity: 1; } }
+
 /* ═══════════ หน้าครู: ฟอร์มห้องเรียน (46_CLASSROOM_MANAGE) ═══════════ */
 
 /* ฟอร์มห้อง/นักเรียน — พับเป็นคอลัมน์เดียวบนจอแคบเอง ไม่ต้องมี breakpoint แยก */

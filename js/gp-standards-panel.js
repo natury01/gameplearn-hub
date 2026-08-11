@@ -94,14 +94,21 @@
       return '<div class="gp-sec"><div class="gp-sec-t">' + esc(title) + '</div><div class="gp-name">'
         + roots.map(function (n) { return esc(n.it.name_th); }).join(' · ') + '</div></div>';
     }
+    /* สามบรรทัดนี้ตอบคนละคำถามของครู จึงติดป้ายกำกับไว้ ไม่รวมเป็นก้อนเดียว:
+       วัดที่ไหน · หลักฐานคืออะไร · ตัดสินอย่างไร */
+    function extras(it) {
+      return (it._note ? '<div class="gp-note">📍 ' + esc(it._note) + '</div>' : '')
+        + (it._ev ? '<div class="gp-note">🧾 <b>หลักฐาน:</b> ' + esc(it._ev) + '</div>' : '')
+        + (it._cr ? '<div class="gp-note">📏 <b>เกณฑ์:</b> ' + esc(it._cr) + '</div>' : '');
+    }
     return '<div class="gp-sec"><div class="gp-sec-t">' + esc(title) + '</div>'
       + roots.map(function (n) {
         return '<div class="gp-item"><div class="gp-name">' + esc(n.it.name_th)
           + '<span class="gp-code">' + esc(n.it.code) + '</span></div>'
-          + (n.it._note ? '<div class="gp-note">' + esc(n.it._note) + '</div>' : '')
+          + extras(n.it)
           + (n.kids.length ? '<div class="gp-kids">' + n.kids.map(function (k) {
               return '<div class="gp-kid">• ' + esc(k.it.name_th) + '<span class="gp-code">' + esc(k.it.code) + '</span>'
-                + (k.it._note ? '<div class="gp-note">' + esc(k.it._note) + '</div>' : '') + '</div>';
+                + extras(k.it) + '</div>';
             }).join('') + '</div>' : '')
           + '</div>';
       }).join('') + '</div>';
@@ -125,7 +132,7 @@
         var game = rows && rows[0];
         if (!game) throw new Error('ไม่พบเกม ' + cfg.gameCode + ' ใน Game Registry');
         return get(cfg, '/rest/v1/game_framework_items?game_id=eq.' + game.id
-          + '&select=note,weight,framework_items(id,code,name_th,depth,sort_order,parent_id,'
+          + '&select=note,weight,evidence,criteria,framework_items(id,code,name_th,depth,sort_order,parent_id,'
           + 'assessment_frameworks(code,kind,name_th,status))')
           .then(function (maps) { return { game: game, maps: maps || [] }; });
       })
@@ -135,6 +142,8 @@
           var it = m.framework_items; if (!it) return;
           var f = it.assessment_frameworks || {};
           it._note = m.note || null;
+          it._ev   = m.evidence || null;   /* แหล่งหลักฐาน (53 ฉบับแก้ 2) */
+          it._cr   = m.criteria || null;   /* เกณฑ์การวัด  (53 ฉบับแก้ 2) */
           fwNames[f.kind] = f.name_th;
           if (f.kind === 'competency') comp.push(it);
           else if (f.kind === 'achievement') ach.push(it);

@@ -22,7 +22,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     <div class="sp"></div>
     <nav class="navlinks" aria-label="เมนูหลัก">
       <a href="./#games">เกมทั้งหมด</a>
-      <a href="teacher.html" class="on">สำหรับครู</a>
+      <!-- เมนูหน้าครู 3 หน้า อยู่บนแถบหัวเว็บ (เดิมเป็นแถบย่อยใต้หัวเว็บ — ครูสั่งให้เอาออก)
+           ตัวที่กำลังเปิดอยู่ติด .on + aria-current ผ่าน syncNav() ทุกครั้งที่เปลี่ยน route
+           จึงไม่ต้องใส่ class="on" ตายตัวให้ "สำหรับครู" อีก (จะไฮไลต์ซ้อนกันสองอัน) -->
+      <a href="#/" data-nav="#/">📊 Dashboard</a>
+      <a href="#/rooms" data-nav="#/rooms">🏫 สร้างห้องเรียน</a>
+      <a href="#/standards" data-nav="#/standards">📋 มาตรฐาน</a>
       <a href="support.html">สนับสนุน</a>
       <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
     </nav>
@@ -130,6 +135,13 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   /* เรียงเลขที่แบบจำนวนนับเสมอ — ฐานข้อมูลเรียง student_number แบบข้อความ
      ทำให้ได้ 1, 10, 11, …, 2, 20 (ดู G.cmpStudentNo ใน gp-core.js) */
   const studentsOf = (cid) => S.students.filter((s) => s.classroom_id === cid).sort(G.byStudentNo);
+  /* นักเรียนที่ครูปิดการใช้งาน — ไม่นับใน "ยอดรวม/ค่าเฉลี่ยของห้อง" กติกาเดียวกับหน้าครูของเกม
+     (คำตอบ #47 ของภาค 2: ยอดรวมไม่นับคนที่ถูกปิด · กระดานอันดับก็ไม่นับ)
+     แต่ข้อมูลรายคน "ยังแสดงครบ" ติดป้ายไว้เฉย ๆ — ไม่ซ่อน ไม่ลบ (กฎข้อ 1)
+     อ่านแบบทนคอลัมน์หาย: is_active !== false → ฐานที่ยังไม่รัน 46 ถือว่าใช้งานปกติทุกคน */
+  const isOn = (x) => !!x && x.is_active !== false;
+  const offIds = () => new Set(S.students.filter((x) => x.is_active === false).map((x) => x.id));
+  const offTag = (x) => (isOn(x) ? '' : ' <span class="badge">ปิดใช้งาน</span>');
   const progOf = (sid) => S.progress.filter((p) => p.student_id === sid);
   const cgOf = (cid) => S.cg.filter((x) => x.classroom_id === cid);
   const enabledGames = (cid) => cgOf(cid).filter((x) => x.is_enabled).map((x) => gameById(x.game_id)).filter(Boolean);
@@ -140,20 +152,23 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
   /* ===================== routing ===================== */
-  /* เมนูของหน้าครู — 3 หน้าตามที่ครูสั่ง · ใช้ hash route เดิม ไม่ต้องเพิ่มไฟล์ */
-  const APPNAV = [['#/', '📊 Dashboard'], ['#/rooms', '🏫 สร้างห้องเรียน'], ['#/standards', '📋 มาตรฐาน']];
-  function appnav() {
+  /* เมนูหน้าครูอยู่บนแถบหัวเว็บแล้ว (ดู .navlinks ด้านบน) — ที่นี่แค่ทำหน้าที่ติดสถานะ
+     "กำลังอยู่หน้านี้" ให้ลิงก์ตัวที่ตรงกับ route ปัจจุบัน · หน้าลูก (#/room/..., #/student/...)
+     นับเป็น Dashboard เพราะเดินเข้ามาจากหน้านั้น */
+  function syncNav() {
     const h = location.hash || '#/';
     const cur = h.indexOf('#/rooms') === 0 ? '#/rooms'
       : h.indexOf('#/standards') === 0 ? '#/standards' : '#/';
-    return '<nav class="appnav" aria-label="เมนูหน้าครู">'
-      + APPNAV.map(([href, label]) => '<a href="' + href + '"'
-          + (href === cur ? ' aria-current="page"' : '') + '>' + label + '</a>').join('')
-      + '</nav>';
+    document.querySelectorAll('.navlinks a[data-nav]').forEach((a) => {
+      const on = a.getAttribute('data-nav') === cur;
+      a.classList.toggle('on', on);
+      if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
   }
 
   function route() {
     clearErr();
+    syncNav();
     const h = location.hash || '#/';
     if (h.indexOf('#/rooms') === 0) { $('crumb').classList.add('hidden'); return renderRooms(); }
     if (h.indexOf('#/standards') === 0) { $('crumb').classList.add('hidden'); return renderStandardsPage(); }
@@ -205,12 +220,16 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   /* ===================== หน้ารวม ===================== */
   function renderHome() {
     const activeGames = new Set(S.cg.filter((x) => x.is_enabled).map((x) => x.game_id)).size;
-    const avgProg = S.progress.length ? S.progress.reduce((a, p) => a + (Number(p.progress_percent) || 0), 0) / S.progress.length : null;
+    const off = offIds();
+    const stuOn = S.students.filter(isOn).length;
+    /* ค่าเฉลี่ยของห้องไม่รวมคนที่ปิดการใช้งาน — ไม่งั้นเลขบนเว็บกลางจะไม่ตรงกับหน้าครูของเกม */
+    const prog = S.progress.filter((p) => !off.has(p.student_id));
+    const avgProg = prog.length ? prog.reduce((a, p) => a + (Number(p.progress_percent) || 0), 0) / prog.length : null;
     const totalAttempts = S.summary.reduce((a, r) => a + (Number(r.total_attempts) || 0), 0);
 
     let html = '<div class="tiles">'
       + tile('ห้องเรียน', G.fmtInt(S.rooms.length))
-      + tile('นักเรียน', G.fmtInt(S.students.length))
+      + tile('นักเรียน', G.fmtInt(stuOn), off.size ? '· ปิด ' + off.size : '')
       + tile('เกมที่ใช้งาน', G.fmtInt(activeGames))
       + tile('ความคืบหน้าเฉลี่ย', avgProg == null ? '–' : Math.round(avgProg), avgProg == null ? '' : '%')
       + tile('รอบที่ส่งผล', G.fmtInt(totalAttempts))
@@ -230,7 +249,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + '<div style="margin-top:14px"><a class="btn btn-primary" href="#/rooms">🏫 สร้าง / จัดการห้องเรียน</a></div>';
     }
 
-    $('content').innerHTML = appnav() + html;
+    $('content').innerHTML = html;
     const go = $('nr-go'); if (go) go.onclick = createRoom;
   }
 
@@ -330,7 +349,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   };
 
   function agg6(cid) {
-    const rows = (S.compDims || []).filter((r) => !cid || r.classroom_id === cid);
+    const off = offIds();
+    const rows = (S.compDims || []).filter((r) => (!cid || r.classroom_id === cid) && !off.has(r.student_id));
     return COMP6.map(function ([code, name, short]) {
       const rs = rows.filter((r) => r.comp_code === code);
       const scored = rs.filter((r) => r.evidence !== 'self_report');
@@ -434,9 +454,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + COMP6.map((c) => '<th scope="col">' + G.esc(c[2]) + '</th>').join('')
       + '</tr></thead><tbody>';
     stu.forEach(function (st) {
-      html += '<tr><td class="num">' + G.esc(st.student_number || '–') + '</td>'
+      html += '<tr' + (isOn(st) ? '' : ' style="opacity:.6"') + '><td class="num">' + G.esc(st.student_number || '–') + '</td>'
         + '<td><a href="#/student/' + st.id + '">'
-        + G.esc((st.first_name || '') + ' ' + (st.last_name || '')) + '</a></td>'
+        + G.esc((st.first_name || '') + ' ' + (st.last_name || '')) + '</a>' + offTag(st) + '</td>'
         + COMP6.map(function (c) {
             const rs = rows.filter((r) => r.student_id === st.id && r.comp_code === c[0]);
             if (!rs.length) return '<td><span class="muted small">–</span></td>';
@@ -558,7 +578,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     return (S.achieve || []).find((x) => x.student_id === sid && x.game_id === gid) || null;
   }
   function achSummaryCards(cid) {
-    const rows = (S.achieve || []).filter((r) => !cid || r.classroom_id === cid);
+    const off = offIds();
+    const rows = (S.achieve || []).filter((r) => (!cid || r.classroom_id === cid) && !off.has(r.student_id));
     if (!rows.length) return '';
     const byGame = {};
     rows.forEach(function (r) { (byGame[r.game_name] = byGame[r.game_name] || []).push(r); });
@@ -751,12 +772,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   function roomCard(r) {
-    const stu = studentsOf(r.id).length;
+    const all = studentsOf(r.id);
+    const stu = all.filter(isOn).length;
+    const stuOff = all.length - stu;
     const en = enabledGames(r.id);
     return '<div class="card">'
       + '<div style="display:flex;align-items:baseline;gap:8px"><h3 style="margin:0;font-size:16.5px;flex:1">🏫 ' + G.esc(r.name) + '</h3>'
       + (r.is_active ? '' : '<span class="badge">ปิดใช้งาน</span>') + '</div>'
-      + '<div class="muted small" style="margin:4px 0 8px">นักเรียน ' + stu + ' คน · เกมที่เปิด: '
+      + '<div class="muted small" style="margin:4px 0 8px">นักเรียน ' + stu + ' คน'
+      + (stuOff ? ' · ปิดการใช้งาน ' + stuOff + ' คน' : '') + ' · เกมที่เปิด: '
       + (en.length ? en.map((g) => G.esc(g.name)).join(', ') : '<span style="color:var(--critical)">ยังไม่เปิดเกม</span>') + '</div>'
       + '<div style="display:flex;align-items:center;gap:10px;margin:8px 0 12px">'
       + '<span class="muted small">โค้ดเข้าห้อง</span> <span class="joinkey">' + G.esc(r.join_key) + '</span>'
@@ -883,7 +907,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       ? '<div class="grid cols-2">' + rooms.map(roomManageCard).join('') + '</div>'
       : '<div class="card muted">ยังไม่มีห้องเรียน — สร้างห้องแรกด้านบน</div>';
 
-    $('content').innerHTML = appnav() + html;
+    $('content').innerHTML = html;
     bindRoomForm();
     $('nr-go').onclick = createRoom;
     bindRoomActions();
@@ -1009,7 +1033,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + games.map((g) => '<div class="std-slot" data-std-game="' + G.esc(g.code) + '"></div>').join('')
         + '</div>';
     }
-    $('content').innerHTML = appnav() + html;
+    $('content').innerHTML = html;
     mountStandardsPanels();
   }
 
@@ -1090,6 +1114,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + '<th scope="col" class="num">คะแนนรวม</th></tr></thead><tbody>';
       stu.forEach((s) => {
         const prows = progOf(s.id);
+        const dim = isOn(s) ? '' : ' style="opacity:.6"';
         let total = 0;
         const cells = games.map((g) => {
           const p = prows.find((x) => x.game_id === g.id);
@@ -1117,9 +1142,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             + '<div class="muted small">คะแนน ' + G.fmt(p.best_score) + '</div>'
             + '<div class="muted small">รอผลสรุปจากเกม</div>' : '<span class="muted small">ยังไม่เริ่ม</span>') + '</td>';
         }).join('');
-        html += '<tr><td class="num">' + G.esc(s.student_number || '–') + '</td>'
+        html += '<tr' + dim + '><td class="num">' + G.esc(s.student_number || '–') + '</td>'
           + '<td><a href="#/student/' + s.id + '">' + G.esc((s.first_name || '') + ' ' + (s.last_name || '')) + '</a>'
-          + (s.character_name ? ' <span class="muted small">🎮 ' + G.esc(s.character_name) + '</span>' : '') + '</td>'
+          + (s.character_name ? ' <span class="muted small">🎮 ' + G.esc(s.character_name) + '</span>' : '')
+          + offTag(s) + '</td>'
           + cells + '<td class="num"><b>' + G.fmt(total) + '</b></td></tr>';
       });
       html += '</tbody></table></div>';
@@ -1127,7 +1153,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       html += rosterSection(cid, stu);
     }
 
-    $('content').innerHTML = appnav() + html;
+    $('content').innerHTML = html;
     const g2 = $('as-go'); if (g2) g2.onclick = () => addStudents(cid);
     bindRoster();
     mountStandardsPanels();
@@ -1289,7 +1315,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
     let html = '<h2 style="margin:0 0 2px;font-size:20px">👦 ' + G.esc((s.first_name || '') + ' ' + (s.last_name || ''))
       + (s.character_name ? ' <span class="muted" style="font-size:14px">🎮 ' + G.esc(s.character_name) + '</span>' : '') + '</h2>'
-      + '<div class="muted small">เลขที่ ' + G.esc(s.student_number || '–') + ' · ห้อง ' + G.esc(r ? r.name : '') + '</div>';
+      + '<div class="muted small">เลขที่ ' + G.esc(s.student_number || '–') + ' · ห้อง ' + G.esc(r ? r.name : '') + '</div>'
+      + (isOn(s) ? '' : '<div class="card muted small" style="margin-top:10px">⏸ <b>ปิดการใช้งานอยู่</b> — '
+          + 'ข้อมูลและผลการเล่นทั้งหมดยังอยู่ครบ (หน้านี้แสดงให้ดูได้ตามปกติ) '
+          + 'แต่ไม่ถูกนับในยอดรวมและค่าเฉลี่ยของห้อง · เปิดกลับได้ที่หน้า “สร้างห้องเรียน”</div>');
 
     // ---- มิติที่ 1: ผลสัมฤทธิ์ ----
     html += '<h2 class="section-title">ผลสัมฤทธิ์ <span class="sub">ความก้าวหน้าและคะแนนรายเกม</span></h2>';
@@ -1355,7 +1384,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     }
 
     html += '<h2 class="section-title">กิจกรรมล่าสุด</h2><div id="stu-ev" class="card muted small"><span class="loading"></span> กำลังโหลด…</div>';
-    $('content').innerHTML = appnav() + html;
+    $('content').innerHTML = html;
 
     // รายละเอียดด้านย่อย (เช่น การคิดขั้นสูง 4 ด้าน) — โหลดแยกเพราะเป็นรายแถวลึก
     if (fws.length) {

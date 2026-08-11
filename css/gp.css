@@ -338,6 +338,11 @@ a:hover { text-decoration: underline; }
 }
 .navlinks a:hover { background: var(--tint-blue); color: var(--accent-strong); text-decoration: none; }
 .navlinks a.on { color: var(--accent-strong); font-weight: 600; background: var(--tint-blue); }
+/* ลิงก์เมนูหน้าครู (Dashboard · สร้างห้องเรียน · มาตรฐาน) อยู่แถวเดียวกับเมนูหลัก
+   ใส่ขีดใต้เพิ่มให้ตัวที่เปิดอยู่ เพราะพื้นหลังจาง ๆ อย่างเดียวแยกยากเมื่อมีลิงก์ 6 ตัว */
+.navlinks a[data-nav] { display: inline-flex; align-items: center; min-height: 24px;
+  border-bottom: 2px solid transparent; border-radius: var(--r-sm) var(--r-sm) 0 0; }
+.navlinks a[aria-current="page"] { border-bottom-color: var(--accent-strong); }
 /* หน้าครู/ผู้ดูแล มีชื่อผู้ใช้เพิ่มมาอีกชิ้น รวมแล้วกว้างเกินความกว้างสูงสุดของ .wrap เสมอ
    ไม่ว่าจอจะกว้างแค่ไหน — จึงให้เมนูอยู่แถวล่างตายตัว ดูตั้งใจกว่าปล่อยให้ปุ่มหล่นทีละตัว */
 .topbar-app .navlinks {
@@ -886,14 +891,7 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
 .c6sub > span:first-child { flex: 0 0 176px; color: var(--ink-2); }
 @media (max-width: 560px) { .c6name, .c6sub > span:first-child { flex-basis: 118px; } }
 
-/* ═══════════ หน้าครู: เมนูย่อย + ฟอร์มห้องเรียน (46_CLASSROOM_MANAGE) ═══════════ */
-.appnav { display: flex; gap: 4px; flex-wrap: wrap; margin: 0 0 16px;
-  border-bottom: 1px solid var(--grid); padding-bottom: 2px; }
-.appnav a { padding: 8px 14px; border-radius: var(--r-sm) var(--r-sm) 0 0; text-decoration: none;
-  color: var(--ink-2); font-weight: 600; font-size: 14.5px; min-height: 24px; display: inline-flex;
-  align-items: center; border-bottom: 3px solid transparent; }
-.appnav a:hover { background: var(--tint-blue); }
-.appnav a[aria-current="page"] { color: var(--accent-strong); border-bottom-color: var(--accent-strong); }
+/* ═══════════ หน้าครู: ฟอร์มห้องเรียน (46_CLASSROOM_MANAGE) ═══════════ */
 
 /* ฟอร์มห้อง/นักเรียน — พับเป็นคอลัมน์เดียวบนจอแคบเอง ไม่ต้องมี breakpoint แยก */
 .rf { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }

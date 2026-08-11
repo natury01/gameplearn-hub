@@ -69,7 +69,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   const $ = (id) => document.getElementById(id);
   const S = { teacher: null, games: [], rooms: [], cg: [], students: [], progress: [], summary: [],
               eventsCount: null, frameworks: [], coverage: [], itemSummary: [], itemProfile: [],
-              compDims: [], achieve: [] };
+              compDims: [], achieve: [], schools: [] };
   let TAB = 'ach';   // 'ach' = ผลสัมฤทธิ์ | 'comp' = สมรรถนะ
 
   function showErr(m) { const b = $('err'); b.textContent = m; b.classList.add('on'); }
@@ -100,11 +100,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   const soft = (p) => G.get(p).catch(() => []);
 
   async function loadAll() {
-    const [games, rooms, cg, students, progress, summary, evCount, frameworks, coverage, itemSummary, itemProfile, comp, compDims, achieve] = await Promise.all([
+    const [games, rooms, cg, students, progress, summary, evCount, frameworks, coverage, itemSummary, itemProfile, comp, compDims, achieve, schools] = await Promise.all([
       G.get('/rest/v1/games?select=id,code,name,status,launch_url,dashboard_url,minimum_grade,maximum_grade&order=name'),
       G.get('/rest/v1/classrooms?select=*&order=created_at.desc'),
       G.get('/rest/v1/classroom_games?select=*'),
-      G.get('/rest/v1/students?select=id,classroom_id,student_number,first_name,last_name,character_name&order=student_number'),
+      /* select=* เพื่อไม่ให้พังถ้าฐานยังไม่ได้รัน 46 (คอลัมน์ is_active/join_pin ยังไม่มี) */
+      G.get('/rest/v1/students?select=*&order=student_number'),
       G.get('/rest/v1/student_game_progress?select=*'),
       G.get('/rest/v1/v_classroom_game_summary?select=*'),
       G.countRows('/rest/v1/events').catch(() => null),
@@ -117,10 +118,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       /* ใบรายงานผล 2 ใบ (43_REPORT_CARDS.sql): สมรรถนะรายด้าน 6 ด้าน + ผลสัมฤทธิ์สรุปจากเกม */
       soft('/rest/v1/v_student_comp_dims?select=*'),
       soft('/rest/v1/v_student_achievement?select=*'),
+      soft('/rest/v1/schools?select=id,name&order=name'),
     ]);
     Object.assign(S, { games, rooms, cg, students, progress, summary, eventsCount: evCount,
       frameworks, coverage, itemSummary, itemProfile, comp,
-      compDims: compDims || [], achieve: achieve || [] });
+      compDims: compDims || [], achieve: achieve || [], schools: schools || [] });
   }
 
   const gameById = (id) => S.games.find((g) => g.id === id);
@@ -138,9 +140,23 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
   /* ===================== routing ===================== */
+  /* เมนูของหน้าครู — 3 หน้าตามที่ครูสั่ง · ใช้ hash route เดิม ไม่ต้องเพิ่มไฟล์ */
+  const APPNAV = [['#/', '📊 Dashboard'], ['#/rooms', '🏫 สร้างห้องเรียน'], ['#/standards', '📋 มาตรฐาน']];
+  function appnav() {
+    const h = location.hash || '#/';
+    const cur = h.indexOf('#/rooms') === 0 ? '#/rooms'
+      : h.indexOf('#/standards') === 0 ? '#/standards' : '#/';
+    return '<nav class="appnav" aria-label="เมนูหน้าครู">'
+      + APPNAV.map(([href, label]) => '<a href="' + href + '"'
+          + (href === cur ? ' aria-current="page"' : '') + '>' + label + '</a>').join('')
+      + '</nav>';
+  }
+
   function route() {
     clearErr();
     const h = location.hash || '#/';
+    if (h.indexOf('#/rooms') === 0) { $('crumb').classList.add('hidden'); return renderRooms(); }
+    if (h.indexOf('#/standards') === 0) { $('crumb').classList.add('hidden'); return renderStandardsPage(); }
     const mRoom = h.match(/^#\/room\/([0-9a-f-]+)/i);
     const mStu = h.match(/^#\/student\/([0-9a-f-]+)/i);
     $('crumb').classList.toggle('hidden', !(mRoom || mStu));
@@ -163,7 +179,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     return '<div class="tabs" role="tablist">'
       + '<button class="tab" role="tab" data-tab="ach"  aria-selected="' + (TAB === 'ach') + '">ผลสัมฤทธิ์</button>'
       + '<button class="tab" role="tab" data-tab="comp" aria-selected="' + (TAB === 'comp') + '">สมรรถนะหลัก</button>'
-      + '<button class="tab" role="tab" data-tab="hots" aria-selected="' + (TAB === 'hots') + '">ระดับสมรรถนะรายเกม</button>'
+      + '<button class="tab" role="tab" data-tab="hots" aria-selected="' + (TAB === 'hots') + '">การคิดขั้นสูง (รายเกม)</button>'
       + '</div>';
   }
 
@@ -204,23 +220,17 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     html += tabs();
 
     if (TAB === 'hots') {
-      html += '<h2 class="sr-only">ระดับสมรรถนะรายเกม</h2>' + hotsSection(null);
+      html += '<h2 class="sr-only">การคิดขั้นสูง รายเกม</h2>' + hotsSection(null);
     } else if (TAB === 'comp') {
-      html += comp6Section(null) + compSection(null);
+      html += comp6Section(null) + comp6Table(null) + compSection(null);
     } else {
       html += achSummaryCards(null);
       html += '<h2 class="section-title">ห้องเรียนของฉัน <span class="sub">' + S.rooms.length + ' ห้อง</span></h2>'
         + '<div class="grid cols-3">' + (S.rooms.map(roomCard).join('') || '<div class="card muted">ยังไม่มีห้องเรียน — สร้างห้องแรกด้านล่าง</div>') + '</div>'
-        + '<h2 class="section-title">สร้างห้องเรียนใหม่</h2>'
-        + '<div class="card" style="max-width:520px">'
-        + '<label class="f" for="nr-name">ชื่อห้อง (เช่น ป.4/1)</label><input type="text" id="nr-name" placeholder="ป.4/1">'
-        + '<label class="f" for="nr-grade">ระดับชั้น</label><input type="text" id="nr-grade" placeholder="4">'
-        + '<button class="btn btn-primary" style="margin-top:12px" id="nr-go">+ สร้างห้อง</button>'
-        + '<div class="form-hint">ระบบจะสร้างโค้ดเข้าห้อง 6 ตัวให้อัตโนมัติ นักเรียนใช้โค้ดนี้เข้าเล่นได้ทุกเกมที่ครูเปิดให้ห้อง</div>'
-        + '</div>';
+        + '<div style="margin-top:14px"><a class="btn btn-primary" href="#/rooms">🏫 สร้าง / จัดการห้องเรียน</a></div>';
     }
 
-    $('content').innerHTML = html;
+    $('content').innerHTML = appnav() + html;
     const go = $('nr-go'); if (go) go.onclick = createRoom;
   }
 
@@ -287,6 +297,23 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     'ns-a': 'เข้าใจธรรมชาติ ช่างสังเกตและตั้งคำถาม', 'ns-b': 'ใช้ทรัพยากรและวิทยาการอย่างรู้คุณค่า',
     'ns-c': 'ร่วมดูแลรักษาเพื่อความยั่งยืน'
   };
+  /* ทำ sub_scores ให้เป็น object เสมอ — ภาค 1 เก็บด้านย่อยเป็น "อาเรย์ของ {code,label,pct}"
+     (ฟิลด์ dims) ส่วนภาค 2 เป็น object · รับทั้งสองทรงจะได้ไม่มีใครส่งแล้วเงียบหายโดยไม่รู้ตัว */
+  function subObj(ss) {
+    if (!ss) return null;
+    if (Array.isArray(ss)) {
+      const o = {};
+      ss.forEach(function (d) {
+        if (!d || typeof d !== 'object') return;
+        const k = d.code || d.label;
+        if (!k) return;
+        if (d.pct != null) o[k] = d.pct;
+        else if (d.score != null) o[k] = d.score;
+      });
+      return o;
+    }
+    return (typeof ss === 'object') ? ss : null;
+  }
   /* รับได้ทั้งคีย์สั้น 'ctc' และคีย์เต็ม 'HT-CTC' — ไม่รู้จักก็แสดงคีย์ตามที่เกมส่งมา ไม่เดา */
   function subName(k) {
     const key = String(k).toLowerCase();
@@ -318,8 +345,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       let prov = 0, cmpN = 0;
       scored.forEach(function (r) {
         if (r.criteria_note) notes[r.criteria_note] = 1;
-        const ss = r.sub_scores;
-        if (!ss || typeof ss !== 'object') return;
+        const ss = subObj(r.sub_scores);
+        if (!ss) return;
         Object.keys(ss).forEach(function (k) {
           const raw = ss[k];
           if (String(k).charAt(0) === '_') {
@@ -392,6 +419,44 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + axes + poly + dots + labels + '</svg>';
   }
 
+  /* ตารางรายคน × 6 ด้าน — ตอบโจทย์ "ดูรวมทุกเกมและแยกรายคนได้ครบทุกด้าน"
+     เซลล์แสดงระดับ (คำ) นำหน้าเสมอตามมาตรฐาน 07 ข้อ 3.2 · ไม่มีข้อมูล = เว้น ไม่ใส่ 0 */
+  function comp6Table(cid) {
+    const rows = (S.compDims || []).filter((r) => (!cid || r.classroom_id === cid)
+      && r.evidence !== 'self_report');
+    if (!rows.length) return '';
+    const ids = [...new Set(rows.map((r) => r.student_id))];
+    const stu = S.students.filter((x) => ids.indexOf(x.id) >= 0).sort(G.byStudentNo);
+    if (!stu.length) return '';
+    let html = '<h2 class="section-title">สมรรถนะรายคน <span class="sub">ครบ 6 ด้าน · รวมทุกเกม</span></h2>'
+      + '<div class="card table-scroll"><table class="gol"><thead><tr>'
+      + '<th scope="col" class="num">เลขที่</th><th scope="col" class="name">ชื่อ</th>'
+      + COMP6.map((c) => '<th scope="col">' + G.esc(c[2]) + '</th>').join('')
+      + '</tr></thead><tbody>';
+    stu.forEach(function (st) {
+      html += '<tr><td class="num">' + G.esc(st.student_number || '–') + '</td>'
+        + '<td><a href="#/student/' + st.id + '">'
+        + G.esc((st.first_name || '') + ' ' + (st.last_name || '')) + '</a></td>'
+        + COMP6.map(function (c) {
+            const rs = rows.filter((r) => r.student_id === st.id && r.comp_code === c[0]);
+            if (!rs.length) return '<td><span class="muted small">–</span></td>';
+            const w = rs.filter((r) => r.score != null);
+            const avg = w.length ? w.reduce((t, r) => t + Number(r.score), 0) / w.length : null;
+            const lv = (rs.find((r) => r.level != null) || {}).level;
+            const lb = (rs.find((r) => r.level_label) || {}).level_label;
+            const byT = rs.some((r) => r.decided_by === 'teacher');
+            return '<td>'
+              + (lv != null ? '<span class="lvpill" style="background:' + (LV_COLOR[lv] || '#475569')
+                  + ';color:#fff">' + lv + '</span> ' : '')
+              + '<span class="small">' + G.esc(lb || (lv != null ? LV_NAME[lv] : '')) + '</span>'
+              + (avg != null ? '<div class="muted small">' + avg.toFixed(1) + '</div>' : '')
+              + (byT ? '<div class="muted small">🧑‍🏫 ครูตัดสิน</div>' : '')
+              + '</td>';
+          }).join('') + '</tr>';
+    });
+    return html + '</tbody></table></div>';
+  }
+
   function comp6Section(cid) {
     const ds = agg6(cid);
     const any = ds.some((d) => d.n > 0 || d.self.n > 0);
@@ -435,10 +500,17 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             + '</div>' : '')
         + '</div>';
     }).join('');
+    /* มีแค่การคิดขั้นสูงด้านเดียว = เกมยังส่งผ่านช่องทางเดิม (rpc_submit_competency)
+       ซึ่งรับได้เฉพาะด้านนี้ — บอกสาเหตุและทางแก้ตรง ๆ ดีกว่าปล่อยให้ครูงงว่าทำไมขาด */
+    const withData = ds.filter((d) => d.n > 0);
+    const onlyHot = withData.length === 1 && withData[0].code === 'HOT';
     const selfs = ds.filter((d) => d.self.n);
     html += '<div class="card"><div class="c6wrap">'
       + '<div class="c6radar">' + radarSvg(ds) + '</div>'
       + '<div class="c6list">' + bars + '</div></div>'
+      + (onlyHot ? '<div class="panel-note">ตอนนี้มีข้อมูลเฉพาะ <b>การคิดขั้นสูง</b> เพราะเกมยังส่งผลผ่าน'
+          + 'ช่องทางเดิมที่รับได้ด้านเดียว — เมื่อรัน <code>43_REPORT_CARDS.sql</code> และอัปเดตเกมเป็นรุ่นที่'
+          + 'ส่ง "ใบรายงานผล" แล้ว ด้านที่เหลือจะขึ้นเองทันทีโดยไม่ต้องแก้อะไรที่หน้านี้</div>' : '')
       + (selfs.length ? '<div class="panel-note">📋 จากแบบประเมินตนเอง (แสดงแยก ไม่รวมกับคะแนน): '
           + selfs.map((d) => G.esc(d.name) + (d.self.avg != null ? ' เฉลี่ย ' + d.self.avg.toFixed(1) : '')
             + ' (' + d.self.n + ' รายการ)').join(' · ') + '</div>' : '')
@@ -499,7 +571,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       return '<div class="card"><h3 style="margin:0 0 6px;font-size:15.5px">' + G.esc(gn) + '</h3>'
         + '<div class="muted small">' + g.length + ' คนมีผลสรุปจากเกม'
         + (legacy ? ' · ข้อมูลเก่าจากชีต ' + legacy + ' คน' : '') + '</div>'
-        + (avg != null ? meter(avg) + '<div class="muted small">เฉลี่ย ' + avg.toFixed(1) + '%</div>' : '')
+        + (avg != null ? meter(avg) + '<div class="muted small">คะแนนเฉลี่ย ' + avg.toFixed(1) + '% ของคะแนนเต็ม</div>' : '')
         + (note ? '<div class="form-hint">' + G.esc(note) + '</div>' : '') + '</div>';
     }).join('');
     return '<h2 class="section-title">ผลสัมฤทธิ์จากใบรายงานผลของเกม '
@@ -704,19 +776,274 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     }).join('') + '</div>';
   }
 
+  /* ===================== หน้า "สร้าง / จัดการห้องเรียน" =====================
+     ฟิลด์ทุกช่องตรงกับหน้าสร้างห้องของเกมภาค 1/ภาค 2 (จากคำตอบแบบสอบถามข้อ 3)
+     เพราะห้องเรียนเป็นตารางกลางที่ทุกเกมใช้ร่วมกัน — ชื่อคอลัมน์ต้องชุดเดียวกัน */
+
+  const GRADES = ['อ.1','อ.2','อ.3','ป.1','ป.2','ป.3','ป.4','ป.5','ป.6',
+                  'ม.1','ม.2','ม.3','ม.4','ม.5','ม.6'];
+
+  /* ปีการศึกษาไทย — ก่อนพฤษภาคมนับเป็นปีก่อนหน้า (กติกาเดียวกับ clsThaiYear ของเกม) */
+  function thaiYear() {
+    const d = new Date();
+    return String(d.getFullYear() + 543 - (d.getMonth() < 4 ? 1 : 0));
+  }
+  function roomName(grade, no) {
+    const g = (grade || '').trim();
+    const n = (no || '').trim();
+    return n ? g + '/' + n : g;
+  }
+
+  /* ns = ส่วนต่อท้าย id — ฟอร์มสร้างใช้ '' · ฟอร์มแก้ไขใช้ '-<รหัสห้อง>'
+     ถ้าไม่แยก id จะซ้ำทั้งหน้า (getElementById หยิบตัวแรกเสมอ = แก้ห้องแล้วอ่านค่าจากฟอร์มสร้าง
+     และผิดมาตรฐาน HTML ที่ id ต้องไม่ซ้ำ) */
+  function roomFormFields(pre, ns) {
+    const p = pre || {}; ns = ns || '';
+    const ID = (k) => k + ns;
+    return '<div class="rf">'
+      + '<div><label class="f" for="' + ID('rf-grade') + '">ระดับชั้น</label>'
+      +   '<input type="text" id="' + ID('rf-grade') + '" list="' + ID('rf-grades') + '" placeholder="เช่น ป.4" value="' + G.esc(p.grade || '') + '">'
+      +   '<datalist id="' + ID('rf-grades') + '">' + GRADES.map((g) => '<option value="' + g + '">').join('') + '</datalist></div>'
+      + '<div><label class="f" for="' + ID('rf-no') + '">ห้องที่</label>'
+      +   '<input type="text" id="' + ID('rf-no') + '" inputmode="numeric" placeholder="เช่น 1" value="' + G.esc(p.room_no || '') + '"></div>'
+      + '<div><label class="f" for="' + ID('rf-school') + '">โรงเรียน</label><select id="' + ID('rf-school') + '">'
+      +   '<option value="">— เลือกโรงเรียน —</option>'
+      +   S.schools.map((sc) => '<option value="' + G.esc(sc.id) + '"'
+          + (p.school_id === sc.id ? ' selected' : '') + '>' + G.esc(sc.name) + '</option>').join('')
+      +   '<option value="__new__">＋ เพิ่มโรงเรียนใหม่…</option></select>'
+      +   '<input type="text" id="' + ID('rf-school-new') + '" class="hidden" placeholder="ชื่อโรงเรียนใหม่" style="margin-top:6px"></div>'
+      + '<div><label class="f" for="' + ID('rf-year') + '">ปีการศึกษา</label>'
+      +   '<input type="text" id="' + ID('rf-year') + '" inputmode="numeric" value="' + G.esc(p.academic_year || thaiYear()) + '"></div>'
+      + '<div><label class="f" for="' + ID('rf-listed') + '">วิธีเข้าห้องของนักเรียน</label><select id="' + ID('rf-listed') + '">'
+      +   '<option value="1"' + (p.listed === false ? '' : ' selected') + '>โค้ดหรือค้นหาชื่อโรงเรียน (แนะนำ)</option>'
+      +   '<option value="0"' + (p.listed === false ? ' selected' : '') + '>โค้ดเท่านั้น</option></select></div>'
+      + '</div>'
+      + '<div id="' + ID('rf-warn') + '"></div>';
+  }
+
+  /* คำเตือนความเป็นส่วนตัว — ข้อความและเงื่อนไขเดียวกับหน้าเกม (clsListedWarnHtml)
+     เรื่องนี้กระทบข้อมูลเด็กโดยตรง จึงต้องเตือนเหมือนกันทุกที่ ไม่ใช่เตือนเฉพาะในเกม */
+  function listedWarn(listed) {
+    return listed
+      ? '<div class="err-box on" style="margin-top:10px">⚠️ โหมดนี้<b>ไม่ควรใส่ชื่อ-นามสกุลจริง</b>ของนักเรียน — '
+        + 'เพราะทุกคนสามารถค้นชื่อโรงเรียนและเห็นรายชื่อนักเรียนในห้องนี้ได้จากหน้าเข้าห้องของเกม<br>'
+        + 'แนะนำให้ใช้ชื่อเล่นหรือชื่อในเกมแทน</div>'
+      : '<div class="ok-box on" style="margin-top:10px">🔒 เห็นได้เฉพาะครูเจ้าของห้อง — ใส่ชื่อจริงได้</div>';
+  }
+
+  function bindRoomForm(ns) {
+    ns = ns || '';
+    const sel = $('rf-school' + ns), nw = $('rf-school-new' + ns),
+          ls = $('rf-listed' + ns), wr = $('rf-warn' + ns);
+    if (sel) sel.onchange = () => nw.classList.toggle('hidden', sel.value !== '__new__');
+    if (ls && wr) {
+      const paint = () => { wr.innerHTML = listedWarn(ls.value === '1'); };
+      ls.onchange = paint; paint();
+    }
+  }
+
+  function readRoomForm(ns) {
+    ns = ns || '';
+    const grade = ($('rf-grade' + ns).value || '').trim();
+    if (!grade) { showErr('ใส่ระดับชั้นก่อน เช่น ป.4'); return null; }
+    return {
+      grade: grade,
+      room_no: ($('rf-no' + ns).value || '').trim() || null,
+      academic_year: ($('rf-year' + ns).value || '').trim() || null,
+      listed: $('rf-listed' + ns).value === '1',
+      schoolSel: $('rf-school' + ns).value,
+      schoolNew: ($('rf-school-new' + ns).value || '').trim()
+    };
+  }
+
+  /* โรงเรียนใหม่ต้องสร้างก่อน แล้วค่อยผูกกับห้อง — เหมือนลำดับที่หน้าเกมทำ */
+  async function resolveSchool(v) {
+    if (v.schoolSel === '__new__') {
+      if (!v.schoolNew) { showErr('ใส่ชื่อโรงเรียนใหม่ก่อน'); return undefined; }
+      const rows = await G.api('/rest/v1/schools', { method: 'POST',
+        headers: { Prefer: 'return=representation' }, body: JSON.stringify([{ name: v.schoolNew }]) });
+      return (rows && rows[0] && rows[0].id) || null;
+    }
+    return v.schoolSel || null;
+  }
+
+  function renderRooms() {
+    clearErr();
+    const rooms = S.rooms.slice();
+    let html = '<h2 class="section-title">สร้างห้องเรียนใหม่</h2>'
+      + '<div class="card">' + roomFormFields(null)
+      + '<div style="margin-top:12px"><button class="btn btn-primary" id="nr-go">+ สร้างห้อง</button></div>'
+      + '<div class="form-hint">ชื่อห้องจะถูกตั้งเป็น <b>ระดับชั้น/ห้องที่</b> เช่น ป.4 + 1 → <b>ป.4/1</b> '
+      + '(ใช้กับกระดานอันดับ "รายชั้น" และรายงานทุกหน้า) · ระบบสร้างโค้ดเข้าห้อง 6 ตัวให้อัตโนมัติ '
+      + 'และ<b>โค้ดจะไม่เปลี่ยนอีก</b> นักเรียนที่เข้าห้องแล้วจึงไม่ได้รับผลกระทบเมื่อครูแก้ข้อมูลห้อง</div>'
+      + '</div>';
+
+    html += '<h2 class="section-title">ห้องเรียนของฉัน <span class="sub">' + rooms.length + ' ห้อง</span></h2>';
+    html += rooms.length
+      ? '<div class="grid cols-2">' + rooms.map(roomManageCard).join('') + '</div>'
+      : '<div class="card muted">ยังไม่มีห้องเรียน — สร้างห้องแรกด้านบน</div>';
+
+    $('content').innerHTML = appnav() + html;
+    bindRoomForm();
+    $('nr-go').onclick = createRoom;
+    bindRoomActions();
+  }
+
+  function roomManageCard(r) {
+    const stu = studentsOf(r.id);
+    const off = stu.filter((x) => x.is_active === false).length;
+    return '<div class="card" data-room="' + r.id + '">'
+      + '<div style="display:flex;align-items:baseline;gap:8px">'
+      +   '<h3 style="margin:0;font-size:16.5px;flex:1">🏫 ' + G.esc(r.name) + '</h3>'
+      +   (r.is_active === false ? '<span class="badge">ปิดใช้งาน</span>' : '')
+      +   (r.listed === false ? '<span class="badge">โค้ดเท่านั้น</span>' : '') + '</div>'
+      + '<div class="muted small" style="margin:4px 0 8px">'
+      +   (r.academic_year ? 'ปีการศึกษา ' + G.esc(r.academic_year) + ' · ' : '')
+      +   'นักเรียน ' + stu.length + ' คน' + (off ? ' (ปิดใช้งาน ' + off + ')' : '') + '</div>'
+      + '<div style="display:flex;align-items:center;gap:10px;margin:8px 0 12px;flex-wrap:wrap">'
+      +   '<span class="muted small">โค้ดเข้าห้อง</span> <span class="joinkey">' + G.esc(r.join_key) + '</span>'
+      +   '<button class="btn btn-sm" data-copy="' + G.esc(r.join_key) + '">คัดลอก</button>'
+      +   '<button class="btn btn-sm" data-sheet="' + r.id + '">🖨 ใบแจกโค้ด</button></div>'
+      + assignRows(r)
+      + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+      +   '<a class="btn btn-sm btn-primary" href="#/room/' + r.id + '">ดูผล / รายชื่อ →</a>'
+      +   '<button class="btn btn-sm" data-edit-room="' + r.id + '">✏️ แก้ไข</button>'
+      +   '<button class="btn btn-sm" data-toggle-room="' + r.id + '">'
+      +     (r.is_active === false ? 'เปิดห้อง' : 'ปิดห้องชั่วคราว') + '</button></div>'
+      + '<div class="hidden" data-editbox="' + r.id + '"></div>'
+      + '</div>';
+  }
+
+  function bindRoomActions() {
+    document.querySelectorAll('[data-edit-room]').forEach(function (b) {
+      b.onclick = function () {
+        const id = b.getAttribute('data-edit-room');
+        const box = document.querySelector('[data-editbox="' + id + '"]');
+        const r = roomById(id);
+        if (!box.classList.contains('hidden')) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+        box.innerHTML = '<div style="border-top:1px solid var(--grid);margin-top:12px;padding-top:12px">'
+          + roomFormFields(r, '-' + id)
+          + '<div style="margin-top:10px"><button class="btn btn-primary btn-sm" data-save-room="' + id + '">บันทึก</button></div>'
+          + '<div class="form-hint">โค้ดเข้าห้อง <b>' + G.esc(r.join_key) + '</b> ไม่เปลี่ยน — '
+          + 'นักเรียนที่เข้าห้องแล้วเล่นต่อได้ตามปกติ</div></div>';
+        box.classList.remove('hidden');
+        bindRoomForm('-' + id);
+        box.querySelector('[data-save-room]').onclick = () => saveRoom(id);
+      };
+    });
+    document.querySelectorAll('[data-toggle-room]').forEach(function (b) {
+      b.onclick = async function () {
+        const id = b.getAttribute('data-toggle-room'), r = roomById(id);
+        b.disabled = true;
+        try {
+          await G.api('/rest/v1/classrooms?id=eq.' + id, { method: 'PATCH',
+            body: JSON.stringify({ is_active: r.is_active === false }) });
+          await loadAll(); renderRooms();
+        } catch (e) { showErr('เปลี่ยนสถานะห้องไม่สำเร็จ: ' + e.message); b.disabled = false; }
+      };
+    });
+    document.querySelectorAll('[data-sheet]').forEach(function (b) {
+      b.onclick = () => codeSheet(b.getAttribute('data-sheet'));
+    });
+  }
+
+  async function saveRoom(id) {
+    const v = readRoomForm('-' + id); if (!v) return;
+    let school; try { school = await resolveSchool(v); } catch (e) { showErr('เพิ่มโรงเรียนไม่สำเร็จ: ' + e.message); return; }
+    if (school === undefined) return;
+    try {
+      await G.api('/rest/v1/classrooms?id=eq.' + id, { method: 'PATCH',
+        body: JSON.stringify({ name: roomName(v.grade, v.room_no), grade: v.grade, room_no: v.room_no,
+          school_id: school, academic_year: v.academic_year, listed: v.listed }) });
+      await loadAll(); renderRooms();
+    } catch (e) { showErr('บันทึกห้องไม่สำเร็จ: ' + e.message); }
+  }
+
+  /* ใบแจกโค้ด — เปิดหน้าต่างพิมพ์ ไม่ใช้ไฟล์ใหม่ · ครูแจกนักเรียน/ผู้ปกครองได้ทันที */
+  function codeSheet(id) {
+    const r = roomById(id); if (!r) return;
+    const w = window.open('', '_blank', 'width=760,height=900');
+    if (!w) { showErr('เบราว์เซอร์บล็อกหน้าต่างใหม่ — อนุญาต pop-up ให้เว็บนี้ก่อน'); return; }
+    const esc = G.esc;
+    w.document.write('<!doctype html><html lang="th"><head><meta charset="utf-8">'
+      + '<title>ใบแจกโค้ดห้อง ' + esc(r.name) + '</title><style>'
+      + 'body{font-family:system-ui,"Sarabun","Noto Sans Thai",sans-serif;padding:36px;color:#111;line-height:1.6}'
+      + 'h1{font-size:24px;margin:0 0 4px} .code{font-family:ui-monospace,monospace;font-size:52px;'
+      + 'letter-spacing:6px;font-weight:800;margin:18px 0;padding:14px 20px;border:3px dashed #333;'
+      + 'display:inline-block;border-radius:14px} ol{font-size:17px;padding-left:22px} li{margin:6px 0}'
+      + '.muted{color:#555;font-size:14px}</style></head><body>'
+      + '<h1>🏫 ห้อง ' + esc(r.name) + '</h1>'
+      + '<div class="muted">' + (r.academic_year ? 'ปีการศึกษา ' + esc(r.academic_year) : '') + '</div>'
+      + '<div class="code">' + esc(r.join_key) + '</div>'
+      + '<ol><li>เปิดเว็บ <b>' + esc(location.host || 'gameplearn.com') + '</b></li>'
+      + '<li>ใส่โค้ด <b>' + esc(r.join_key) + '</b> ในช่องหน้าแรก</li>'
+      + '<li>แตะชื่อตัวเองในรายชื่อ แล้วเริ่มเล่นได้เลย</li></ol>'
+      + '<p class="muted">คะแนนบันทึกอัตโนมัติ เปลี่ยนเครื่องแล้วใส่โค้ดเดิมเล่นต่อได้</p>'
+      + '</body></html>');
+    w.document.close();
+    w.focus();
+    setTimeout(() => { try { w.print(); } catch (e) {} }, 300);
+  }
+
+  /* หน้ามาตรฐาน — ตารางสรุปเดียวกับหน้าแรก + แผงรายละเอียดต่อเกม (คอมโพเนนต์กลางตัวเดียวกับเกม) */
+  function renderStandardsPage() {
+    clearErr();
+    const games = S.games.filter((g) => g.status !== 'archived');
+    let html = '<h2 class="section-title">📋 มาตรฐานที่แต่ละเกมวัด '
+      + '<span class="sub">ใช้อ้างอิงในแผนการสอนและงานประกันคุณภาพ</span></h2>';
+    if (!games.length) {
+      html += '<div class="card muted">ยังไม่มีเกมในระบบ</div>';
+    } else {
+      /* ตารางสรุปก่อน (ภาพรวมทุกเกมในหน้าเดียว) แล้วค่อยแผงรายละเอียดต่อเกม */
+      html += '<div class="card table-scroll"><table class="gol"><thead><tr>'
+        + '<th scope="col">เกม</th><th scope="col">ระดับชั้น</th><th scope="col">สถานะ</th>'
+        + '</tr></thead><tbody>'
+        + games.map((g) => '<tr><td><b>' + G.esc(g.name) + '</b></td>'
+            + '<td>' + G.esc(g.minimum_grade != null
+                ? 'ป.' + g.minimum_grade + (g.maximum_grade ? '–' + g.maximum_grade : '') : '–') + '</td>'
+            + '<td><span class="badge ' + G.esc(g.status) + '">' + G.esc(g.status) + '</span></td></tr>').join('')
+        + '</tbody></table>'
+        + '<div class="form-hint">รายละเอียดตัวชี้วัดและสมรรถนะของแต่ละเกมอยู่ในแผงด้านล่าง — '
+        + 'ข้อมูลชุดเดียวกับที่แสดงในหน้า Dashboard ของตัวเกม</div></div>'
+        + '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));margin-top:14px">'
+        + games.map((g) => '<div class="std-slot" data-std-game="' + G.esc(g.code) + '"></div>').join('')
+        + '</div>';
+    }
+    $('content').innerHTML = appnav() + html;
+    mountStandardsPanels();
+  }
+
   async function createRoom() {
-    const name = ($('nr-name').value || '').trim();
-    if (!name) { showErr('ใส่ชื่อห้องก่อน'); return; }
-    const grade = ($('nr-grade').value || '').trim() || null;
+    clearErr();
+    const v = readRoomForm(); if (!v) return;
     $('nr-go').disabled = true;
-    for (let i = 0; i < 3; i++) {
+    let school;
+    try { school = await resolveSchool(v); }
+    catch (e) { showErr('เพิ่มโรงเรียนไม่สำเร็จ: ' + e.message); $('nr-go').disabled = false; return; }
+    if (school === undefined) { $('nr-go').disabled = false; return; }
+
+    const base = { teacher_id: G.session().user_id, name: roomName(v.grade, v.room_no),
+      grade: v.grade, room_no: v.room_no, school_id: school, academic_year: v.academic_year,
+      listed: v.listed, is_active: true, allow_self_add: false, join_pin_required: false };
+    /* โค้ดชนกัน (23505) = สุ่มใหม่แล้วลองอีก — วิธีเดียวกับหน้าเกม */
+    for (let i = 0; i < 4; i++) {
       try {
         await G.api('/rest/v1/classrooms', { method: 'POST', headers: { Prefer: 'return=representation' },
-          body: JSON.stringify([{ teacher_id: G.session().user_id, name: name, grade: grade,
-            join_key: G.joinKeyGen(), is_active: true, allow_self_add: false, join_pin_required: false }]) });
-        await loadAll(); renderHome(); return;
+          body: JSON.stringify([Object.assign({ join_key: G.joinKeyGen() }, base)]) });
+        await loadAll(); renderRooms(); return;
       } catch (e) {
-        if (String(e.code) !== '23505') { showErr('สร้างห้องไม่สำเร็จ: ' + e.message); break; }
+        if (String(e.code) === '23505') continue;      /* โค้ดซ้ำ — สุ่มใหม่ */
+        if (String(e.code) === 'PGRST204') {           /* ฐานยังไม่ได้รัน 46 — สร้างแบบย่อไปก่อน */
+          try {
+            await G.api('/rest/v1/classrooms', { method: 'POST', headers: { Prefer: 'return=representation' },
+              body: JSON.stringify([{ teacher_id: base.teacher_id, name: base.name, grade: base.grade,
+                join_key: G.joinKeyGen(), is_active: true, allow_self_add: false, join_pin_required: false }]) });
+            await loadAll(); renderRooms();
+            showErr('สร้างห้องแล้ว แต่ฐานข้อมูลยังไม่มีช่อง โรงเรียน/ปีการศึกษา/วิธีเข้าห้อง — รัน 46_CLASSROOM_MANAGE.sql แล้วแก้ไขห้องอีกครั้ง');
+            return;
+          } catch (e2) { showErr('สร้างห้องไม่สำเร็จ: ' + e2.message); break; }
+        }
+        showErr('สร้างห้องไม่สำเร็จ: ' + e.message); break;
       }
     }
     $('nr-go').disabled = false;
@@ -737,10 +1064,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
     if (TAB === 'hots') {
       html += hotsSection(cid);
-      html += '<h2 class="section-title">ระดับสมรรถนะรายคน</h2>'
+      html += '<h2 class="section-title">การคิดขั้นสูงรายคน</h2>'
         + '<div class="card table-scroll">' + hotsTable(cid) + '</div>';
     } else if (TAB === 'comp') {
-      html += comp6Section(cid) + compSection(cid);
+      html += comp6Section(cid) + comp6Table(cid) + compSection(cid);
       html += '<h2 class="section-title">สมรรถนะรายคน</h2>'
         + '<div class="card table-scroll">' + compTable(cid) + '</div>';
       html += '<h2 class="section-title">มาตรฐานการเรียนรู้ของเกมที่เปิดใช้ในห้องนี้ '
@@ -771,12 +1098,20 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           if (ac && ac.score != null) total += Number(ac.score) || 0;
           else if (p && p.best_score != null) total += Number(p.best_score) || 0;
           if (ac) {
+            /* แถบต้องเป็น "สัดส่วนคะแนน" เรื่องเดียวกับตัวเลขข้างบน — เดิมวาดความคืบหน้า
+               (คนละเรื่องกัน) เลยดูเหมือนเลขกับแถบไม่ตรงกัน · ความคืบหน้าแยกไปอีกบรรทัดพร้อมป้าย */
+            const pc = ac.percent != null ? Number(ac.percent)
+              : (ac.score != null && ac.max_score ? ac.score / ac.max_score * 100 : null);
             return '<td style="min-width:150px"' + (ac.criteria_note ? ' title="' + G.esc(ac.criteria_note) + '"' : '') + '>'
               + '<div><b>' + G.fmt(ac.score) + '</b>'
               + (ac.max_score != null ? '<span class="muted small">/' + G.fmt(ac.max_score) + '</span>' : '')
+              + (pc != null ? ' <span class="muted small">= ' + pc.toFixed(1) + '%</span>' : '')
               + (ac.grade_label ? ' <span class="muted small">(' + G.esc(ac.grade_label) + ')</span>' : '')
               + (ac.is_legacy ? ' <span class="muted small">เก่า</span>' : '') + '</div>'
-              + (ac.progress_percent != null ? meter(ac.progress_percent) : '') + '</td>';
+              + (pc != null ? meter(pc) : '')
+              + (ac.progress_percent != null
+                  ? '<div class="muted small">เล่นไปแล้ว ' + G.fmt(ac.progress_percent) + '% ของเนื้อหา</div>' : '')
+              + '</td>';
           }
           return '<td style="min-width:150px">' + (p ? meter(p.progress_percent)
             + '<div class="muted small">คะแนน ' + G.fmt(p.best_score) + '</div>'
@@ -789,15 +1124,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       });
       html += '</tbody></table></div>';
 
-      html += '<h2 class="section-title">เพิ่มนักเรียน</h2>'
-        + '<div class="card" style="max-width:560px">'
-        + '<label class="f">พิมพ์ทีละบรรทัด: เลขที่ ชื่อ นามสกุล</label>'
-        + '<textarea id="as-lines" placeholder="1 สมชาย ใจดี&#10;2 สมหญิง เรียนเก่ง"></textarea>'
-        + '<button class="btn btn-primary" style="margin-top:10px" id="as-go">+ เพิ่มรายชื่อ</button></div>';
+      html += rosterSection(cid, stu);
     }
 
-    $('content').innerHTML = html;
+    $('content').innerHTML = appnav() + html;
     const g2 = $('as-go'); if (g2) g2.onclick = () => addStudents(cid);
+    bindRoster();
     mountStandardsPanels();
   }
 
@@ -832,6 +1164,106 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
               + (p.level_label ? '<div class="muted small">' + G.esc(p.level_label) + '</div>' : '') + '</td>';
           }).join('') + '</tr>';
       }).join('') + '</tbody></table>';
+  }
+
+  /* ===================== รายชื่อนักเรียน =====================
+     แก้ไขได้ครบเหมือนหน้าเกม แต่ **ไม่มีปุ่มลบ** — ใช้ "ปิดการใช้งาน" แทน
+     เพราะการลบนักเรียนจะลบผลการเล่นทั้งหมดของคนนั้นถาวร (กฎข้อ 1: ข้อมูลนักเรียนห้ามหาย) */
+  function rosterSection(cid, stu) {
+    const on = stu.filter((x) => x.is_active !== false);
+    const off = stu.filter((x) => x.is_active === false);
+    let html = '<h2 class="section-title">รายชื่อนักเรียน <span class="sub">'
+      + on.length + ' คน' + (off.length ? ' · ปิดการใช้งาน ' + off.length + ' คน' : '') + '</span></h2>';
+    if (stu.length) {
+      html += '<div class="card table-scroll"><table class="gol"><thead><tr>'
+        + '<th scope="col" class="num">เลขที่</th><th scope="col" class="name">ชื่อ — นามสกุล</th>'
+        + '<th scope="col">🎮 ชื่อในเกม</th><th scope="col">PIN</th><th scope="col">จัดการ</th>'
+        + '</tr></thead><tbody>';
+      stu.forEach(function (x) {
+        const dim = x.is_active === false ? ' style="opacity:.55"' : '';
+        html += '<tr' + dim + ' data-srow="' + x.id + '">'
+          + '<td class="num">' + G.esc(x.student_number || '–') + '</td>'
+          + '<td>' + G.esc(((x.first_name || '') + ' ' + (x.last_name || '')).trim() || '–')
+          +   (x.is_active === false ? ' <span class="badge">ปิดใช้งาน</span>' : '') + '</td>'
+          + '<td class="muted small">' + G.esc(x.character_name || '–') + '</td>'
+          + '<td class="muted small">' + G.esc(x.join_pin || '–') + '</td>'
+          + '<td><button class="btn btn-sm" data-edit-stu="' + x.id + '">✏️ แก้ไข</button> '
+          +   '<button class="btn btn-sm" data-off-stu="' + x.id + '">'
+          +     (x.is_active === false ? 'เปิดใช้งาน' : 'ปิดการใช้งาน') + '</button></td></tr>'
+          + '<tr class="hidden" data-sedit="' + x.id + '"><td colspan="5"></td></tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+    html += '<h2 class="section-title">เพิ่มนักเรียน</h2>'
+      + '<div class="card" style="max-width:560px">'
+      + '<label class="f" for="as-lines">พิมพ์ทีละบรรทัด: เลขที่ ชื่อ นามสกุล</label>'
+      + '<textarea id="as-lines" placeholder="1 สมชาย ใจดี&#10;2 สมหญิง เรียนเก่ง"></textarea>'
+      + '<button class="btn btn-primary" style="margin-top:10px" id="as-go">+ เพิ่มรายชื่อ</button>'
+      + '<div class="form-hint">วางจาก Excel ได้ทั้งห้อง (บรรทัดละคน) · '
+      + 'ถ้าห้องนี้ตั้งเป็น "ค้นหาชื่อโรงเรียนได้" ไม่ควรใส่ชื่อ-นามสกุลจริง ใช้ชื่อเล่นแทน</div></div>';
+    return html;
+  }
+
+  function bindRoster() {
+    document.querySelectorAll('[data-edit-stu]').forEach(function (b) {
+      b.onclick = function () {
+        const id = b.getAttribute('data-edit-stu');
+        const tr = document.querySelector('[data-sedit="' + id + '"]');
+        const x = S.students.find((v) => v.id === id);
+        if (!tr.classList.contains('hidden')) { tr.classList.add('hidden'); return; }
+        const F = (k) => 'se-' + k + '-' + id;   /* หลายแถวเปิดพร้อมกันได้ id จึงต้องไม่ซ้ำ */
+        tr.querySelector('td').innerHTML = '<div class="rf">'
+          + '<div><label class="f" for="' + F('no') + '">เลขที่</label>'
+          +   '<input type="text" id="' + F('no') + '" inputmode="numeric" value="' + G.esc(x.student_number || '') + '"></div>'
+          + '<div><label class="f" for="' + F('first') + '">ชื่อ</label>'
+          +   '<input type="text" id="' + F('first') + '" value="' + G.esc(x.first_name || '') + '"></div>'
+          + '<div><label class="f" for="' + F('last') + '">นามสกุล</label>'
+          +   '<input type="text" id="' + F('last') + '" value="' + G.esc(x.last_name || '') + '"></div>'
+          + '<div><label class="f" for="' + F('char') + '">🎮 ชื่อในเกม</label>'
+          +   '<input type="text" id="' + F('char') + '" maxlength="20" value="' + G.esc(x.character_name || '') + '"></div>'
+          + '<div><label class="f" for="' + F('pin') + '">PIN (ตัวเลข 4–6 หลัก · เว้นว่าง = ไม่ใช้)</label>'
+          +   '<input type="text" id="' + F('pin') + '" inputmode="numeric" value="' + G.esc(x.join_pin || '') + '"></div>'
+          + '</div><div style="margin:10px 0"><button class="btn btn-primary btn-sm" data-save-stu="' + id + '">บันทึก</button></div>';
+        tr.classList.remove('hidden');
+        tr.querySelector('[data-save-stu]').onclick = () => saveStudent(id);
+      };
+    });
+    document.querySelectorAll('[data-off-stu]').forEach(function (b) {
+      b.onclick = async function () {
+        const id = b.getAttribute('data-off-stu');
+        const x = S.students.find((v) => v.id === id);
+        const turnOff = x.is_active !== false;
+        if (turnOff && !confirm('ปิดการใช้งาน "' + ((x.first_name || '') + ' ' + (x.last_name || '')).trim()
+          + '" ?\n\nข้อมูลและผลการเล่นทั้งหมดยังอยู่ครบ ไม่ได้ถูกลบ — เปิดกลับมาได้ทุกเมื่อ')) return;
+        b.disabled = true;
+        try {
+          await G.api('/rest/v1/students?id=eq.' + id, { method: 'PATCH',
+            body: JSON.stringify({ is_active: !turnOff }) });
+          await loadAll(); route();
+        } catch (e) {
+          showErr(String(e.code) === 'PGRST204'
+            ? 'ฐานข้อมูลยังไม่มีช่อง "ปิดการใช้งาน" — รัน 46_CLASSROOM_MANAGE.sql ก่อน'
+            : 'เปลี่ยนสถานะไม่สำเร็จ: ' + e.message);
+          b.disabled = false;
+        }
+      };
+    });
+  }
+
+  async function saveStudent(id) {
+    const F = (k) => $('se-' + k + '-' + id);
+    const pin = (F('pin').value || '').trim();
+    if (pin && !/^\d{4,6}$/.test(pin)) { showErr('PIN ต้องเป็นตัวเลข 4–6 หลัก'); return; }
+    const first = (F('first').value || '').trim();
+    if (!first) { showErr('ต้องมีชื่ออย่างน้อยหนึ่งช่อง'); return; }
+    try {
+      await G.api('/rest/v1/students?id=eq.' + id, { method: 'PATCH',
+        body: JSON.stringify({ student_number: (F('no').value || '').trim() || null,
+          first_name: first, last_name: (F('last').value || '').trim() || '',
+          character_name: (F('char').value || '').trim() || null,
+          join_pin: pin || null }) });
+      await loadAll(); route();
+    } catch (e) { showErr('บันทึกไม่สำเร็จ: ' + e.message); }
   }
 
   async function addStudents(cid) {
@@ -884,6 +1316,13 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           + '<div style="font-size:22px;font-weight:800">' + G.fmt(ac.score)
           + (ac.max_score != null ? '<span class="muted" style="font-size:14px;font-weight:400">/' + G.fmt(ac.max_score) + '</span>' : '')
           + (ac.grade_label ? ' <span class="muted" style="font-size:14px">(' + G.esc(ac.grade_label) + ')</span>' : '') + '</div>'
+          + (function () {
+              const pc = ac.percent != null ? Number(ac.percent)
+                : (ac.score != null && ac.max_score ? ac.score / ac.max_score * 100 : null);
+              return pc != null ? meter(pc) + '<div class="muted small">คิดเป็น ' + pc.toFixed(1) + '% ของคะแนนเต็ม</div>' : '';
+            })()
+          + (ac.progress_percent != null
+              ? '<div class="muted small">เล่นไปแล้ว ' + G.fmt(ac.progress_percent) + '% ของเนื้อหา</div>' : '')
           + unitRows(ac.unit_scores)
           + (ac.criteria_note ? '<div class="form-hint">' + G.esc(ac.criteria_note) + '</div>' : '')
           + (ac.is_legacy ? '<div class="muted small">ข้อมูลเก่าจากชีต</div>' : '')
@@ -916,7 +1355,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     }
 
     html += '<h2 class="section-title">กิจกรรมล่าสุด</h2><div id="stu-ev" class="card muted small"><span class="loading"></span> กำลังโหลด…</div>';
-    $('content').innerHTML = html;
+    $('content').innerHTML = appnav() + html;
 
     // รายละเอียดด้านย่อย (เช่น การคิดขั้นสูง 4 ด้าน) — โหลดแยกเพราะเป็นรายแถวลึก
     if (fws.length) {

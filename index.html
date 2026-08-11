@@ -104,6 +104,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     <div class="card muted"><span class="loading"></span> กำลังโหลดรายชื่อเกม…</div>
   </div>
 
+  <!-- ==================== ตารางสรุปมาตรฐานที่แต่ละเกมวัด ====================
+       ครูขอให้มีตารางสรุปแบบเดียวกับหน้า Dashboard ของภาค 1/ภาค 2
+       ข้อมูลชุดเดียวกับการ์ดเกม (v_game_catalog) จึงไม่ยิงคำขอเพิ่ม -->
+  <h2 class="section-title" id="standards">📋 มาตรฐานที่แต่ละเกมวัด
+    <span class="sub">ใช้อ้างอิงในแผนการสอนและงานประกันคุณภาพ</span></h2>
+  <div class="card table-scroll" id="std-wrap">
+    <div class="muted"><span class="loading"></span> กำลังโหลด…</div>
+  </div>
+
   <!-- ==================== โซนครู ==================== -->
   <h2 class="section-title" id="teacher-zone">👩‍🏫 สำหรับคุณครู</h2>
   <section class="zone">
@@ -123,7 +132,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         <span class="t">สร้างห้องเรียน</span>
         <span class="d">ได้โค้ด 6 ตัวให้นักเรียนใช้เข้าเล่นทันที</span>
       </a>
-      <a class="zcard" href="#games">
+      <a class="zcard" href="#standards">
         <span class="ic">📋</span>
         <span class="t">มาตรฐานที่แต่ละเกมวัด</span>
         <span class="d">ตัวชี้วัดและสมรรถนะที่เกมครอบคลุม สำหรับเขียนแผนการสอน</span>
@@ -320,6 +329,45 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   function activeCount() { return Object.keys(sel).filter((k) => sel[k]).length + (q ? 1 : 0); }
 
+  /* ตารางสรุปมาตรฐาน — 1 แถวต่อเกม · ช่องที่เกมยังไม่ระบุเขียนว่า "รอยืนยัน" ไม่เดาแทนเจ้าของเกม */
+  function renderStandards() {
+    const list = ALL.slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    if (!list.length) {
+      $('std-wrap').innerHTML = '<div class="muted">ยังไม่มีเกมในระบบ</div>';
+      return;
+    }
+    const wait = '<span class="muted small">รอยืนยัน</span>';
+    let html = '<table class="gol"><thead><tr>'
+      + '<th scope="col">เกม</th><th scope="col">ระดับชั้น</th><th scope="col">เรื่อง</th>'
+      + '<th scope="col">กลุ่มสาระ (ผลสัมฤทธิ์)</th><th scope="col">สมรรถนะหลักที่วัด</th>'
+      + '</tr></thead><tbody>';
+    list.forEach(function (g) {
+      const subs = g.subject_codes.length
+        ? g.subject_codes.map((c) => K.SUBJ_SHORT[c] || c)
+        : g.subject_areas;
+      const comps = g.competency_codes.length
+        ? g.competency_codes.map((c) => K.COMP_SHORT[c] || c)
+        : g.competencies;
+      const full = g.competency_codes.length >= K.CBE_TOTAL;
+      html += '<tr>'
+        + '<td><b>' + G.esc(g.name) + '</b>'
+          + (g.name_en ? '<div class="muted small">' + G.esc(g.name_en) + '</div>' : '') + '</td>'
+        + '<td>' + G.esc(g.grade_band || '–') + '</td>'
+        + '<td>' + (g.topic ? G.esc(g.topic) : wait) + '</td>'
+        + '<td>' + (subs.length ? G.esc(subs.join(' · ')) : wait) + '</td>'
+        + '<td>' + (comps.length
+            ? (full ? '<b>ครบ ' + K.CBE_TOTAL + ' ด้าน</b><div class="muted small">' + G.esc(comps.join(' · ')) + '</div>'
+                    : G.esc(comps.join(' · ')))
+            : wait) + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table>'
+      + '<div class="form-hint">อ้างอิงหลักสูตรแกนกลางฯ 2551 (ปรับปรุง 2560) และกรอบสมรรถนะหลัก 6 ประการ · '
+      + 'ตัวชี้วัดรายข้อของแต่ละเกมดูได้ที่ปุ่ม 📋 บนการ์ดเกม · '
+      + 'ช่องที่เขียนว่า "รอยืนยัน" คือเจ้าของเกมยังไม่ได้ระบุ — ไม่ใช่ว่าเกมไม่ได้วัด</div>';
+    $('std-wrap').innerHTML = html;
+  }
+
   function renderList() {
     const rows = K.apply(ALL, sel, q, sortKey);
     $('cat').innerHTML = rows.length
@@ -372,6 +420,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     renderFilters();
     renderFeatured();
     renderList();
+    renderStandards();
 
     if (SOURCE === 'basic') {
       const n = $('basic-note');

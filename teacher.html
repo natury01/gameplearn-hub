@@ -274,6 +274,33 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     ['CM','การสื่อสาร','สื่อสาร'], ['TW','การรวมพลังทำงานเป็นทีม','ทำงานทีม'],
     ['CZ','การเป็นพลเมืองที่เข้มแข็ง','พลเมือง'], ['SN','การอยู่ร่วมกับธรรมชาติฯ','ธรรมชาติฯ']];
   const HOT_SUB = { ctc: 'คิดอย่างมีวิจารณญาณ', stm: 'คิดเชิงระบบ', crt: 'คิดสร้างสรรค์', prb: 'คิดแก้ปัญหา' };
+  /* ด้านย่อยชุด 19 ตัวที่เกมใช้ร่วมกัน (SELF_SUB_LABEL) — ใช้แสดงชื่อไทยเมื่อเกมส่งรหัสมา */
+  const SUB_LABEL = {
+    'sm-a': 'รู้จักและเห็นคุณค่าในตนเอง', 'sm-b': 'กำกับตนเอง จัดการอารมณ์และเวลา',
+    'sm-c': 'ตั้งเป้าหมายและมุ่งมั่นพัฒนาตนเอง',
+    'cm-a': 'รับสาร (ฟังและอ่านจับใจความ)', 'cm-b': 'ส่งสาร (พูดและเขียนให้เข้าใจ)',
+    'cm-c': 'สื่อสารให้เหมาะกับบุคคลและกาลเทศะ',
+    'tw-a': 'เป็นสมาชิกทีมที่ดีและมีภาวะผู้นำ', 'tw-b': 'ร่วมมือรวมพลังอย่างเป็นระบบ',
+    'tw-c': 'สร้างความสัมพันธ์และจัดการความขัดแย้ง',
+    'cz-a': 'ปฏิบัติตนอย่างรับผิดชอบตามบทบาทหน้าที่', 'cz-b': 'เคารพสิทธิผู้อื่นและอยู่ร่วมกันในความต่าง',
+    'cz-c': 'มีส่วนร่วมทำเพื่อส่วนรวมและท้องถิ่น',
+    'ns-a': 'เข้าใจธรรมชาติ ช่างสังเกตและตั้งคำถาม', 'ns-b': 'ใช้ทรัพยากรและวิทยาการอย่างรู้คุณค่า',
+    'ns-c': 'ร่วมดูแลรักษาเพื่อความยั่งยืน'
+  };
+  /* รับได้ทั้งคีย์สั้น 'ctc' และคีย์เต็ม 'HT-CTC' — ไม่รู้จักก็แสดงคีย์ตามที่เกมส่งมา ไม่เดา */
+  function subName(k) {
+    const key = String(k).toLowerCase();
+    if (HOT_SUB[key]) return HOT_SUB[key];
+    if (SUB_LABEL[key]) return SUB_LABEL[key];
+    const tail = key.split('-').slice(1).join('-');
+    return HOT_SUB[tail] || k;
+  }
+  /* สถานะเทียบผลของภาค 2 (CBE8.ST_INFO) — "ข้อมูลประกอบ" ไม่ใช่คะแนน */
+  const CMP_STATUS = {
+    CONFIRMED: '🟢 ยืนยันตรงกัน', CONFIRMED_WITH_VARIANCE: '🟡 ตรงกันแบบมีส่วนต่าง',
+    QUICK_REVIEW: '🟠 ควรทบทวน', AWAITING_TEACHER_CONFIRMATION: '🔵 รอครูยืนยัน',
+    FINALIZED: '🔷 ครูยืนยันผลแล้ว', NO_DATA: '⬜ ยังไม่มีข้อมูล', NO_SOURCES: '◻️ ไม่มีแหล่งเทียบ'
+  };
 
   function agg6(cid) {
     const rows = (S.compDims || []).filter((r) => !cid || r.classroom_id === cid);
@@ -285,15 +312,28 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       const avg = withScore.length
         ? withScore.reduce((t, r) => t + Number(r.score), 0) / withScore.length : null;
       const games = [...new Set(scored.map((r) => r.game_name))];
-      const subAgg = {};
+      /* คีย์ที่ขึ้นต้นด้วย _ = ข้อมูลประกอบ (สถานะเทียบผล · ฐานการคิด · ธงคะแนนชั่วคราว)
+         ห้ามเอาไปวาดเป็นแถบคะแนน — ภาค 2 ส่งมาแบบนี้ตามข้อตกลง "เทียบได้ ไม่รวมคะแนน" */
+      const subAgg = {}, stat = {}, notes = {};
+      let prov = 0, cmpN = 0;
       scored.forEach(function (r) {
-        if (r.sub_scores && typeof r.sub_scores === 'object')
-          Object.keys(r.sub_scores).forEach(function (k) {
-            const v = Number(r.sub_scores[k]);
-            if (!isNaN(v)) (subAgg[k] = subAgg[k] || []).push(v);
-          });
+        if (r.criteria_note) notes[r.criteria_note] = 1;
+        const ss = r.sub_scores;
+        if (!ss || typeof ss !== 'object') return;
+        Object.keys(ss).forEach(function (k) {
+          const raw = ss[k];
+          if (String(k).charAt(0) === '_') {
+            if (k === '_status' && raw) stat[raw] = (stat[raw] || 0) + 1;
+            else if (k === '_provisional' && raw) prov++;
+            else if (/^_cmp_/.test(k) && raw != null) cmpN++;
+            return;
+          }
+          if (raw == null) return;              /* null = ยังไม่มีหลักฐาน ไม่ใช่ศูนย์ */
+          const v = Number(raw);
+          if (!isNaN(v)) (subAgg[k] = subAgg[k] || []).push(v);
+        });
       });
-      const subs = Object.keys(subAgg).map((k) => ({ k, name: HOT_SUB[k] || k,
+      const subs = Object.keys(subAgg).map((k) => ({ k, name: subName(k),
         avg: subAgg[k].reduce((t, v) => t + v, 0) / subAgg[k].length }));
       const perGame = games.map(function (gn) {
         const g = scored.filter((r) => r.game_name === gn);
@@ -303,7 +343,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           label: (g.find((r) => r.level_label) || {}).level_label || null };
       });
       const selfScored = selfR.filter((r) => r.score != null);
+      const byTeacher = scored.filter((r) => r.decided_by === 'teacher');
       return { code, name, short, avg, n: scored.length,
+        stat, prov, cmpN, notes: Object.keys(notes),
+        teacher: byTeacher.length,
+        sysAvg: (function () {
+          const w = byTeacher.filter((r) => r.system_score != null);
+          return w.length ? w.reduce((t, r) => t + Number(r.system_score), 0) / w.length : null;
+        })(),
         students: new Set(scored.map((r) => r.student_id)).size,
         games, subs, perGame,
         self: { n: selfR.length,
@@ -373,9 +420,18 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
                 '<div class="c6sub"><span>' + G.esc(s2.name) + '</span>'
                 + '<span class="c6bar sm"><i style="width:' + Math.min(100, s2.avg).toFixed(1) + '%"></i></span>'
                 + '<span class="c6val">' + s2.avg.toFixed(1) + '</span></div>').join('') + '</div>' : '')
+            + (Object.keys(d.stat).length || d.cmpN || d.prov
+                ? '<div class="muted small">'
+                  + Object.keys(d.stat).map((k) => G.esc(CMP_STATUS[k] || k) + ' ' + d.stat[k] + ' คน').join(' · ')
+                  + (d.cmpN ? (Object.keys(d.stat).length ? ' · ' : '') + 'มีผลเทียบจากครู/เพื่อน/ตนเอง ' + d.cmpN + ' รายการ' : '')
+                  + (d.prov ? ' · ⏳ คะแนนชั่วคราวรอครูตรวจ ' + d.prov + ' คน' : '')
+                  + '</div>' : '')
+            + (d.teacher ? '<div class="muted small">🧑‍🏫 ครูตัดสินระดับเอง ' + d.teacher + ' คน'
+                + (d.sysAvg != null ? ' (ระบบคิดไว้เฉลี่ย ' + d.sysAvg.toFixed(1) + ')' : '') + '</div>' : '')
             + '<div class="muted small">' + G.esc(meta) + ' · ' + d.perGame.map((pg) =>
                 G.esc(pg.name) + (pg.avg != null ? ' ' + pg.avg.toFixed(1) : '')
                 + (pg.label ? ' (' + G.esc(pg.label) + ')' : '')).join(' · ') + '</div>'
+            + d.notes.map((t) => '<div class="form-hint">' + G.esc(t) + '</div>').join('')
             + '</div>' : '')
         + '</div>';
     }).join('');
@@ -401,6 +457,31 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   });
 
   /* ===================== ใบผลสัมฤทธิ์จากเกม (43) ===================== */
+  /* คีย์ที่ขึ้นต้นด้วย _ ในใบผลสัมฤทธิ์ = "รายการประกอบ" ที่เกมส่งมาให้ครูเห็น
+     แต่ไม่ได้บวกอยู่ในคะแนนหลัก (เช่นคะแนนสอบด่านบอสของกาญจนบุรี ซึ่งนับซ้ำอยู่ในคะแนนเก็บแล้ว)
+     — แยกกลุ่มแสดงเสมอ จะได้ไม่มีใครเผลออ่านว่าเป็นคะแนนอีกก้อน */
+  const UNIT_LABEL = { _boss: 'คะแนนสอบด่านบอส', _cap24: 'ด่านรวบยอด (เต็ม 24)',
+    _badges: 'ตราที่ได้', _badges_total: 'ตราทั้งหมด' };
+  function unitName(k) {
+    if (String(k).charAt(0) === '_') return UNIT_LABEL[k] || String(k).slice(1);
+    return /^\d+$/.test(String(k)) ? 'ด่าน ' + k : String(k);
+  }
+  function unitRows(us) {
+    if (!us || typeof us !== 'object') return '';
+    const keys = Object.keys(us);
+    const main = keys.filter((k) => String(k).charAt(0) !== '_');
+    const extra = keys.filter((k) => String(k).charAt(0) === '_');
+    const row = (k) => '<tr><td class="muted small">' + G.esc(unitName(k)) + '</td>'
+      + '<td class="num">' + G.fmt(us[k]) + '</td></tr>';
+    if (!main.length && !extra.length) return '';
+    return '<table class="gol" style="margin-top:8px"><tbody>'
+      + main.map(row).join('')
+      + (extra.length
+          ? '<tr><td colspan="2" class="muted small" style="padding-top:8px">'
+            + 'รายการประกอบ (ไม่รวมในคะแนนหลัก)</td></tr>' + extra.map(row).join('')
+          : '')
+      + '</tbody></table>';
+  }
   function achOf(sid, gid) {
     return (S.achieve || []).find((x) => x.student_id === sid && x.game_id === gid) || null;
   }
@@ -798,15 +879,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const arows = (S.achieve || []).filter((x) => x.student_id === sid);
     if (arows.length) {
       html += '<div class="grid cols-3" style="margin-top:10px">' + arows.map(function (ac) {
-        const units = (ac.unit_scores && typeof ac.unit_scores === 'object') ? Object.keys(ac.unit_scores) : [];
         return '<div class="card"><h3 style="margin:0 0 6px;font-size:15.5px">📄 ' + G.esc(ac.game_name)
           + ' <span class="muted small">ผลสรุปจากเกม</span></h3>'
           + '<div style="font-size:22px;font-weight:800">' + G.fmt(ac.score)
           + (ac.max_score != null ? '<span class="muted" style="font-size:14px;font-weight:400">/' + G.fmt(ac.max_score) + '</span>' : '')
           + (ac.grade_label ? ' <span class="muted" style="font-size:14px">(' + G.esc(ac.grade_label) + ')</span>' : '') + '</div>'
-          + (units.length ? '<table class="gol" style="margin-top:8px"><tbody>' + units.map((k) =>
-              '<tr><td class="muted small">' + G.esc(k) + '</td><td class="num">' + G.fmt(ac.unit_scores[k]) + '</td></tr>').join('')
-              + '</tbody></table>' : '')
+          + unitRows(ac.unit_scores)
           + (ac.criteria_note ? '<div class="form-hint">' + G.esc(ac.criteria_note) + '</div>' : '')
           + (ac.is_legacy ? '<div class="muted small">ข้อมูลเก่าจากชีต</div>' : '')
           + '</div>';

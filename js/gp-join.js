@@ -23,7 +23,7 @@
  * ไม่โหลดไฟล์นี้ก็ยังใช้ได้ — เกมทำงานเหมือนเดิมทุกอย่าง
  *
  * ⚠️ คีย์ localStorage ที่จองไว้ให้แพลตฟอร์ม/เว็บกลาง ห้ามเกมใดใช้ซ้ำ:
- *    gp_join_handoff · gp_hub_sess · gp_brand_cache · gp_theme · gp_announce_off
+ *    gp_join_handoff · gp_hub_sess · gp_brand_cache · gp_theme · gp_announce_off · gp_room_claims
  */
 (function () {
   'use strict';

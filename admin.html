@@ -176,7 +176,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         <h2 style="margin:0 0 4px;font-size:18px">ห้องเรียนทั้งระบบ</h2>
         <div class="muted small" style="margin-bottom:12px">
           รวมห้องของครูทุกคน — <b>อ่านอย่างเดียว</b> หน้านี้ไม่แก้ ไม่ปิด ไม่ลบห้องของใคร
-          ครูเจ้าของห้องแก้ได้เองที่หน้าครู · ห้องของครูคนอื่นจะไม่โผล่ในหน้า "ห้องเรียนของฉัน" อีกแล้ว
+          ครูเจ้าของห้องแก้ได้เองที่หน้าครู · ห้องของครูคนอื่นจะไม่โผล่ในหน้า "ห้องเรียนของฉัน" อีกแล้ว<br>
+          ห้อง <b>ผู้เล่นทั่วไป</b> (คนที่สมัครเล่นเองจากในเกม) แสดงที่นี่ที่เดียว ไม่โผล่ในหน้าครู
+          และไม่แสดงโค้ดห้อง — เป็นข้อจำกัดเรื่องข้อมูลส่วนบุคคลของเด็กที่ตกลงกับฝั่งเกมไว้
         </div>
         <div class="f">
           <label for="rm-q">ค้นหา</label>
@@ -1105,14 +1107,24 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       $('rm-wrap').innerHTML = '<div class="muted">โหลดไม่สำเร็จ: ' + G.esc(e.message) + '</div>';
     }
   }
+  /* ห้อง "ผู้เล่นทั่วไป" — คนที่สมัครเล่นเองจากในเกม ไม่ใช่ห้องเรียนของครูคนไหน
+     หน้าครูกรองห้องนี้ออกไปแล้ว (ไม่ใช่ห้องของเขา) จึงต้องเห็นที่นี่ที่เดียว
+     ไม่งั้นห้องที่มีนักเรียนอยู่จริงจะหายไปจากทุกหน้าจนไม่มีใครรู้ว่ามีอยู่
+     แต่ยังต้องไม่โชว์โค้ดห้อง ตามข้อจำกัด PDPA เด็กที่ภาค 1 กำชับไว้ (ไฟล์ 23) */
+  const isPublicRoom = (r) => !!r && String(r.name || '').trim() === 'ผู้เล่นทั่วไป';
+
   function drawRooms() {
     const q = ($('rm-q').value || '').trim().toLowerCase();
-    const list = !q ? RM : RM.filter((r) => [r.name, r._school, r.join_key, r._teacher,
-      r.academic_year].join(' ').toLowerCase().indexOf(q) >= 0);
-    const orphan = RM.filter((r) => !r.teacher_id).length;
+    /* ไม่ให้ค้นเจอด้วยโค้ดของห้องผู้เล่นทั่วไป — โค้ดนั้นไม่ควรถูกแจกหรือถูกยืนยันจากหน้านี้ */
+    const list = !q ? RM : RM.filter((r) => [r.name, r._school, r._teacher, r.academic_year]
+      .concat(isPublicRoom(r) ? [] : [r.join_key]).join(' ').toLowerCase().indexOf(q) >= 0);
+    const orphan = RM.filter((r) => !r.teacher_id && !isPublicRoom(r)).length;
+    const pub = RM.filter(isPublicRoom);
+    const pubKids = pub.reduce((a, r) => a + r._on, 0);
     $('rm-stat').textContent = 'ทั้งระบบ ' + RM.length + ' ห้อง · ครู '
       + new Set(RM.map((r) => r.teacher_id).filter(Boolean)).size + ' คน · นักเรียน '
       + RM.reduce((a, r) => a + r._on, 0) + ' คน'
+      + (pub.length ? ' (ในนั้นเป็นผู้เล่นทั่วไป ' + pubKids + ' คน)' : '')
       + (orphan ? ' · ยังไม่มีเจ้าของ ' + orphan + ' ห้อง' : '')
       + (q ? ' — ตรงกับที่ค้นหา ' + list.length + ' ห้อง' : '');
     if (!list.length) { $('rm-wrap').innerHTML = '<div class="muted">ไม่พบห้องที่ตรงกับที่ค้นหา</div>'; return; }
@@ -1121,13 +1133,18 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + '<th scope="col">ครูเจ้าของ</th><th scope="col" class="num">นักเรียน</th>'
       + '<th scope="col">โค้ด</th><th scope="col">สถานะ</th></tr></thead><tbody>'
       + list.map((r) => '<tr>'
-          + '<td><b>' + G.esc(r.name || '–') + '</b></td>'
+          + '<td><b>' + G.esc(r.name || '–') + '</b>'
+          +   (isPublicRoom(r) ? ' <span class="badge">ผู้เล่นทั่วไป</span>' : '') + '</td>'
           + '<td>' + G.esc(r._school || '–') + '</td>'
           + '<td>' + G.esc(r.academic_year || '–') + '</td>'
-          + '<td>' + (r.teacher_id ? G.esc(r._teacher || r.teacher_id)
-              : '<span class="badge">ยังไม่มีเจ้าของ</span>') + '</td>'
+          + '<td>' + (isPublicRoom(r) ? '<span class="muted small">ไม่ใช่ห้องของครู</span>'
+              : (r.teacher_id ? G.esc(r._teacher || r.teacher_id)
+              : '<span class="badge">ยังไม่มีเจ้าของ</span>')) + '</td>'
           + '<td class="num">' + r._on + (r._off ? ' <span class="muted small">(ปิด ' + r._off + ')</span>' : '') + '</td>'
-          + '<td><span class="joinkey" style="font-size:13px">' + G.esc(r.join_key || '–') + '</span></td>'
+          /* โค้ดของห้องผู้เล่นทั่วไปถูกปิดไว้โดยตั้งใจ — ห้องนี้ไม่ได้เข้าด้วยโค้ด สมาชิกใช้
+             ชื่อผู้ใช้+รหัสผ่านของตัวเอง · โชว์โค้ดที่นี่มีแต่ทำให้มีคนเอาไปแจกโดยไม่รู้ว่าผิดกติกา */
+          + '<td>' + (isPublicRoom(r) ? '<span class="muted small">— ไม่แจกโค้ด —</span>'
+              : '<span class="joinkey" style="font-size:13px">' + G.esc(r.join_key || '–') + '</span>') + '</td>'
           + '<td>' + (r.is_active === false ? '<span class="badge">ปิดอยู่</span>'
               : '<span class="badge published">เปิด</span>') + '</td>'
           + '</tr>').join('')

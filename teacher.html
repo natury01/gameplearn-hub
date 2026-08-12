@@ -27,6 +27,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
            จึงไม่ต้องใส่ class="on" ตายตัวให้ "สำหรับครู" อีก (จะไฮไลต์ซ้อนกันสองอัน) -->
       <a href="#/" data-nav="#/">📊 Dashboard</a>
       <a href="#/rooms" data-nav="#/rooms">🏫 สร้างห้องเรียน</a>
+      <a href="#/browse" data-nav="#/browse">🔎 ห้องของครูคนอื่น</a>
       <a href="standards.html">📋 มาตรฐาน</a>
       <a href="support.html">สนับสนุน</a>
       <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
@@ -39,10 +40,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   <main id="page-main">
 
   <div class="err-box" id="err" role="alert"></div>
+  <!-- ข้อความยืนยัน "ทำสำเร็จแล้ว" — อยู่นอก #content โดยตั้งใจ เพราะทุกครั้งที่บันทึก/ลบ
+       หน้าจะโหลดข้อมูลใหม่แล้ววาด #content ทับ ถ้าเขียนข้อความไว้ข้างในจะหายไปพร้อมกัน
+       ครูจะไม่มีทางรู้ว่าที่กดไปนั้นสำเร็จหรือเงียบหาย — ซึ่งสำคัญมากกับปุ่มลบ -->
+  <div class="ok-box" id="flash" role="status"></div>
 
   <!-- ================= หน้า Login ================= -->
   <div id="v-login" class="hidden">
-    <div class="card" style="max-width:440px;margin:32px auto;text-align:center">
+    <div class="card" style="max-width:440px;margin:32px auto 14px;text-align:center">
       <div style="font-size:40px">👩‍🏫</div>
       <h1 style="margin:8px 0 4px;font-size:19px">เข้าสู่ระบบครู</h1>
       <div class="muted small" style="margin-bottom:18px">บัญชีเดียวกับที่ใช้ในเกมทุกเกมของแพลตฟอร์ม</div>
@@ -50,6 +55,21 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         เข้าสู่ระบบด้วย Google</button>
       <div class="form-hint" style="margin-top:12px;text-align:left">
         ครูที่ใช้เกมแบบ "ไม่ต้องสมัคร" อยู่: แนะนำให้ผูกบัญชี Google จากในเกมก่อน แล้วกดปุ่มนี้ด้วยบัญชีเดียวกัน</div>
+    </div>
+
+    <!-- สร้างห้องก่อนล็อกอิน (60_ROOM_CLAIM.sql) — ครูสั่งให้มีทางนี้
+         เหตุผล: ครูที่เพิ่งรู้จักเว็บนี้อยากลองสร้างห้องให้เด็กเล่นก่อน ไม่อยากสมัครตั้งแต่ยังไม่รู้ว่าดีไหม
+         ห้องที่สร้างทางนี้ผูกอยู่กับ "เครื่องนี้" จนกว่าจะล็อกอินแล้วกดผูกเข้าบัญชี -->
+    <div class="card" style="max-width:440px;margin:0 auto">
+      <div id="claim-list"></div>
+      <div id="open-room-box">
+        <button class="btn" style="width:100%;justify-content:center" id="btn-open-room">
+          🏫 สร้างห้องเรียนเลย โดยยังไม่ต้องล็อกอิน</button>
+        <div class="form-hint" style="margin-top:8px">
+          ได้โค้ดให้นักเรียนใช้ทันที · ล็อกอินทีหลังแล้วค่อยผูกห้องเข้าบัญชีก็ได้
+        </div>
+      </div>
+      <div id="open-room-form" class="hidden"></div>
     </div>
   </div>
 
@@ -74,26 +94,192 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   const $ = (id) => document.getElementById(id);
   const S = { teacher: null, games: [], rooms: [], cg: [], students: [], progress: [], summary: [],
               eventsCount: null, frameworks: [], coverage: [], itemSummary: [], itemProfile: [],
-              compDims: [], achieve: [], schools: [] };
+              compDims: [], achieve: [], schools: [],
+              /* true = ฐานมีตารางใบรายงานผลแล้ว · false = ยังไม่ได้รัน 43 · null = ตรวจไม่ได้
+                 ใช้แยกว่า "หน้าจอว่างเพราะยังไม่มีท่อ" หรือ "มีท่อแล้วแต่ยังไม่มีน้ำ" (ดู pipeNote) */
+              has43: null };
   let TAB = 'ach';   // 'ach' = ผลสัมฤทธิ์ | 'comp' = สมรรถนะ
   /* ตัวกรองห้องบนหน้า Dashboard — '' = รวมทุกห้องของฉัน · ไม่งั้นเป็น id ของห้องเดียว
      ทุกส่วนบนหน้านี้ (กล่องตัวเลข · เรดาร์ · ผลสัมฤทธิ์ · ตารางรายคน) อ่านค่าเดียวกันนี้
      ครูจึงเทียบ "ภาพรวมทุกห้อง" กับ "ห้องเดียว" ได้โดยไม่ต้องเปลี่ยนหน้า */
   let ROOM = '';
+  /* ตัวกรองรายเกม — '' = รวมทุกเกม · ไม่งั้นเป็น id ของเกมเดียว
+     คู่กับตัวกรองห้อง เพราะคำถามจริงของครูคือ "ห้องนี้ เกมนี้ ไปถึงไหนแล้ว"
+     ไม่ใช่ "ทุกห้องรวมทุกเกม" ซึ่งเป็นตัวเลขที่เอาไปทำอะไรต่อไม่ได้เมื่อสอนหลายห้องหลายเกม */
+  let GAME = '';
 
   function showErr(m) { const b = $('err'); b.textContent = m; b.classList.add('on'); }
   function clearErr() { $('err').classList.remove('on'); }
+  /* ข้อความ "ทำสำเร็จแล้ว" — อยู่ได้ข้ามการวาดหน้าใหม่ (ดู #flash ใน HTML) จางหายเองใน 12 วิ */
+  let flashT = null;
+  function showOk(m) {
+    const b = $('flash'); if (!b) return;
+    b.innerHTML = m; b.classList.add('on');
+    clearTimeout(flashT);
+    flashT = setTimeout(function () { b.classList.remove('on'); b.innerHTML = ''; }, 12000);
+  }
+
+  /* ห้อง "ผู้เล่นทั่วไป" — คนที่สมัครเล่นเองจากในเกม ไม่ใช่ห้องเรียนของครูคนไหน
+     กติกาล็อกไว้ตั้งแต่ภาค 1 (V.7.99.5 · ไฟล์ 23 ข้อ "ถือเสมือน 🔒"):
+     ห้ามโผล่ในหน้าจัดการใด ๆ ของเว็บกลาง · ห้ามแสดงหรือแจกโค้ด · ห้ามเก็บชื่อจริง/โรงเรียน (PDPA เด็ก)
+     ถ้าปล่อยให้ปนอยู่ในรายการ มันจะไม่ใช่แค่หัวข้อผิด — ยอดนักเรียน ค่าเฉลี่ย และเรดาร์สมรรถนะ
+     จะกลายเป็นตัวเลขของคนทั้งอินเทอร์เน็ตที่ปนอยู่ในห้องของครู
+     ดูจากชื่อห้อง เพราะเป็นสิ่งเดียวที่ทั้งสองฝั่งตกลงกันไว้ (ฐานสร้างห้องนี้ด้วยชื่อนี้ตายตัว) */
+  const PUBLIC_ROOM_NAME = 'ผู้เล่นทั่วไป';
+  const isPublicRoom = (r) => !!r && String(r.name || '').trim() === PUBLIC_ROOM_NAME;
+
+  /* ===================== ห้องที่สร้างก่อนล็อกอิน (60_ROOM_CLAIM.sql) =====================
+     ครูสร้างห้องได้เลยโดยไม่ต้องสมัคร · ฐานคืน "กุญแจรับห้อง" มาให้เก็บไว้ในเครื่อง
+     ล็อกอินเมื่อไหร่ หน้านี้เอากุญแจไปผูกห้องเข้าบัญชีให้อัตโนมัติ
+
+     ⚠️ กุญแจอยู่ใน localStorage ของเบราว์เซอร์ตัวนี้เท่านั้น — ล้างข้อมูลเบราว์เซอร์ก่อนผูก = เสียห้อง
+        (ห้องยังอยู่ในฐานและเด็กยังเข้าเล่นได้ด้วยโค้ดเดิม แต่ครูจะเข้าไปจัดการไม่ได้อีก)
+        จึงต้องเขียนเตือนให้ครูเห็นทุกครั้งที่สร้างทางนี้ ไม่ใช่ซ่อนไว้ในเอกสาร
+     คีย์นี้จองไว้ให้แพลตฟอร์ม ห้ามเกมใดใช้ชื่อซ้ำ (ชุดเดียวกับ gp_join_handoff · gp_hub_sess ฯลฯ) */
+  const CLAIM_KEY = 'gp_room_claims';
+  function claimsRead() {
+    try { const a = JSON.parse(localStorage.getItem(CLAIM_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+    catch (e) { return []; }
+  }
+  function claimsWrite(a) {
+    try { localStorage.setItem(CLAIM_KEY, JSON.stringify(a.slice(-20))); } catch (e) {}
+  }
+  function claimAdd(rec) { const a = claimsRead(); a.push(rec); claimsWrite(a); }
+  function claimDrop(token) { claimsWrite(claimsRead().filter((x) => x && x.token !== token)); }
+
+  /* คำสั่งลบ/ผูก ที่ยังไม่มีบนฐาน = PostgREST ตอบ PGRST202 · แยกให้ออกจาก error อื่น
+     เพราะกรณีนี้ต้อง "บอกให้ครูไปรัน SQL" ไม่ใช่ "ลองใหม่อีกครั้ง" */
+  const missingRpc = (e) => String(e.code) === 'PGRST202' || e.status === 404
+    || /could not find the function|does not exist/i.test(String(e.message || ''));
+
+  /* ผูกห้องที่ค้างอยู่ทั้งหมดเข้าบัญชีที่เพิ่งล็อกอิน — เรียกครั้งเดียวตอน boot
+     กุญแจที่ฐานบอกว่าใช้ไม่ได้แล้ว (ผูกไปแล้ว/หมดอายุ) ถูกทิ้งไปเลย ไม่ต้องค้างกวนใจอีก
+     แต่ถ้าฐานยังไม่มีคำสั่งนี้ (ยังไม่รัน 60) ต้อง **ไม่ทิ้ง** ไม่งั้นครูเสียห้องเพราะ SQL ยังไม่ได้รัน */
+  async function claimPending() {
+    const pend = claimsRead();
+    if (!pend.length) return;
+    const done = [];
+    for (const c of pend) {
+      if (!c || !c.token) { claimDrop(c && c.token); continue; }
+      try {
+        const r = await G.rpc('rpc_claim_room', { p_token: c.token });
+        claimDrop(c.token);
+        done.push((r && r.name) || c.name || 'ห้องเรียน');
+      } catch (e) {
+        if (missingRpc(e)) {
+          showErr('มีห้องที่สร้างไว้ก่อนล็อกอินรออยู่ แต่ฐานข้อมูลยังไม่มีคำสั่งผูกห้อง — '
+            + 'รัน 60_ROOM_CLAIM.sql บน Supabase แล้วเปิดหน้านี้ใหม่ · ห้องยังอยู่ครบ ไม่ได้หายไปไหน');
+          return;                       /* ตัวอื่นก็จะพังเหมือนกัน ไม่ต้องยิงซ้ำ */
+        }
+        claimDrop(c.token);             /* ผูกไปแล้ว หรือหมดอายุ — เก็บไว้ก็ไม่มีประโยชน์ */
+      }
+    }
+    if (done.length) {
+      showOk('🔗 ผูกห้องที่สร้างไว้ก่อนล็อกอินเข้าบัญชีนี้แล้ว: <b>' + G.esc(done.join(' · ')) + '</b>');
+    }
+  }
+
+  /* ---------- ฟอร์มสร้างห้องบนหน้า login ----------
+     ใช้ช่อง "โรงเรียน" เป็นข้อความล้วน ไม่ใช่รายการให้เลือกเหมือนฟอร์มปกติ
+     เพราะตอนยังไม่ล็อกอินอาจอ่านตารางโรงเรียนไม่ได้ (แล้วแต่ RLS ของแต่ละฐาน)
+     ฝั่ง SQL รับชื่อโรงเรียนแล้วหาให้เอง มีอยู่แล้วก็ใช้ของเดิม ไม่สร้างซ้ำ */
+  function mountOpenRoom() {
+    renderClaimList();
+    const btn = $('btn-open-room');
+    if (btn) btn.onclick = function () {
+      $('open-room-box').classList.add('hidden');
+      const box = $('open-room-form');
+      box.innerHTML = '<h2 style="margin:0 0 10px;font-size:16px">🏫 สร้างห้องเรียน (ยังไม่ต้องล็อกอิน)</h2>'
+        + '<div class="rf">'
+        + '<div><label class="f" for="or-grade">ระดับชั้น</label>'
+        +   '<input type="text" id="or-grade" list="or-grades" placeholder="เช่น ป.4">'
+        +   '<datalist id="or-grades">' + GRADES.map((g) => '<option value="' + g + '">').join('') + '</datalist></div>'
+        + '<div><label class="f" for="or-no">ห้องที่</label>'
+        +   '<input type="text" id="or-no" inputmode="numeric" placeholder="เช่น 1"></div>'
+        + '<div><label class="f" for="or-school">โรงเรียน</label>'
+        +   '<input type="text" id="or-school" placeholder="พิมพ์ชื่อโรงเรียน"></div>'
+        + '<div><label class="f" for="or-year">ปีการศึกษา</label>'
+        +   '<input type="text" id="or-year" inputmode="numeric" value="' + G.esc(thaiYear()) + '"></div>'
+        + '<div><label class="f" for="or-listed">วิธีเข้าห้องของนักเรียน</label><select id="or-listed">'
+        +   '<option value="1" selected>โค้ดหรือค้นหาชื่อโรงเรียน (แนะนำ)</option>'
+        +   '<option value="0">โค้ดเท่านั้น</option></select></div>'
+        + '</div><div id="or-warn"></div>'
+        + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
+        +   '<button class="btn btn-primary" id="or-go">+ สร้างห้อง</button>'
+        +   '<button class="btn" id="or-cancel">ยกเลิก</button></div>'
+        + '<div class="err-box on" style="margin-top:12px">⚠️ <b>ห้องนี้จะผูกอยู่กับเบราว์เซอร์ตัวนี้</b> '
+        + 'จนกว่าจะล็อกอินแล้วกดผูกเข้าบัญชี<br>ถ้าล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่องก่อนผูก '
+        + '<b>จะเข้าไปจัดการห้องไม่ได้อีก</b> (นักเรียนยังเล่นด้วยโค้ดเดิมได้ ข้อมูลไม่หาย แต่ครูแก้อะไรไม่ได้)<br>'
+        + 'ถ้าสะดวกล็อกอินตอนนี้ ล็อกอินก่อนจะปลอดภัยกว่า</div>';
+      box.classList.remove('hidden');
+      const ls = $('or-listed'), wr = $('or-warn');
+      const paint = () => { wr.innerHTML = listedWarn(ls.value === '1'); };
+      ls.onchange = paint; paint();
+      $('or-cancel').onclick = function () {
+        box.classList.add('hidden'); box.innerHTML = '';
+        $('open-room-box').classList.remove('hidden');
+      };
+      $('or-go').onclick = createRoomOpen;
+      $('or-grade').focus();
+    };
+  }
+
+  async function createRoomOpen() {
+    clearErr();
+    const grade = ($('or-grade').value || '').trim();
+    if (!grade) { showErr('ใส่ระดับชั้นก่อน เช่น ป.4'); $('or-grade').focus(); return; }
+    const btn = $('or-go'); btn.disabled = true; btn.textContent = 'กำลังสร้าง…';
+    try {
+      const r = await G.rpc('rpc_create_room_open', {
+        p_grade: grade,
+        p_room_no: ($('or-no').value || '').trim() || null,
+        p_school_name: ($('or-school').value || '').trim() || null,
+        p_academic_year: ($('or-year').value || '').trim() || null,
+        p_listed: $('or-listed').value === '1',
+      });
+      if (!r || !r.ok) throw new Error('สร้างห้องไม่สำเร็จ');
+      claimAdd({ token: r.claim_token, name: r.name, join_key: r.join_key, at: Date.now() });
+      $('open-room-form').classList.add('hidden');
+      $('open-room-form').innerHTML = '';
+      $('open-room-box').classList.remove('hidden');
+      renderClaimList();
+      showOk('🏫 สร้างห้อง <b>' + G.esc(r.name) + '</b> แล้ว · โค้ดเข้าห้อง <b>' + G.esc(r.join_key) + '</b>');
+    } catch (e) {
+      showErr(missingRpc(e)
+        ? 'ยังสร้างห้องแบบไม่ล็อกอินไม่ได้ — ฐานข้อมูลยังไม่มีคำสั่งนี้ · รัน 60_ROOM_CLAIM.sql บน Supabase ก่อน'
+        : 'สร้างห้องไม่สำเร็จ: ' + e.message);
+      btn.disabled = false; btn.textContent = '+ สร้างห้อง';
+    }
+  }
+
+  /* รายการห้องที่สร้างไว้แต่ยังไม่ได้ผูกบัญชี — โชว์บนหน้า login ให้ครูเห็นว่ายังอยู่
+     พร้อมโค้ดเข้าห้องและใบแจกโค้ด จะได้ใช้งานได้จริงตั้งแต่ยังไม่ล็อกอิน */
+  function renderClaimList() {
+    const box = $('claim-list'); if (!box) return;
+    const list = claimsRead();
+    if (!list.length) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="ok-box on" style="margin-bottom:12px">'
+      + '<b>ห้องที่สร้างไว้จากเครื่องนี้ ' + list.length + ' ห้อง</b> — ยังไม่ได้ผูกเข้าบัญชี<br>'
+      + list.map((c) => '🏫 ' + G.esc(c.name || 'ห้องเรียน')
+          + ' · โค้ด <span class="joinkey">' + G.esc(c.join_key || '–') + '</span>'
+          + ' <button class="btn btn-sm" data-copy="' + G.esc(c.join_key || '') + '">คัดลอก</button>').join('<br>')
+      + '<div class="muted small" style="margin-top:8px">เข้าสู่ระบบด้วยปุ่มด้านบน '
+      + 'แล้วห้องเหล่านี้จะถูกผูกเข้าบัญชีให้อัตโนมัติ</div></div>';
+  }
 
   /* ===================== เริ่มต้น ===================== */
   async function boot() {
     G.captureOAuthReturn();
     const ok = await G.ensure();
-    if (!ok) { $('v-login').classList.remove('hidden'); return; }
+    if (!ok) { $('v-login').classList.remove('hidden'); mountOpenRoom(); return; }
     $('v-login').classList.add('hidden');
     $('v-app').classList.remove('hidden');
     $('btn-logout').classList.remove('hidden');
     try {
       S.teacher = await G.ensureTeacherRow();
+      /* ผูกห้องที่สร้างไว้ก่อนล็อกอิน **ก่อน** โหลดข้อมูล — ไม่งั้นห้องที่เพิ่งผูกจะยังไม่โผล่
+         จนกว่าครูจะรีเฟรชเอง ซึ่งดูเหมือนการผูกไม่สำเร็จ */
+      await claimPending();
       if (G.refreshModeSwitch) G.refreshModeSwitch();   /* ปุ่มสลับโหมด (เฉพาะ admin) */
       /* โชว์แค่ชื่อ — อีเมลยาวเกินจนเบียดเมนูหัวเว็บ เก็บไว้ใน tooltip แทน */
       const nm = (S.teacher && S.teacher.display_name) || 'ครู';
@@ -144,13 +330,22 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   async function loadAll() {
     const uid = G.session().user_id;
 
-    const [games, rooms, frameworks, coverage, schools] = await Promise.all([
+    const [games, roomsRaw, frameworks, coverage, schools, has43] = await Promise.all([
       G.get('/rest/v1/games?select=id,code,name,status,launch_url,dashboard_url,minimum_grade,maximum_grade&order=name'),
       G.get('/rest/v1/classrooms?select=*&teacher_id=eq.' + encodeURIComponent(uid) + '&order=created_at.desc'),
       soft('/rest/v1/assessment_frameworks?select=code,kind,name_th,status,level_scale&status=eq.active'),
       soft('/rest/v1/v_framework_coverage?select=*&depth=eq.1'),
       soft('/rest/v1/schools?select=id,name&order=name'),
+      /* ถามฐานตรง ๆ ว่ามีมุมมองใบรายงานผลหรือยัง — ถามแถวเดียวพอ ไม่ได้เอาข้อมูล
+         ต้องถามแยก เพราะการดึงข้อมูลจริงด้านล่างใช้ soft() ซึ่งกลืน error เป็นอาเรย์ว่าง
+         ทำให้ "ไม่มีตาราง" กับ "มีตารางแต่ยังไม่มีข้อมูล" หน้าตาเหมือนกันเป๊ะ */
+      G.get('/rest/v1/v_student_achievement?select=student_id&limit=1')
+        .then(() => true).catch(() => false),
     ]);
+
+    /* ตัดห้องผู้เล่นทั่วไปทิ้งตั้งแต่ประตูเข้า — จุดเดียวจบ ทุกอย่างที่อ่าน S.rooms จึงสะอาดตามไปหมด
+       (ตัวกรองห้อง · รายการห้อง · หน้าห้อง · ยอดรวม · และ id ที่ใช้ดึงนักเรียนระลอกถัดไป) */
+    const rooms = roomsRaw.filter((r) => !isPublicRoom(r));
 
     const rid = rooms.map((r) => r.id);
     const [cg, students, summary, itemSummary, itemProfile, comp, compDims, achieve] = await Promise.all([
@@ -176,7 +371,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
     Object.assign(S, { games, rooms, cg, students, progress, summary, eventsCount: evCount,
       frameworks, coverage, itemSummary, itemProfile, comp,
-      compDims: compDims || [], achieve: achieve || [], schools: schools || [] });
+      compDims: compDims || [], achieve: achieve || [], schools: schools || [], has43: has43 });
   }
 
   const gameById = (id) => S.games.find((g) => g.id === id);
@@ -200,13 +395,58 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   const itemsOf = (fcode) => S.coverage.filter((c) => c.framework_code === fcode)
     .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
+  /* ---------- ตัวกรองรายเกม ----------
+     ต้องอ่านได้ทุกทรงของข้อมูล เพราะแต่ละมุมมองบอก "เกมไหน" คนละแบบ:
+       v_student_achievement → game_id · v_student_competency → game_code
+       v_student_comp_dims   → มีแต่ game_name (ไม่มีรหัสเกมเลย)
+     เทียบเท่าที่แถวนั้นมี · แถวที่ไม่บอกเกมเลย = ถือว่าไม่ตรง ไม่งั้นตอนกรองเกมหนึ่ง
+     ตัวเลขของเกมอื่นจะไหลเข้ามาปนโดยที่ครูไม่มีทางรู้ */
+  function rowGameOk(x) {
+    if (!GAME || !x) return true;
+    const g = gameById(GAME);
+    if (!g) return true;                                  /* เกมหายจากทะเบียน — ไม่กรองดีกว่าโชว์ว่าง */
+    if (x.game_id != null) return x.game_id === GAME;
+    if (x.game_code != null) return x.game_code === g.code;
+    if (x.game_name != null) return x.game_name === g.name;
+    return false;
+  }
+  /* เกมที่เลือกได้ในตัวกรอง = เกมที่ "เปิดใช้จริง" ในขอบเขตที่ดูอยู่ ไม่ใช่เกมทั้งทะเบียน
+     ครูมีเกมเดียวก็ไม่ต้องมีตัวกรอง ไม่มีอะไรให้เลือก */
+  function gamesInScope(cid) {
+    const ids = new Set(S.cg.filter((x) => x.is_enabled && (!cid || x.classroom_id === cid))
+      .map((x) => x.game_id));
+    return S.games.filter((g) => ids.has(g.id));
+  }
+
+  /* ---------- กล่องบอกสถานะท่อข้อมูล ----------
+     หน้าจอว่างเกิดได้จาก 2 เรื่องที่ครูต้องทำคนละอย่าง และแยกกันเองจากหน้าจอไม่ได้เลย:
+       ท่อยังไม่มี  → ยังไม่ได้รัน 43_REPORT_CARDS.sql (ฐานยังไม่มีมุมมองใบรายงานผล)
+       ท่อมีแต่แห้ง → รันแล้ว แต่ยังไม่มีเกมไหนส่งใบรายงานผลเข้ามาสักใบ
+     ทั้งคู่ไม่ใช่บั๊กของหน้าจอ — อาการที่ครูเจอ (สมรรถนะขึ้นด้านเดียว ผลสัมฤทธิ์ว่าง) คือกรณีแรก
+     เขียนบอกตรงจุดที่ว่าง ดีกว่าให้ครูไปไล่หาผิดที่ */
+  function pipeNote(hasRows) {
+    if (hasRows) return '';
+    if (S.has43 === false) {
+      return '<div class="warn-note pipe">🚧 <b>ยังไม่ได้รัน <code>43_REPORT_CARDS.sql</code></b> — '
+        + 'ฐานข้อมูลยังไม่มีที่เก็บ "ใบรายงานผล" ที่เกมส่งมา ตรงนี้จึงว่างไว้ก่อน '
+        + '<b>ไม่ใช่ความผิดพลาดของหน้าจอ</b><br>'
+        + 'รันตามลำดับใน <code>README_DEPLOY.md</code> แล้วรีเฟรชหน้านี้ ตัวเลขจะขึ้นเองโดยไม่ต้องแก้อะไรอีก</div>';
+    }
+    if (S.has43 == null) return '';       /* ตรวจไม่ได้ (เน็ตหลุดตอนโหลด) — ไม่เดาให้ครู */
+    return '<div class="warn-note pipe">⏳ <b>รัน <code>43_REPORT_CARDS.sql</code> แล้ว '
+      + 'แต่ยังไม่มีเกมส่งใบรายงานผลเข้ามา</b> — ท่อพร้อมแล้ว รออีกฝั่งส่งข้อมูล<br>'
+      + 'เกมจะส่งให้ตอน<b>เปิดหน้าครูของเกมนั้นสักครั้ง</b> (เกมเป็นผู้คิดคะแนนและเป็นผู้ส่ง '
+      + 'เว็บกลางรับมาแสดงอย่างเดียว) · เปิดครั้งเดียวแล้วกลับมารีเฟรชหน้านี้</div>';
+  }
+
   /* ===================== routing ===================== */
   /* เมนูหน้าครูอยู่บนแถบหัวเว็บแล้ว (ดู .navlinks ด้านบน) — ที่นี่แค่ทำหน้าที่ติดสถานะ
      "กำลังอยู่หน้านี้" ให้ลิงก์ตัวที่ตรงกับ route ปัจจุบัน · หน้าลูก (#/room/..., #/student/...)
      นับเป็น Dashboard เพราะเดินเข้ามาจากหน้านั้น */
   function syncNav() {
     const h = location.hash || '#/';
-    const cur = h.indexOf('#/rooms') === 0 ? '#/rooms' : '#/';
+    const cur = h.indexOf('#/rooms') === 0 ? '#/rooms'
+      : (h.indexOf('#/browse') === 0 ? '#/browse' : '#/');
     document.querySelectorAll('.navlinks a[data-nav]').forEach((a) => {
       const on = a.getAttribute('data-nav') === cur;
       a.classList.toggle('on', on);
@@ -219,6 +459,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     syncNav();
     const h = location.hash || '#/';
     if (h.indexOf('#/rooms') === 0) { $('crumb').classList.add('hidden'); return renderRooms(); }
+    if (h.indexOf('#/browse') === 0) { $('crumb').classList.add('hidden'); return renderBrowse(); }
     /* #/standards ย้ายไปหน้า standards.html (เปิดดูได้โดยไม่ต้องล็อกอิน) — ลิงก์เก่าพาไปที่นั่น */
     if (h.indexOf('#/standards') === 0) { location.replace('standards.html'); return; }
     const mRoom = h.match(/^#\/room\/([0-9a-f-]+)/i);
@@ -267,47 +508,78 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   /* ===================== หน้ารวม ===================== */
-  /* แถบเลือกห้อง — ถ้ามีห้องเดียวก็ไม่ต้องมี ไม่มีอะไรให้เลือก */
-  function roomPicker() {
-    if (S.rooms.length < 2) return '';
-    const cur = ROOM;
-    return '<div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">'
-      + '<label for="room-pick" style="font-weight:600">ดูข้อมูลของ</label>'
-      + '<select id="room-pick" style="max-width:320px">'
-      +   '<option value=""' + (cur === '' ? ' selected' : '') + '>ทุกห้องของฉัน ('
-      +     S.rooms.length + ' ห้อง)</option>'
-      +   S.rooms.map((r) => '<option value="' + G.esc(r.id) + '"'
-          + (cur === r.id ? ' selected' : '') + '>' + G.esc(r.name)
-          + ' — นักเรียน ' + studentsOf(r.id).filter(isOn).length + ' คน</option>').join('')
-      + '</select>'
-      + (cur ? '<a class="btn btn-sm" href="#/room/' + G.esc(cur) + '">เปิดหน้าห้องนี้ →</a>' : '')
-      + '</div>';
+  /* แถบตัวกรอง — เลือกห้อง และ/หรือ เกม · มิติไหนมีตัวเลือกเดียวก็ไม่ต้องโชว์ ไม่มีอะไรให้เลือก
+     cid ที่ส่งเข้ามา = ห้องที่หน้านั้นล็อกไว้แล้ว (หน้าห้อง) → ไม่ต้องมีช่องเลือกห้องอีก */
+  function pickerBar(cid) {
+    const rooms = !cid && S.rooms.length >= 2;
+    const glist = gamesInScope(cid || ROOM || null);
+    const games = glist.length >= 2;
+    if (!rooms && !games) return '';
+
+    let html = '<div class="card pickbar">';
+    if (rooms) {
+      html += '<label for="room-pick">ดูข้อมูลของ</label>'
+        + '<select id="room-pick">'
+        +   '<option value=""' + (ROOM === '' ? ' selected' : '') + '>ทุกห้องของฉัน ('
+        +     S.rooms.length + ' ห้อง)</option>'
+        +   S.rooms.map((r) => '<option value="' + G.esc(r.id) + '"'
+            + (ROOM === r.id ? ' selected' : '') + '>' + G.esc(r.name)
+            + ' — นักเรียน ' + studentsOf(r.id).filter(isOn).length + ' คน</option>').join('')
+        + '</select>';
+    }
+    if (games) {
+      html += '<label for="game-pick">เฉพาะเกม</label>'
+        + '<select id="game-pick">'
+        +   '<option value=""' + (GAME === '' ? ' selected' : '') + '>ทุกเกม ('
+        +     glist.length + ' เกม)</option>'
+        +   glist.map((g) => '<option value="' + G.esc(g.id) + '"'
+            + (GAME === g.id ? ' selected' : '') + '>' + G.esc(g.name) + '</option>').join('')
+        + '</select>';
+    }
+    if (!cid && ROOM) html += '<a class="btn btn-sm" href="#/room/' + G.esc(ROOM) + '">เปิดหน้าห้องนี้ →</a>';
+    return html + '</div>';
+  }
+
+  /* ผูกช่องเลือกทั้งสอง — เรียกหลังวาดทุกครั้ง · redraw = ฟังก์ชันวาดหน้าที่กำลังอยู่
+     เปลี่ยนห้อง = ล้างตัวกรองเกมด้วย เพราะห้องใหม่อาจไม่ได้เปิดเกมนั้น
+     ถ้าไม่ล้าง ครูจะเจอหน้าว่างเปล่าโดยที่ช่อง "เฉพาะเกม" ยังค้างชื่อเกมที่ห้องนี้ไม่มี */
+  function bindPickers(redraw) {
+    const rp = $('room-pick');
+    if (rp) rp.onchange = function () { ROOM = rp.value; GAME = ''; redraw(); };
+    const gp = $('game-pick');
+    if (gp) gp.onchange = function () { GAME = gp.value; redraw(); };
   }
 
   function renderHome() {
     /* กรองทุกอย่างด้วยห้องที่เลือกไว้ — cid = null คือรวมทุกห้อง (ฟังก์ชันด้านล่างรับกติกานี้อยู่แล้ว) */
     const cid = ROOM || null;
+    /* เกมที่เลือกค้างไว้อาจไม่มีในขอบเขตปัจจุบันแล้ว (ครูปิดเกมนั้นไป) — ล้างทิ้งก่อนวาด
+       ไม่งั้นหน้าจะว่างทั้งหน้าโดยไม่มีอะไรบอกว่าเพราะตัวกรองที่มองไม่เห็น */
+    if (GAME && !gamesInScope(cid).some((g) => g.id === GAME)) GAME = '';
     const inRoom = (x) => !cid || x.classroom_id === cid;
     const myStu = S.students.filter((x) => inRoom(x));
     const stuIds = new Set(myStu.map((x) => x.id));
-    const cgRows = S.cg.filter((x) => x.is_enabled && inRoom(x));
+    const cgRows = S.cg.filter((x) => x.is_enabled && inRoom(x) && rowGameOk(x));
     const activeGames = new Set(cgRows.map((x) => x.game_id)).size;
     const off = offIds();
     const stuOn = myStu.filter(isOn).length;
     /* ค่าเฉลี่ยของห้องไม่รวมคนที่ปิดการใช้งาน — ไม่งั้นเลขบนเว็บกลางจะไม่ตรงกับหน้าครูของเกม */
-    const prog = S.progress.filter((p) => !off.has(p.student_id) && stuIds.has(p.student_id));
+    const prog = S.progress.filter((p) => !off.has(p.student_id) && stuIds.has(p.student_id) && rowGameOk(p));
     const avgProg = prog.length ? prog.reduce((a, p) => a + (Number(p.progress_percent) || 0), 0) / prog.length : null;
-    const totalAttempts = S.summary.filter(inRoom).reduce((a, r) => a + (Number(r.total_attempts) || 0), 0);
+    const totalAttempts = S.summary.filter((r) => inRoom(r) && rowGameOk(r))
+      .reduce((a, r) => a + (Number(r.total_attempts) || 0), 0);
     const offHere = myStu.filter((x) => x.is_active === false).length;
 
-    let html = roomPicker() + '<div class="tiles">'
+    let html = pickerBar(null) + '<div class="tiles">'
       + tile('ห้องเรียน', G.fmtInt(cid ? 1 : S.rooms.length))
       + tile('นักเรียน', G.fmtInt(stuOn), offHere ? '· ปิด ' + offHere : '')
       + tile('เกมที่ใช้งาน', G.fmtInt(activeGames))
       + tile('ความคืบหน้าเฉลี่ย', avgProg == null ? '–' : Math.round(avgProg), avgProg == null ? '' : '%')
       + tile('รอบที่ส่งผล', G.fmtInt(totalAttempts))
+      /* "บันทึกการเล่นสะสม" นับจากตาราง events ซึ่งนับรวมทั้งบัญชี แยกรายห้อง/รายเกมไม่ได้
+         จึงแสดง – เมื่อกรอง แทนที่จะโชว์เลขรวมทั้งหมดข้างตัวเลขที่กรองแล้ว ซึ่งอ่านผิดแน่นอน */
       + tile('บันทึกการเล่นสะสม',
-          cid ? '–' : (S.eventsCount == null ? '–' : G.fmtInt(S.eventsCount)))
+          (cid || GAME) ? '–' : (S.eventsCount == null ? '–' : G.fmtInt(S.eventsCount)))
       + '</div>';
 
     html += tabs();
@@ -317,7 +589,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     } else if (TAB === 'comp') {
       html += comp6Section(cid) + comp6Table(cid) + compSection(cid);
     } else {
-      html += achSummaryCards(cid);
+      html += pipeNote(achRows(cid).length > 0) + achSummaryCards(cid);
       /* รายการห้องตามตัวกรองด้วย — ไม่งั้นครูเลือกห้องเดียวแล้วยังเห็นทุกห้องข้างล่าง
          จะไม่แน่ใจว่าตัวเลขด้านบนเป็นของห้องไหน */
       const showRooms = cid ? S.rooms.filter((r) => r.id === cid) : S.rooms;
@@ -329,8 +601,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
     $('content').innerHTML = html;
     const go = $('nr-go'); if (go) go.onclick = createRoom;
-    const pick = $('room-pick');
-    if (pick) pick.onchange = function () { ROOM = pick.value; renderHome(); };
+    bindPickers(renderHome);
   }
 
   /** ส่วนสมรรถนะ — classroomId = null หมายถึงรวมทุกห้องของครู */
@@ -430,7 +701,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   function agg6(cid) {
     const off = offIds();
-    const rows = (S.compDims || []).filter((r) => (!cid || r.classroom_id === cid) && !off.has(r.student_id));
+    const rows = (S.compDims || []).filter((r) => (!cid || r.classroom_id === cid)
+      && !off.has(r.student_id) && rowGameOk(r));
     return COMP6.map(function ([code, name, short]) {
       const rs = rows.filter((r) => r.comp_code === code);
       const scored = rs.filter((r) => r.evidence !== 'self_report');
@@ -523,7 +795,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      เซลล์แสดงระดับ (คำ) นำหน้าเสมอตามมาตรฐาน 07 ข้อ 3.2 · ไม่มีข้อมูล = เว้น ไม่ใส่ 0 */
   function comp6Table(cid) {
     const rows = (S.compDims || []).filter((r) => (!cid || r.classroom_id === cid)
-      && r.evidence !== 'self_report');
+      && r.evidence !== 'self_report' && rowGameOk(r));
     if (!rows.length) return '';
     const ids = [...new Set(rows.map((r) => r.student_id))];
     const stu = S.students.filter((x) => ids.indexOf(x.id) >= 0).sort(G.byStudentNo);
@@ -563,9 +835,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let html = '<h2 class="section-title">สมรรถนะหลัก 6 ด้าน '
       + '<span class="sub">ค่าที่เกมคิดแล้วส่งมา — เว็บกลางไม่คิดซ้ำ</span></h2>';
     if (!any) {
-      return html + '<div class="card muted">ยังไม่มีเกมส่งผลสมรรถนะรายด้านเข้ามา — '
-        + 'รัน <code>43_REPORT_CARDS.sql</code> แล้วให้เกมส่ง "ใบรายงานผล" ตัวเลขจะขึ้นที่นี่เอง '
-        + '(ผลการคิดขั้นสูงของเกมที่ส่งผ่านช่องเดิมจะถูกย้ายมาให้อัตโนมัติ)</div>';
+      /* กล่องเดียวกับฝั่งผลสัมฤทธิ์ — แยกให้ครูเห็นว่า "ยังไม่มีท่อ" กับ "ท่อแห้ง" คนละเรื่องกัน
+         (เดิมเขียนรวมเป็นข้อความเดียวว่าให้รัน 43 ทั้งที่บางทีรันไปแล้วนานแล้ว) */
+      return html + pipeNote(false)
+        + '<div class="card muted">เมื่อเกมส่ง "ใบรายงานผล" เข้ามา ตัวเลขทั้ง 6 ด้านจะขึ้นที่นี่เอง '
+        + 'โดยไม่ต้องแก้อะไรที่หน้านี้ — ผลการคิดขั้นสูงที่เกมเคยส่งผ่านช่องเดิมจะถูกย้ายมาให้อัตโนมัติ</div>';
     }
     const bars = ds.map(function (d) {
       const meta = d.n ? ('จาก ' + d.games.length + ' เกม · ' + d.students + ' คน') : '';
@@ -682,9 +956,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   function achOf(sid, gid) {
     return (S.achieve || []).find((x) => x.student_id === sid && x.game_id === gid) || null;
   }
-  function achSummaryCards(cid) {
+  /* แถวใบผลสัมฤทธิ์ในขอบเขตที่ดูอยู่ — แยกออกมาเพราะ pipeNote ต้องรู้ว่า "มีแถวไหม"
+     ก่อนที่การ์ดสรุปจะถูกวาด (การ์ดคืนสตริงว่างเมื่อไม่มีข้อมูล จึงถามมันไม่ได้) */
+  function achRows(cid) {
     const off = offIds();
-    const rows = (S.achieve || []).filter((r) => (!cid || r.classroom_id === cid) && !off.has(r.student_id));
+    return (S.achieve || []).filter((r) => (!cid || r.classroom_id === cid)
+      && !off.has(r.student_id) && rowGameOk(r));
+  }
+  function achSummaryCards(cid) {
+    const rows = achRows(cid);
     if (!rows.length) return '';
     const byGame = {};
     rows.forEach(function (r) { (byGame[r.game_name] = byGame[r.game_name] || []).push(r); });
@@ -706,7 +986,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
 
-  const compRows = (cid) => (S.comp || []).filter((r) => !cid || r.classroom_id === cid);
+  const compRows = (cid) => (S.comp || [])
+    .filter((r) => (!cid || r.classroom_id === cid) && rowGameOk(r));
 
   function avgOf(rows, key) {
     const v = rows.map((r) => Number(r[key])).filter((n) => !isNaN(n));
@@ -1032,15 +1313,70 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + '<div class="rr-code"><span class="joinkey">' + G.esc(r.join_key) + '</span>'
       +   '<button class="btn btn-sm" data-copy="' + G.esc(r.join_key) + '">คัดลอก</button>'
       +   '<button class="btn btn-sm" data-sheet="' + r.id + '">🖨 ใบแจกโค้ด</button></div>'
+      /* แถวปุ่มการทำงานครบชุดเหมือนการ์ดห้องในหน้าเกม — ครูสั่งให้เท่ากัน
+         เรียงตามความถี่ที่ใช้จริง: ดูผล → แชร์ให้เด็ก → แก้ไข → ส่งออก → ปิด → ลบ
+         ปุ่มลบอยู่ท้ายสุดเสมอ ไม่ให้อยู่ติดปุ่มที่กดบ่อย */
       + '<div class="rr-act">'
       +   '<a class="btn btn-sm btn-primary" href="#/room/' + r.id + '">ดูผล / รายชื่อ →</a>'
+      +   '<button class="btn btn-sm" data-share="' + r.id + '">🔗 แชร์ลิงก์</button>'
       +   '<button class="btn btn-sm" data-edit-room="' + r.id + '">✏️ แก้ไข</button>'
+      +   '<button class="btn btn-sm" data-csv="' + r.id + '">⬇ CSV รายชื่อ</button>'
       +   '<button class="btn btn-sm" data-toggle-room="' + r.id + '">'
       +     (r.is_active === false ? 'เปิดห้อง' : 'ปิดห้องชั่วคราว') + '</button>'
       +   '<button class="btn btn-sm btn-danger" data-del-room="' + r.id + '">🗑 ลบห้อง</button></div>'
+      + '<div class="rr-box hidden" data-sharebox="' + r.id + '"></div>'
       + '<div class="rr-box hidden" data-delbox="' + r.id + '"></div>'
       + '<div class="rr-box hidden" data-editbox="' + r.id + '"></div>'
       + '</div>';
+  }
+
+  /* ลิงก์เข้าห้องแบบกดครั้งเดียว — ?join=โค้ด หน้าแรกจะกรอกและตรวจให้เอง (ดู index.html)
+     ใช้ origin ของหน้าที่เปิดอยู่ ไม่ hard-code โดเมน จะได้ทดสอบบนเครื่องหรือย้ายโดเมนก็ยังถูก */
+  function joinLink(key) {
+    return location.origin + '/?join=' + encodeURIComponent(key);
+  }
+  function shareMessage(r) {
+    return 'เข้าห้องเรียน ' + r.name + '\n'
+      + 'กดลิงก์นี้แล้วเลือกชื่อตัวเองได้เลย\n' + joinLink(r.join_key) + '\n'
+      + 'หรือเปิด ' + location.host + ' แล้วใส่โค้ด ' + r.join_key;
+  }
+
+  /* ชื่อไฟล์ที่ดาวน์โหลด **ต้องเป็นตัวอักษรอังกฤษล้วน**
+     ⚠️ วัดจริงบน Chromium แล้ว: ถ้า download="…" มีอักษรไทยแม้ตัวเดียว เบราว์เซอร์จะทิ้งชื่อทั้งอัน
+        แล้วเซฟเป็นไฟล์ชื่อ "download" เฉย ๆ (ทดสอบทั้ง locale en-US และ th-TH ได้ผลเหมือนกัน)
+        ครูโหลด 5 ห้องก็จะได้ download, download(1), download(2)… แยกไม่ออกว่าห้องไหน
+     จึงแปลงระดับชั้นเป็นอักษรย่อที่ครูไทยอ่านออกอยู่แล้ว (ป.4/1 → P4-1) แล้วต่อท้ายด้วยโค้ดห้อง
+     ซึ่งไม่ซ้ำกันทั้งระบบ — ได้ชื่อแบบ GamePlearn-P4-1-ABC123.csv */
+  const GRADE_ASCII = { 'อ': 'K', 'ป': 'P', 'ม': 'M' };
+  function csvName(r) {
+    const part = String(r.name || '')
+      /* กินจุดที่ตามหลังอักษรย่อระดับชั้นไปด้วย ไม่งั้น "ป.4/1" จะได้ P-4-1 ที่อ่านสะดุด */
+      .replace(/([อปม])\s*\.?\s*/g, (m, c) => GRADE_ASCII[c] || '')
+      .replace(/[^A-Za-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return 'GamePlearn-' + (part ? part + '-' : '') + (r.join_key || 'room') + '.csv';
+  }
+
+  /* ส่งออกรายชื่อเป็น CSV — เปิดใน Excel ได้ตรง ๆ
+     ต้องมี BOM นำหน้าและใช้ CRLF ไม่งั้น Excel บนวินโดวส์อ่านภาษาไทยเป็นตัวขยะ
+     (เปิดแล้วเห็น "à¸ª" คือลืม BOM — เคยเป็นปัญหาซ้ำ ๆ กับไฟล์ภาษาไทยทุกโครงการ) */
+  function roomCsv(id) {
+    const r = roomById(id); if (!r) return;
+    const stu = studentsOf(id);
+    const head = ['เลขที่', 'ชื่อ', 'นามสกุล', 'ชื่อในเกม', 'PIN', 'สถานะ'];
+    const body = stu.map((s) => [s.student_number || '', s.first_name || '', s.last_name || '',
+      s.character_name || '', s.join_pin || '', s.is_active === false ? 'ปิดการใช้งาน' : 'ใช้งาน']);
+    const cell = (v) => '"' + String(v).replace(/"/g, '""') + '"';
+    const csv = '﻿' + [head].concat(body).map((row) => row.map(cell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = csvName(r);
+    document.body.appendChild(a); a.click();
+    /* ⚠️ อย่าถอดลิงก์ออกทันทีหลัง click() — เบราว์เซอร์อ่านชื่อไฟล์จากแท็กนี้แบบไม่พร้อมกัน
+       ถอดเร็วไปจะได้ไฟล์ชื่อ "download" เฉย ๆ แทนชื่อห้อง (วัดจริงบน Chromium แล้ว) */
+    setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 4000);
+    showOk('⬇ ส่งออกรายชื่อห้อง <b>' + G.esc(r.name) + '</b> แล้ว ' + stu.length + ' คน '
+      + '(เปิดด้วย Excel ได้เลย ภาษาไทยไม่เพี้ยน)');
   }
 
   function bindRoomActions() {
@@ -1074,6 +1410,102 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     document.querySelectorAll('[data-sheet]').forEach(function (b) {
       b.onclick = () => codeSheet(b.getAttribute('data-sheet'));
     });
+    document.querySelectorAll('[data-csv]').forEach(function (b) {
+      b.onclick = () => roomCsv(b.getAttribute('data-csv'));
+    });
+
+    /* ---- แชร์ลิงก์เข้าห้อง ----
+       ครูส่งต่อในไลน์กลุ่มผู้ปกครองเป็นงานประจำ — ให้ทั้งลิงก์และข้อความที่ก๊อปแล้วส่งได้เลย
+       ไม่ใช่ให้ครูมานั่งพิมพ์ประกอบเอง (หน้าเกมมีให้แบบนี้อยู่แล้ว) */
+    document.querySelectorAll('[data-share]').forEach(function (b) {
+      b.onclick = function () {
+        const id = b.getAttribute('data-share');
+        const box = document.querySelector('[data-sharebox="' + id + '"]');
+        const r = roomById(id);
+        if (!r || !box) return;
+        if (!box.classList.contains('hidden')) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+        const link = joinLink(r.join_key), msg = shareMessage(r);
+        box.innerHTML = '<div style="border-top:1px solid var(--grid);margin-top:12px;padding-top:12px">'
+          + '<label class="f" for="sh-link-' + id + '">ลิงก์เข้าห้อง (กดแล้วเข้าได้เลย ไม่ต้องพิมพ์โค้ด)</label>'
+          + '<input type="text" id="sh-link-' + id + '" readonly value="' + G.esc(link) + '">'
+          + '<div style="margin:8px 0"><button class="btn btn-sm" data-copy="' + G.esc(link) + '">คัดลอกลิงก์</button></div>'
+          + '<label class="f" for="sh-msg-' + id + '">ข้อความสำเร็จรูป (ส่งในไลน์กลุ่มได้เลย)</label>'
+          + '<textarea id="sh-msg-' + id + '" rows="4" readonly>' + G.esc(msg) + '</textarea>'
+          + '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
+          +   '<button class="btn btn-sm" data-copy="' + G.esc(msg) + '">คัดลอกข้อความ</button>'
+          +   '<button class="btn btn-sm" data-sheet="' + id + '">🖨 ใบแจกโค้ด</button></div>'
+          + '<div class="form-hint">ลิงก์นี้พาไปหน้าแรกของเว็บพร้อมโค้ดห้องนี้ — '
+          + 'นักเรียนกดแล้วเลือกชื่อตัวเองได้เลย ไม่ต้องจำโค้ด</div></div>';
+        box.classList.remove('hidden');
+        box.querySelector('[data-sheet]').onclick = () => codeSheet(id);
+      };
+    });
+
+    /* ---- ลบห้อง ----
+       ปุ่มนี้เคยมีอยู่แล้วแต่ไม่มีตัวรับ กดแล้วเงียบสนิท — ซึ่งอันตรายกว่าไม่มีปุ่ม
+       เพราะครูจะคิดว่าลบไปแล้ว แล้วทิ้งห้องที่ยังอยู่จริงไว้ในระบบ
+       ยืนยันสองจังหวะ: กดปุ่มลบ = กางกล่องบอกว่าจะเสียอะไรบ้าง · กดปุ่มในกล่องอีกทีถึงลบจริง
+       ตัวเลขในกล่องนับจากข้อมูลจริงของห้องนั้น ไม่ใช่ข้อความขู่ลอย ๆ */
+    document.querySelectorAll('[data-del-room]').forEach(function (b) {
+      b.onclick = function () {
+        const id = b.getAttribute('data-del-room');
+        const box = document.querySelector('[data-delbox="' + id + '"]');
+        const r = roomById(id);
+        if (!r || !box) return;
+        if (!box.classList.contains('hidden')) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+
+        const stu = studentsOf(id);
+        const sids = new Set(stu.map((x) => x.id));
+        const nProg = S.progress.filter((p) => sids.has(p.student_id)).length;
+        const nAch = (S.achieve || []).filter((x) => sids.has(x.student_id)).length;
+        const lost = ['นักเรียน <b>' + stu.length + '</b> คน'];
+        if (nProg) lost.push('ความคืบหน้ารายเกม <b>' + nProg + '</b> รายการ');
+        if (nAch) lost.push('ใบรายงานผลจากเกม <b>' + nAch + '</b> ใบ');
+
+        box.innerHTML = '<div class="err-box on" style="margin-top:12px">'
+          + '<b>ลบห้อง “' + G.esc(r.name) + '” ถาวร?</b><br>'
+          + 'จะหายไปด้วยทั้งหมด: ' + lost.join(' · ') + '<br>'
+          + 'รวมถึงบันทึกการเล่นและผลสมรรถนะของทุกคนในห้องนี้ — <b>กู้คืนอัตโนมัติไม่ได้</b><br>'
+          + '<span class="muted small">ฐานข้อมูลเก็บสำเนาไว้ใน <code>deletion_log</code> ให้ผู้ดูแลสร้างกลับด้วยมือได้ '
+          + 'แต่ไม่ใช่ปุ่มย้อนกลับ · ถ้าแค่อยากพักห้องไว้ ใช้ “ปิดห้องชั่วคราว” แทน ข้อมูลอยู่ครบและเปิดกลับได้ทันที</span>'
+          + '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
+          +   '<button class="btn btn-sm btn-danger" data-del-room-go="' + id + '">ใช่ ลบห้องนี้ถาวร</button>'
+          +   '<button class="btn btn-sm" data-del-room-no="' + id + '">ยกเลิก</button></div></div>';
+        box.classList.remove('hidden');
+        box.querySelector('[data-del-room-no]').onclick = function () {
+          box.classList.add('hidden'); box.innerHTML = '';
+        };
+        box.querySelector('[data-del-room-go]').onclick = function () {
+          delRoom(id, box.querySelector('[data-del-room-go]'));
+        };
+      };
+    });
+  }
+
+  /* ข้อความบอกสาเหตุตอนยังไม่ได้รัน 55 — PostgREST ตอบ PGRST202 เมื่อไม่รู้จักฟังก์ชัน
+     ถ้าไม่ดักไว้ ครูจะเห็นข้อความภาษาอังกฤษของฐานข้อมูลแล้วไม่รู้ว่าต้องทำอะไรต่อ */
+  function delErr(e) {
+    const miss = String(e.code) === 'PGRST202' || e.status === 404
+      || /could not find the function|does not exist/i.test(String(e.message || ''));
+    return miss
+      ? 'ยังใช้ปุ่มลบไม่ได้ — ฐานข้อมูลยังไม่มีคำสั่งลบ · รัน 55_DELETE_ROOM_STUDENT.sql บน Supabase ก่อน'
+      : 'ลบไม่สำเร็จ: ' + e.message;
+  }
+
+  async function delRoom(id, btn) {
+    clearErr();
+    btn.disabled = true;
+    try {
+      const res = await G.rpc('rpc_delete_classroom', { p_classroom: id });
+      const nm = (res && res.label) || 'ห้องเรียน';
+      const kids = (res && res.students) || 0;
+      await loadAll();
+      if (ROOM === id) ROOM = '';       /* ตัวกรองยังชี้ห้องที่ลบไปแล้ว = หน้ารวมจะว่างทั้งหน้า */
+      renderRooms();
+      showOk('🗑 ลบห้อง <b>' + G.esc(nm) + '</b> แล้ว'
+        + (kids ? ' พร้อมนักเรียน ' + kids + ' คน' : '')
+        + ' · ผู้ดูแลยังเปิดดูสำเนาก่อนลบได้ใน <code>deletion_log</code>');
+    } catch (e) { showErr(delErr(e)); btn.disabled = false; }
   }
 
   async function saveRoom(id) {
@@ -1151,17 +1583,139 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     $('nr-go').disabled = false;
   }
 
+  /* ===================== ห้องสาธารณะของครูคนอื่น (59_ROOM_BROWSE.sql) =====================
+     RLS ตั้งไว้ว่าครูเห็นเฉพาะห้องตัวเอง ซึ่งถูกแล้วและไม่ได้คลาย — หน้านี้เดินผ่าน RPC เฉพาะทาง
+     ที่ฝั่งฐานเลือกส่งออกมาเฉพาะตัวเลขสรุป ไม่มีชื่อนักเรียน ไม่มีโค้ดห้อง ไม่มีชื่อครูเจ้าของ
+     ขอบเขต: เฉพาะห้องที่ครูเจ้าของตั้งเองว่า "ค้นหาชื่อโรงเรียนได้" เท่านั้น */
+  const BR = { rows: null, filters: null, sel: { school: '', grade: '', year: '', q: '' },
+               err: null, missing: false, loading: false };
+
+  function renderBrowse() {
+    drawBrowse();
+    if (BR.rows === null && !BR.loading) loadBrowse();
+  }
+
+  async function loadBrowse() {
+    BR.loading = true; BR.err = null; BR.missing = false;
+    drawBrowse();
+    try {
+      const jobs = [G.rpc('rpc_browse_rooms', {
+        p_school: BR.sel.school || null, p_grade: BR.sel.grade || null,
+        p_year: BR.sel.year || null, p_q: BR.sel.q || null, p_limit: 300 })];
+      /* ตัวเลือกตัวกรองโหลดครั้งเดียวพอ — ไม่เปลี่ยนตามที่กรองอยู่ (ถ้าเปลี่ยน ครูจะกรองกลับไม่ได้) */
+      if (!BR.filters) jobs.push(G.rpc('rpc_browse_room_filters', {}));
+      const res = await Promise.all(jobs);
+      BR.rows = res[0] || [];
+      if (res[1]) BR.filters = res[1] || [];
+    } catch (e) {
+      BR.rows = [];
+      if (missingRpc(e)) BR.missing = true; else BR.err = e.message;
+    }
+    BR.loading = false;
+    drawBrowse();
+  }
+
+  function brOptions(kind, cur) {
+    const list = (BR.filters || []).filter((f) => f.kind === kind);
+    if (!list.length) return '';
+    const label = { school: 'โรงเรียน', grade: 'ระดับชั้น', year: 'ปีการศึกษา' }[kind];
+    return '<label for="br-' + kind + '">' + label + '</label>'
+      + '<select id="br-' + kind + '" data-br="' + kind + '">'
+      + '<option value="">ทั้งหมด</option>'
+      + list.map((f) => '<option value="' + G.esc(f.value) + '"' + (cur === f.value ? ' selected' : '') + '>'
+          + G.esc(f.label) + ' (' + f.n + ')</option>').join('')
+      + '</select>';
+  }
+
+  function drawBrowse() {
+    let html = '<h2 class="section-title">🔎 ห้องเรียนของครูคนอื่น '
+      + '<span class="sub">ใช้เทียบกับห้องของเราได้</span></h2>'
+      + '<div class="panel-note" style="margin-bottom:14px">'
+      + 'แสดงเฉพาะห้องที่ครูเจ้าของ<b>ตั้งเองว่า "ค้นหาชื่อโรงเรียนได้"</b> — ห้องที่ตั้งเป็น "โค้ดเท่านั้น" '
+      + 'ไม่โผล่ที่นี่<br>หน้านี้<b>ไม่แสดงชื่อนักเรียน ไม่แสดงโค้ดเข้าห้อง และไม่บอกว่าใครเป็นครูเจ้าของ</b> — '
+      + 'เห็นได้แค่จำนวนคนกับค่าเฉลี่ย เพื่อให้เทียบภาพรวมได้โดยไม่ล่วงเกินข้อมูลของใคร<br>'
+      + 'ห้องของเราเองก็อยู่ในรายการนี้ด้วย ติดป้ายไว้ให้หาเจอง่าย</div>';
+
+    if (BR.missing) {
+      $('content').innerHTML = html + '<div class="warn-note pipe">🚧 <b>ยังไม่ได้รัน '
+        + '<code>59_ROOM_BROWSE.sql</code></b> — ฐานข้อมูลยังไม่มีคำสั่งสำหรับดูข้ามห้อง '
+        + 'จึงยังใช้หน้านี้ไม่ได้<br>รันไฟล์นั้นบน Supabase แล้วเปิดหน้านี้ใหม่ '
+        + 'ส่วนอื่นของเว็บใช้งานได้ตามปกติทุกอย่าง</div>';
+      return;
+    }
+
+    html += '<div class="card pickbar">'
+      + brOptions('school', BR.sel.school) + brOptions('grade', BR.sel.grade) + brOptions('year', BR.sel.year)
+      + '<label for="br-q">ค้นหา</label>'
+      + '<input type="text" id="br-q" placeholder="ชื่อห้อง หรือชื่อโรงเรียน" value="' + G.esc(BR.sel.q) + '">'
+      + '<button class="btn btn-sm" id="br-clear">ล้างตัวกรอง</button></div>';
+
+    if (BR.loading) {
+      html += '<div class="card muted"><span class="loading"></span> กำลังโหลด…</div>';
+    } else if (BR.err) {
+      html += '<div class="err-box on">โหลดไม่สำเร็จ: ' + G.esc(BR.err) + '</div>';
+    } else if (!BR.rows || !BR.rows.length) {
+      html += '<div class="card muted">ยังไม่มีห้องที่ตรงกับตัวกรอง — '
+        + 'ถ้าเพิ่งเริ่มใช้ อาจเป็นเพราะยังไม่มีครูคนไหนตั้งห้องเป็น "ค้นหาชื่อโรงเรียนได้"</div>';
+    } else {
+      const mine = BR.rows.filter((r) => r.is_mine).length;
+      html += '<div class="muted small" style="margin-bottom:8px">พบ ' + BR.rows.length + ' ห้อง'
+        + (mine ? ' · เป็นห้องของเรา ' + mine + ' ห้อง' : '') + '</div>'
+        + '<div class="card table-scroll"><table class="gol"><thead><tr>'
+        + '<th scope="col">โรงเรียน</th><th scope="col">ห้อง</th><th scope="col">ระดับชั้น</th>'
+        + '<th scope="col">ปีการศึกษา</th><th scope="col" class="num">นักเรียน</th>'
+        + '<th scope="col" class="num">เกมที่เปิด</th><th scope="col">ความคืบหน้าเฉลี่ย</th>'
+        + '</tr></thead><tbody>'
+        + BR.rows.map(function (r) {
+            return '<tr' + (r.is_mine ? ' style="background:var(--tint-teal)"' : '') + '>'
+              + '<td>' + G.esc(r.school_name || '–') + '</td>'
+              + '<td><b>' + G.esc(r.room_name || '–') + '</b>'
+              +   (r.is_mine ? ' <span class="badge published">ห้องของเรา</span>' : '') + '</td>'
+              + '<td>' + G.esc(r.grade || '–') + '</td>'
+              + '<td>' + G.esc(r.academic_year || '–') + '</td>'
+              + '<td class="num">' + G.fmtInt(r.students_on) + '</td>'
+              + '<td class="num">' + G.fmtInt(r.games_on) + '</td>'
+              + '<td style="min-width:150px">' + (r.avg_progress == null
+                  ? '<span class="muted small">ยังไม่มีผล</span>' : meter(r.avg_progress)) + '</td>'
+              + '</tr>';
+          }).join('')
+        + '</tbody></table></div>';
+    }
+
+    $('content').innerHTML = html;
+
+    ['school', 'grade', 'year'].forEach(function (k) {
+      const el = $('br-' + k);
+      if (el) el.onchange = function () { BR.sel[k] = el.value; loadBrowse(); };
+    });
+    const q = $('br-q');
+    if (q) {
+      let t = null;
+      q.oninput = function () {
+        clearTimeout(t);
+        const v = q.value;
+        t = setTimeout(function () { BR.sel.q = v.trim(); loadBrowse(); }, 350);
+      };
+    }
+    const cl = $('br-clear');
+    if (cl) cl.onclick = function () { BR.sel = { school: '', grade: '', year: '', q: '' }; loadBrowse(); };
+  }
+
   /* ===================== หน้าห้องเรียน ===================== */
   function renderRoom(cid) {
     const r = roomById(cid);
+    /* roomById อ่านจาก S.rooms ซึ่งกรองห้องผู้เล่นทั่วไปออกแล้ว — ลิงก์ตรงเข้าห้องนั้นจึงเด้งกลับหน้ารวม */
     if (!r) { location.hash = '#/'; return; }
+    if (GAME && !gamesInScope(cid).some((g) => g.id === GAME)) GAME = '';
     const stu = studentsOf(cid);
-    const games = enabledGames(cid);
-    const sums = S.summary.filter((x) => x.classroom_id === cid);
+    const allGames = enabledGames(cid);
+    const games = GAME ? allGames.filter((g) => g.id === GAME) : allGames;
+    const sums = S.summary.filter((x) => x.classroom_id === cid && rowGameOk(x));
 
     let html = '<h2 style="margin:0 0 2px;font-size:20px">🏫 ' + G.esc(r.name)
       + ' <span class="muted" style="font-size:14px;font-weight:400">โค้ดเข้าห้อง <span class="joinkey" style="font-size:15px">' + G.esc(r.join_key) + '</span></span></h2>'
-      + '<div class="muted small">นักเรียน ' + stu.length + ' คน · เกมที่เปิดใช้ ' + games.length + ' เกม</div>'
+      + '<div class="muted small">นักเรียน ' + stu.length + ' คน · เกมที่เปิดใช้ ' + allGames.length + ' เกม</div>'
+      + pickerBar(cid)
       + tabs();
 
     if (TAB === 'hots') {
@@ -1174,7 +1728,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + '<div class="card table-scroll">' + compTable(cid) + '</div>';
       html += '<h2 class="section-title">มาตรฐานการเรียนรู้ของเกมที่เปิดใช้ในห้องนี้ '
         + '<span class="sub">ใช้อ้างอิงในแผนการสอนได้</span></h2>'
-        + '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">'
+        + '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))">'
         + (games.length ? games.map((g) => '<div class="std-slot" data-std-game="' + G.esc(g.code) + '"></div>').join('')
                         : '<div class="card muted">ยังไม่ได้เปิดเกมให้ห้องนี้</div>')
         + '</div>';
@@ -1185,7 +1739,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + '<div class="muted small">เล่นแล้ว ' + x.students_played + '/' + stu.length + ' คน · คะแนนเฉลี่ย ' + G.fmt(x.avg_best_score) + '</div></div>'
       ).join('') : '<div class="tile"><div class="label">ยังไม่มีข้อมูลการเล่น</div></div>') + '</div>';
 
-      html += achSummaryCards(cid);
+      html += pipeNote(achRows(cid).length > 0) + achSummaryCards(cid);
       html += '<h2 class="section-title">ผลสัมฤทธิ์รายคน <span class="sub">แตะชื่อเพื่อดูรายละเอียด</span></h2>'
         + '<div class="card table-scroll"><table class="gol"><thead><tr><th scope="col">เลขที่</th><th scope="col">ชื่อ</th>'
         + games.map((g) => '<th scope="col">' + G.esc(g.name) + '</th>').join('')
@@ -1231,9 +1785,21 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       html += rosterSection(cid, stu);
     }
 
+    /* สวิตช์เปิด/ปิดเกมของห้องนี้ — อยู่ท้ายหน้าห้องและอยู่ครบทุกแท็บ
+       ครูสั่งให้ย้ายมาไว้ "ในห้อง" ไม่ใช่ในรายการห้อง: ตอนไล่ดูรายการห้องเป็นเรื่องของการหาห้องให้เจอ
+       ส่วนการเลือกว่าห้องนี้เล่นเกมอะไร เป็นการตั้งค่าของห้องนั้น ๆ ซึ่งควรอยู่ในห้อง
+       วางท้ายสุดเพราะเป็นของที่ตั้งครั้งเดียวตอนเปิดเทอม ไม่ใช่ของที่ครูมาดูทุกวัน */
+    html += '<h2 class="section-title">เกมที่เปิดให้ห้องนี้ '
+      + '<span class="sub">ปิดแล้วนักเรียนจะไม่เห็นเกมนั้นตอนใส่โค้ดเข้าห้อง</span></h2>'
+      + '<div class="card">' + assignRows(r)
+      + '<div class="form-hint">ปิดเกม = ซ่อนเกมนั้นจากหน้าเข้าห้องของห้องนี้เท่านั้น '
+      + '<b>ผลการเล่นที่บันทึกไว้แล้วไม่หายไปไหน</b> เปิดกลับมาเมื่อไหร่ก็เห็นครบเหมือนเดิม · '
+      + 'ยังไม่เปิดเกมสักเกม = นักเรียนเลือกเล่นได้ทุกเกมที่เผยแพร่อยู่</div></div>';
+
     $('content').innerHTML = html;
     const g2 = $('as-go'); if (g2) g2.onclick = () => addStudents(cid);
-    bindRoster();
+    bindPickers(() => renderRoom(cid));
+    bindRoster(cid);
     mountStandardsPanels();
   }
 
@@ -1271,8 +1837,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   /* ===================== รายชื่อนักเรียน =====================
-     แก้ไขได้ครบเหมือนหน้าเกม แต่ **ไม่มีปุ่มลบ** — ใช้ "ปิดการใช้งาน" แทน
-     เพราะการลบนักเรียนจะลบผลการเล่นทั้งหมดของคนนั้นถาวร (กฎข้อ 1: ข้อมูลนักเรียนห้ามหาย) */
+     แก้ไขได้ครบเหมือนหน้าเกม + ปิด/เปิดการใช้งาน + **ลบถาวร**
+
+     📌 ปุ่มลบเคยไม่มีโดยเจตนา (ไฟล์ 46/47) เพราะการลบนักเรียนคือการลบผลการเล่นของคนนั้นทิ้งทั้งหมด
+        ครูซึ่งเป็นเจ้าของข้อมูลสั่งให้มี — จึงทำให้ตรงไปตรงมา สิ่งที่ยังยึดไว้คือ
+        ลบแล้วต้องรู้ว่าเสียอะไรไป และฐานต้องเก็บสำเนาไว้ (deletion_log ในไฟล์ 55)
+        "ปิดการใช้งาน" ยังอยู่ครบและยังเป็นทางที่แนะนำก่อนเสมอ — เขียนบอกไว้ในกล่องยืนยัน */
   function rosterSection(cid, stu) {
     const on = stu.filter((x) => x.is_active !== false);
     const off = stu.filter((x) => x.is_active === false);
@@ -1293,7 +1863,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           + '<td class="muted small">' + G.esc(x.join_pin || '–') + '</td>'
           + '<td><button class="btn btn-sm" data-edit-stu="' + x.id + '">✏️ แก้ไข</button> '
           +   '<button class="btn btn-sm" data-off-stu="' + x.id + '">'
-          +     (x.is_active === false ? 'เปิดใช้งาน' : 'ปิดการใช้งาน') + '</button></td></tr>'
+          +     (x.is_active === false ? 'เปิดใช้งาน' : 'ปิดการใช้งาน') + '</button> '
+          +   '<button class="btn btn-sm btn-danger" data-del-stu="' + x.id + '">🗑 ลบ</button></td></tr>'
           + '<tr class="hidden" data-sedit="' + x.id + '"><td colspan="5"></td></tr>';
       });
       html += '</tbody></table></div>';
@@ -1308,13 +1879,29 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     return html;
   }
 
-  function bindRoster() {
+  /* แถวที่กางออกใต้ชื่อนักเรียนใช้ร่วมกันทั้งฟอร์มแก้ไขและกล่องยืนยันลบ
+     จึงต้องจำว่าตอนนี้กางอันไหนอยู่ ไม่งั้นกด "แก้ไข" ตอนกล่องลบเปิดอยู่จะแค่ปิดกล่องลบไปเฉย ๆ
+     แล้วครูต้องกดสองครั้งโดยไม่รู้ว่าทำไม */
+  function stuRow(id, mode) {
+    const tr = document.querySelector('[data-sedit="' + id + '"]');
+    if (!tr) return null;
+    const open = !tr.classList.contains('hidden');
+    if (open && tr.dataset.mode === mode) {          /* กดปุ่มเดิมซ้ำ = หุบ */
+      tr.classList.add('hidden'); tr.dataset.mode = ''; tr.querySelector('td').innerHTML = '';
+      return null;
+    }
+    tr.dataset.mode = mode;
+    tr.classList.remove('hidden');
+    return tr;
+  }
+
+  function bindRoster(cid) {
     document.querySelectorAll('[data-edit-stu]').forEach(function (b) {
       b.onclick = function () {
         const id = b.getAttribute('data-edit-stu');
-        const tr = document.querySelector('[data-sedit="' + id + '"]');
+        const tr = stuRow(id, 'edit');
+        if (!tr) return;
         const x = S.students.find((v) => v.id === id);
-        if (!tr.classList.contains('hidden')) { tr.classList.add('hidden'); return; }
         const F = (k) => 'se-' + k + '-' + id;   /* หลายแถวเปิดพร้อมกันได้ id จึงต้องไม่ซ้ำ */
         tr.querySelector('td').innerHTML = '<div class="rf">'
           + '<div><label class="f" for="' + F('no') + '">เลขที่</label>'
@@ -1328,8 +1915,44 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           + '<div><label class="f" for="' + F('pin') + '">PIN (ตัวเลข 4–6 หลัก · เว้นว่าง = ไม่ใช้)</label>'
           +   '<input type="text" id="' + F('pin') + '" inputmode="numeric" value="' + G.esc(x.join_pin || '') + '"></div>'
           + '</div><div style="margin:10px 0"><button class="btn btn-primary btn-sm" data-save-stu="' + id + '">บันทึก</button></div>';
-        tr.classList.remove('hidden');
         tr.querySelector('[data-save-stu]').onclick = () => saveStudent(id);
+      };
+    });
+
+    /* ---- ลบนักเรียน ---- ยืนยันสองจังหวะเหมือนลบห้อง และบอกจำนวนจากข้อมูลจริงของคนนั้น */
+    document.querySelectorAll('[data-del-stu]').forEach(function (b) {
+      b.onclick = function () {
+        const id = b.getAttribute('data-del-stu');
+        const tr = stuRow(id, 'del');
+        if (!tr) return;
+        const x = S.students.find((v) => v.id === id) || {};
+        const nm = ((x.first_name || '') + ' ' + (x.last_name || '')).trim()
+          || x.character_name || 'นักเรียนคนนี้';
+        const nProg = progOf(id).length;
+        const nAch = (S.achieve || []).filter((a) => a.student_id === id).length;
+        const nComp = (S.compDims || []).filter((a) => a.student_id === id).length;
+        const lost = [];
+        if (nProg) lost.push('ความคืบหน้ารายเกม ' + nProg + ' รายการ');
+        if (nAch) lost.push('ใบรายงานผล ' + nAch + ' ใบ');
+        if (nComp) lost.push('ผลสมรรถนะรายด้าน ' + nComp + ' รายการ');
+
+        tr.querySelector('td').innerHTML = '<div class="err-box on" style="margin:8px 0">'
+          + '<b>ลบ “' + G.esc(nm) + '” ออกจากห้องถาวร?</b><br>'
+          + (lost.length
+              ? 'ผลการเล่นของคนนี้จะถูกลบไปด้วย: <b>' + lost.join(' · ') + '</b> รวมถึงบันทึกการเล่นทั้งหมด'
+              : 'ตอนนี้ยังไม่มีผลการเล่นบันทึกไว้ — ลบแล้วเหลือแค่ชื่อที่หายไปจากรายชื่อ')
+          + '<br><span class="muted small">ถ้าแค่ไม่อยากให้ชื่อนี้อยู่ในยอดรวมของห้อง ใช้ '
+          + '<b>“ปิดการใช้งาน”</b> แทน — ข้อมูลอยู่ครบทุกอย่างและเปิดกลับได้ทุกเมื่อ · '
+          + 'ฐานข้อมูลเก็บสำเนาก่อนลบไว้ใน <code>deletion_log</code> ให้ผู้ดูแลตามได้ แต่ไม่ใช่ปุ่มย้อนกลับ</span>'
+          + '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
+          +   '<button class="btn btn-sm btn-danger" data-del-stu-go="' + id + '">ใช่ ลบถาวร</button>'
+          +   '<button class="btn btn-sm" data-del-stu-no="' + id + '">ยกเลิก</button></div></div>';
+        tr.querySelector('[data-del-stu-no]').onclick = function () {
+          tr.classList.add('hidden'); tr.dataset.mode = ''; tr.querySelector('td').innerHTML = '';
+        };
+        tr.querySelector('[data-del-stu-go]').onclick = function () {
+          delStudent(id, nm, cid, tr.querySelector('[data-del-stu-go]'));
+        };
       };
     });
     document.querySelectorAll('[data-off-stu]').forEach(function (b) {
@@ -1352,6 +1975,21 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         }
       };
     });
+  }
+
+  async function delStudent(id, nm, cid, btn) {
+    clearErr();
+    btn.disabled = true;
+    try {
+      const res = await G.rpc('rpc_delete_student', { p_student: id });
+      const label = (res && res.label) || nm;
+      await loadAll();
+      /* กลับไปหน้าห้องเดิมเสมอ ไม่ใช่ route() ลอย ๆ — ถ้าเผลอลบจากหน้าอื่นแล้ว route()
+         พาไปหน้าที่ไม่มีอะไรเกี่ยว ครูจะไม่เห็นว่ารายชื่อเปลี่ยนไปจริงไหม */
+      if (cid && roomById(cid)) renderRoom(cid); else route();
+      showOk('🗑 ลบ <b>' + G.esc(label) + '</b> ออกจากห้องแล้ว · '
+        + 'ผู้ดูแลยังเปิดดูสำเนาก่อนลบได้ใน <code>deletion_log</code>');
+    } catch (e) { showErr(delErr(e)); btn.disabled = false; }
   }
 
   async function saveStudent(id) {
@@ -1513,7 +2151,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       await G.api('/rest/v1/classroom_games?on_conflict=classroom_id,game_id', {
         method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' },
         body: JSON.stringify([{ classroom_id: parts[0], game_id: parts[1], is_enabled: a.checked }]) });
-      S.cg = await G.get('/rest/v1/classroom_games?select=*');
+      /* ⚠️ ต้องโหลดกลับมาเฉพาะห้องของฉัน — เดิมดึงทั้งตาราง ซึ่งบัญชีผู้ดูแลจะได้ห้องของครูคนอื่นติดมาด้วย
+         (RLS ของ 46 เปิดให้ผู้ดูแลอ่านได้ทุกห้อง) แล้วกล่อง "เกมที่ใช้งาน" กับตัวกรองเกม
+         จะกลายเป็นของทั้งระบบทันทีที่กดสวิตช์หนึ่งครั้ง — บั๊กแบบเดียวกับที่เคยเกิดกับรายการห้อง */
+      const y = window.scrollY;
+      S.cg = await getIn('/rest/v1/classroom_games?select=*', 'classroom_id', S.rooms.map((r) => r.id));
+      /* วาดใหม่เพราะจำนวนเกมที่เปิดและคอลัมน์ในตารางรายคนเปลี่ยนตาม — คืนตำแหน่งเลื่อนให้ด้วย
+         ไม่งั้นกดสวิตช์ท้ายหน้าแล้วหน้าเด้งขึ้นบนสุดทุกครั้ง กดสิบเกมก็เลื่อนลงมาสิบรอบ */
+      route();
+      window.scrollTo(0, y);
     } catch (e) { showErr('บันทึกการมอบหมายเกมไม่สำเร็จ: ' + e.message); a.checked = !a.checked; }
     a.disabled = false;
   });

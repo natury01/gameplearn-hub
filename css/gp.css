@@ -397,15 +397,19 @@ a:hover { text-decoration: underline; }
   border-radius: var(--r-md); padding: 18px; box-shadow: var(--shadow);
 }
 .grid { display: grid; gap: 14px; }
-.grid.cols-3 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-.grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+/* min(กว้างขั้นต่ำ, 100%) ไม่ใช่ความกว้างตายตัว —
+   บนจอ 320px พื้นที่จริงเหลือ ~284px หลังหักขอบของ .wrap ถ้าสั่งขั้นต่ำเป็น 280–320px ตรง ๆ
+   ช่องกริดจะกว้างเกินพื้นที่แล้วดันทั้งหน้าให้เลื่อนแนวนอนได้ (เจอจริงที่หน้ามาตรฐาน ล้น 18px)
+   จอที่กว้างพอยังได้ความกว้างขั้นต่ำเดิมทุกประการ — min() เลือกตัวเลข px ให้เองเมื่อมีที่พอ */
+.grid.cols-3 { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
+.grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
 .section-title { font-size: 16.5px; font-weight: 700; margin: 26px 0 12px;
   display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .section-title .sub { color: var(--muted); font-weight: 400; font-size: 13.5px; }
 .section-title .sp { flex: 1; }
 
 /* ---------- stat tiles ---------- */
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 12px; }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; }
 .tile .label { color: var(--ink-2); font-size: 13px; }
 .tile .value { font-size: 26px; font-weight: 600; margin-top: 2px; }
@@ -671,6 +675,28 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
   position: absolute; top: 10px; right: 10px; background: rgba(11,11,11,.62); color: #fff;
   font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 3px 10px;
 }
+/* ---------- สไลด์ภาพรายด่านบนปกการ์ด (57_GAME_MEDIA.sql) ----------
+   ปกซ้อน 2 ชั้น: ปกเดิมอยู่ล่าง (ไอคอน/cover_url) · ภาพด่านซ้อนทับด้านบน
+   ภาพไหนโหลดไม่ขึ้นก็แค่ซ่อนใบนั้น ปกเดิมโผล่ขึ้นมาแทนเอง ไม่มีช่องว่างขาว */
+.gcover .gbase { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.gcover .gshot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  opacity: 0; transition: opacity .5s ease; }
+.gcover .gshot.on { opacity: 1; }
+.gcover .gshot.dead { display: none; }
+/* ชื่อด่าน — ไล่สีดำจาง ๆ ใต้ตัวอักษร ให้อ่านออกไม่ว่าภาพข้างหลังจะสว่างหรือมืด */
+.gcover .gcap { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  padding: 18px 10px 6px; font-size: 12px; font-weight: 600; line-height: 1.3;
+  color: #fff; text-align: left; text-shadow: 0 1px 2px rgba(0,0,0,.55);
+  background: linear-gradient(to top, rgba(11,11,11,.75), rgba(11,11,11,0));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gcover .gdots { position: absolute; right: 9px; bottom: 8px; z-index: 3; display: flex; gap: 4px; }
+.gcover .gdots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.5);
+  box-shadow: 0 0 2px rgba(0,0,0,.55); transition: background .2s; }
+.gcover .gdots i.on { background: #fff; }
+.gcover .gdots i.gone { display: none; }
+/* ตั้งค่าเครื่องว่าลดการเคลื่อนไหว = ไม่ค่อย ๆ จาง (สคริปต์ก็ไม่เลื่อนให้อยู่แล้ว) */
+@media (prefers-reduced-motion: reduce) { .gcover .gshot { transition: none; } }
+
 .gbody { padding: 14px 16px 0; display: flex; flex-direction: column; gap: 7px; flex: 1; }
 .gbody h3 { margin: 0; font-size: 16.5px; line-height: 1.35; }
 .gdesc { color: var(--ink-2); font-size: 13.5px;
@@ -691,7 +717,7 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
   background: linear-gradient(135deg, var(--tint-teal), var(--surface) 70%); }
 .zone h3 { margin: 0 0 4px; font-size: 19px; }  /* รอบ ข: เดิม h2 — ลดชั้นให้อยู่ใต้หัวข้อหมวด */
 .zone .lede { color: var(--ink-2); font-size: 14px; margin-bottom: 16px; }
-.zcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.zcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 12px; }
 .zcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
   padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; text-decoration: none; color: var(--ink); }
 .zcard:hover { border-color: var(--accent); text-decoration: none; box-shadow: var(--lift); }
@@ -906,6 +932,19 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
 .btn-danger { border-color: var(--critical); color: var(--critical); background: transparent; }
 .btn-danger:hover { background: var(--critical); color: #fff; border-color: var(--critical); }
 
+/* แถบตัวกรองหน้าครู — เลือกห้อง / เลือกเกม อยู่แถวเดียวกัน พับเองบนจอแคบ */
+.pickbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.pickbar > label { font-weight: 600; font-size: 14px; color: var(--ink-2); margin: 0; flex: 0 0 auto; }
+.pickbar select { width: auto; min-width: 170px; max-width: 320px; }
+@media (max-width: 560px) {
+  .pickbar > label { flex-basis: 100%; }
+  .pickbar select { flex: 1 1 100%; max-width: none; }
+}
+
+/* กล่องบอกสถานะท่อข้อมูล — เว้นระยะให้แยกจากแท็บด้านบนและหัวข้อด้านล่างชัด ๆ */
+.warn-note.pipe { margin: 4px 0 16px; }
+.warn-note.pipe code { font-size: 12.5px; }
+
 .gp-ver { text-align: center; color: var(--ink-2); font-size: 12.5px;
   padding: 14px 0 22px; opacity: .75; letter-spacing: .2px; }
 @media print { .gp-ver { opacity: 1; } }
@@ -913,7 +952,7 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
 /* ═══════════ หน้าครู: ฟอร์มห้องเรียน (46_CLASSROOM_MANAGE) ═══════════ */
 
 /* ฟอร์มห้อง/นักเรียน — พับเป็นคอลัมน์เดียวบนจอแคบเอง ไม่ต้องมี breakpoint แยก */
-.rf { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.rf { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); }
 .rf .f { margin-top: 0; }
 .ok-box { display: none; background: var(--tint-teal); border: 1px solid var(--good);
   color: var(--ink); border-radius: var(--r-sm); padding: 10px 12px; font-size: 13.5px; }

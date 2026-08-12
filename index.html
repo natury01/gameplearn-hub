@@ -30,7 +30,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     <div class="sp"></div>
     <nav class="navlinks" aria-label="เมนูหลัก">
       <a href="#games">เกมทั้งหมด</a>
-      <a href="#teacher-zone">สำหรับครู</a>
+      <!-- เดิมชี้ไปบล็อก "สำหรับคุณครู" กลางหน้า — บล็อกนั้นถูกเอาออกแล้ว (ซ้ำกับเมนูนี้เอง)
+           จึงชี้ไปหน้าครูตรง ๆ · ถ้าปล่อยเป็น #teacher-zone ไว้ กดแล้วจะไม่ไปไหนเลย -->
+      <a href="teacher.html">สำหรับครู</a>
       <a href="standards.html">มาตรฐาน</a>
       <a href="support.html">สนับสนุน</a>
       <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
@@ -105,37 +107,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     <div class="card muted"><span class="loading"></span> กำลังโหลดรายชื่อเกม…</div>
   </div>
 
-  <!-- ==================== โซนครู ==================== -->
-  <h2 class="section-title" id="teacher-zone">👩‍🏫 สำหรับคุณครู</h2>
-  <section class="zone">
-    <h3>ดูผลนักเรียนทุกเกม ในที่เดียว</h3>
-    <div class="lede">
-      สร้างห้องเรียน แจกโค้ดให้นักเรียน แล้วดูทั้ง<b>ผลสัมฤทธิ์</b>และ<b>สมรรถนะหลัก</b>
-      ของทุกเกมรวมกัน — ไม่ต้องเปิดหลายเว็บ ไม่ต้องคีย์คะแนนเอง
-    </div>
-    <div class="zcards">
-      <a class="zcard" href="teacher.html">
-        <span class="ic">📊</span>
-        <span class="t">Dashboard กลาง</span>
-        <span class="d">คะแนนรายห้อง รายคน แยกตามเกม พร้อมสรุปรวม</span>
-      </a>
-      <a class="zcard" href="teacher.html#rooms">
-        <span class="ic">🏫</span>
-        <span class="t">สร้างห้องเรียน</span>
-        <span class="d">ได้โค้ด 6 ตัวให้นักเรียนใช้เข้าเล่นทันที</span>
-      </a>
-      <a class="zcard" href="standards.html">
-        <span class="ic">📋</span>
-        <span class="t">มาตรฐานที่แต่ละเกมวัด</span>
-        <span class="d">ตัวชี้วัดรายข้อและสมรรถนะที่เกมครอบคลุม — เปิดดูได้เลย ไม่ต้องเข้าสู่ระบบ</span>
-      </a>
-      <a class="zcard" href="contact.html">
-        <span class="ic">💬</span>
-        <span class="t">แจ้งปัญหา / เสนอแนะ</span>
-        <span class="d">พบบัค อยากได้เกมแนวไหน บอกเราได้เลย</span>
-      </a>
-    </div>
-  </section>
+  <!-- บล็อก "สำหรับคุณครู" 4 การ์ด เคยอยู่ตรงนี้ — ครูสั่งให้เอาออก
+       ทั้ง 4 ใบชี้ไปที่เดียวกับเมนูบนแถบหัวเว็บทุกใบ (Dashboard · สร้างห้อง · มาตรฐาน · แจ้งปัญหา)
+       จึงเป็นแค่ระยะทางที่ครูต้องเลื่อนผ่านก่อนถึงปลายหน้า ไม่ได้พาไปไหนใหม่
+       ⚠️ อย่าใส่กลับโดยไม่ถามครูก่อน — เอาออกแล้วรอบหนึ่ง แล้วเผลอกลับมาอีกรอบหนึ่ง -->
 
   <!-- ==================== ปลายหน้า ==================== -->
   </main>
@@ -183,14 +158,178 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   /* ไอคอนสำรองต่อเกม (ใช้ตอนยังไม่มี cover_url และยังไม่ได้ตั้ง genre) */
   const FALLBACK_ICON = { kanchanaburi2050: '🗺️', 'kanchanaburi2050-2': '🛡️', typing: '⌨️' };
 
+  /* ================= สไลด์ภาพรายด่าน (57_GAME_MEDIA.sql) =================
+     ฐานเก็บเฉพาะ "ที่อยู่ของภาพ" ไม่ได้เก็บไฟล์ — ภาพอยู่ในไซต์ของเกมเอง
+     เกมเปลี่ยนภาพด่านเมื่อไหร่ การ์ดหน้านี้เปลี่ยนตามทันที ไม่มีภาพเก่าค้าง
+     ยังไม่ได้รัน 57 (ยังไม่มีตาราง) → คืนก้อนว่าง หน้าเว็บทำงานเหมือนเดิมทุกประการ */
+  let MEDIA = {};
+  async function loadMedia() {
+    try {
+      const rows = await G.get('/rest/v1/game_media?select=game_id,url,caption,alt,sort_order'
+        + '&order=sort_order.asc,id.asc');
+      const by = {};
+      (rows || []).forEach(function (m) {
+        /* http:// โดนเบราว์เซอร์บล็อกอยู่แล้วบนเว็บ https — คัดทิ้งตั้งแต่ตรงนี้
+           จะได้ไม่เสียช่องสไลด์ให้ใบที่ยังไงก็ขึ้นไม่ได้ (ฝั่ง SQL ก็กันไว้ชั้นหนึ่งแล้ว) */
+        if (!m || !m.url || !/^https:\/\//i.test(m.url)) return;
+        (by[m.game_id] = by[m.game_id] || []).push(m);
+      });
+      return by;
+    } catch (e) { return {}; }   /* ยังไม่รัน 57 · เน็ตล่ม — ทั้งสองกรณีถอยไปใช้ปกเดิม */
+  }
+
   /* ================= การ์ดเกม ================= */
+  /* ปกการ์ดเป็น 2 ชั้นเสมอ:
+       ชั้นล่าง = ปกเดิม (cover_url หรือไอคอนบนพื้นไล่สีตามแนวเกม)
+       ชั้นบน   = ภาพรายด่าน ซ้อนทับ
+     ทำแบบนี้เพราะ "ภาพเสียแล้วถอยไปปกเดิม" กลายเป็นแค่ซ่อนภาพชั้นบน
+     ไม่ต้องวาดการ์ดใหม่ ไม่ต้องเก็บ HTML สำรองไว้ที่ไหน และไม่มีจังหวะที่การ์ดว่างเปล่า */
+  function coverBase(g) {
+    if (g.cover_url) return '<img class="gbase" src="' + G.esc(g.cover_url) + '" alt="">';
+    return g.genre_icon || FALLBACK_ICON[g.code] || '🎮';
+  }
+
   function cover(g) {
-    if (g.cover_url) return '<div class="gcover"><img src="' + G.esc(g.cover_url) + '" alt=""></div>';
-    const icon = g.genre_icon || FALLBACK_ICON[g.code] || '🎮';
+    /* ป้าย ⭐ แนะนำ / ภาค N ติดทุกแบบของปก — เดิมหายไปเงียบ ๆ เมื่อเกมมี cover_url
+       ซึ่งอ่านเหมือนระบบเลิกแนะนำเกมนั้นแล้ว ทั้งที่ยังปักหมุดอยู่ */
     const ribbon = g.is_featured ? '<span class="ribbon">⭐ แนะนำ</span>' : '';
     const part = (g.series && g.series_order) ? '<span class="partno">ภาค ' + g.series_order + '</span>' : '';
-    return '<div class="gcover g-' + G.esc(g.genre || 'none') + '">' + icon + ribbon + part + '</div>';
+    const cls = 'gcover' + (g.cover_url ? '' : ' g-' + G.esc(g.genre || 'none'));
+
+    const shots = (MEDIA[g.id] || []).slice(0, 60);
+    if (!shots.length) return '<div class="' + cls + '">' + coverBase(g) + ribbon + part + '</div>';
+
+    /* ใบแรกใบเดียวที่ใส่ src ตั้งแต่วาด — ที่เหลือรอจนสไลด์เริ่มเลื่อนจริง (ดู shotsWake)
+       หน้าแรกมีการ์ดหลายสิบใบ ถ้าโหลดทุกใบพร้อมกันคือภาพหลักร้อยใบบนเน็ตโรงเรียน */
+    const imgs = shots.map(function (m, i) {
+      /* ไม่มี alt ที่เกมส่งมา ใช้ชื่อด่านแทน · ไม่มีทั้งคู่ = ปล่อยว่าง (ภาพประกอบล้วน)
+         alt="" ที่ตั้งใจว่าง ถูกต้องกว่าใส่ข้อความเดาเอง โปรแกรมอ่านหน้าจอจะข้ามให้ */
+      const alt = G.esc(m.alt || m.caption || '');
+      return '<img class="gshot' + (i === 0 ? ' on' : '') + '" data-i="' + i + '"'
+        + ' data-cap="' + G.esc(m.caption || '') + '"'
+        + (i === 0 ? ' src="' + G.esc(m.url) + '"' : ' data-src="' + G.esc(m.url) + '"')
+        + ' alt="' + alt + '" loading="lazy" decoding="async">';
+    }).join('');
+
+    /* ภาพเดียว = ไม่ใช่สไลด์ ไม่ต้องมีจุดบอกหน้าและไม่ต้องเลื่อน (ไม่ติดคลาส gshots) */
+    if (shots.length < 2) {
+      return '<div class="' + cls + '">' + coverBase(g) + imgs + ribbon + part + '</div>';
+    }
+
+    const dots = shots.map(function (m, i) { return '<i' + (i === 0 ? ' class="on"' : '') + '></i>'; }).join('');
+    const cap = G.esc(shots[0].caption || '');
+    return '<div class="' + cls + ' gshots" data-shots="' + shots.length + '">'
+      + coverBase(g) + imgs + ribbon + part
+      + '<div class="gcap"' + (cap ? '' : ' hidden') + '>' + cap + '</div>'
+      + '<div class="gdots" aria-hidden="true">' + dots + '</div>'
+      + '</div>';
   }
+
+  /* ---- การเลื่อนสไลด์ ----
+     เลื่อนเฉพาะการ์ด "ที่ผู้ใช้กำลังชี้อยู่" ใบเดียว ไม่ใช่ทุกใบพร้อมกัน
+     เหตุผล: หน้าแรกมีการ์ดหลายสิบใบ ถ้าทุกใบขยับตลอดเวลา หน้าจะกระพริบทั้งหน้าจนอ่านชื่อเกมไม่ทัน
+     และเครื่องของโรงเรียนจะทำงานหนักโดยไม่ได้อะไรกลับมา
+     นาฬิกามีตัวเดียวทั้งหน้า ผูกกับการ์ดที่ชี้อยู่ — ออกจากการ์ดเมื่อไหร่ก็หยุดทันที */
+  const SHOT_MS = 2400;
+  /* ผู้ใช้ที่ตั้งค่าเครื่องว่า "ลดการเคลื่อนไหว" (เมาง่าย/ไวต่อภาพขยับ) — ไม่เลื่อนให้เลย
+     ยังเห็นภาพด่านแรกและยังกดเล่นได้ตามปกติ */
+  const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let shotBox = null, shotTimer = null;
+
+  function shotsStop() {
+    if (shotTimer) { clearInterval(shotTimer); shotTimer = null; }
+    shotBox = null;
+  }
+  function wakeOne(im) {
+    if (!im || !im.getAttribute('data-src')) return;
+    im.src = im.getAttribute('data-src');
+    im.removeAttribute('data-src');
+  }
+  function shotsWake(box) {
+    if (box.dataset.woke) return;
+    box.dataset.woke = '1';
+    box.querySelectorAll('.gshot[data-src]').forEach(wakeOne);
+  }
+  function shotsStart(box) {
+    if (shotBox === box) return;
+    shotsStop();
+    if (REDUCED || !box.classList.contains('gshots')) return;
+    shotBox = box;
+    shotsWake(box);
+    shotTimer = setInterval(function () { shotsStep(box); }, SHOT_MS);
+  }
+  /* เลื่อนไปใบถัดไปที่ยังใช้ได้ — ใบที่โหลดไม่ขึ้น (.dead) ถูกข้ามไปเลย
+     ถ้าเหลือใบเดียว (หรือไม่เหลือเลย) ก็หยุดนาฬิกา แล้วปกเดิมชั้นล่างทำหน้าที่ต่อ
+
+     ⚠️ ทุกดัชนีในฟังก์ชันชุดนี้คือ "ตำแหน่งในรายการภาพทั้งหมด" ซึ่งตรงกับ data-i และตรงกับจุดบอกหน้า
+     เคยพลาดตรงนี้มาแล้วเพราะเผลอนับจากรายการที่กรองใบตายออก พอมีภาพเสียจุดจะเลื่อนไม่ตรงกับภาพ */
+  function shotsStep(box, fromIdx) {
+    const all = Array.prototype.slice.call(box.querySelectorAll('.gshot'));
+    const cur = box.querySelector('.gshot.on');
+    const live = all.filter(function (im) { return !im.classList.contains('dead'); });
+    /* ตายหมดทุกใบ = ปกเดิมชั้นล่างทำหน้าที่แทน · ต้องเก็บชื่อด่านกับจุดบอกหน้าไปด้วย
+       ไม่งั้นจะเหลือคำว่า "ด่าน 3 ถ้ำกระแซ" ลอยอยู่บนภาพปกที่ไม่ใช่ด่าน 3 */
+    if (!live.length) {
+      const cap = box.querySelector('.gcap'), dots = box.querySelector('.gdots');
+      if (cap) { cap.textContent = ''; cap.hidden = true; }
+      if (dots) dots.style.display = 'none';
+      if (box === shotBox) shotsStop();
+      return;
+    }
+
+    const start = (fromIdx != null) ? fromIdx : (cur ? all.indexOf(cur) : -1);
+    let next = null;
+    for (let k = 1; k <= all.length; k++) {
+      const c = all[(start + k + all.length) % all.length];
+      if (c && !c.classList.contains('dead')) { next = c; break; }
+    }
+    if (live.length < 2 && box === shotBox) shotsStop();   /* เหลือใบเดียว ไม่มีอะไรให้สลับแล้ว */
+    if (!next || next === cur) return;
+    /* ⚠️ ปลุกใบที่กำลังจะโชว์ก่อนเสมอ — ไม่งั้นกรณีใบแรกโหลดไม่ขึ้นตั้งแต่เปิดหน้า
+       เราจะเลื่อนไปใบที่ยังไม่มี src (ยังรอ lazy อยู่) แล้วได้ชื่อด่านใหม่ทับบนปกเดิมที่ไม่ใช่ด่านนั้น
+       เจอจริงตอนทดสอบกับชุด 14 ใบของภาค 1 ที่โฮสต์ภาพยังไม่ได้อัปโหลด */
+    wakeOne(next);
+    if (cur) cur.classList.remove('on');
+    next.classList.add('on');
+    paintShotMeta(box, all.indexOf(next));
+  }
+  /* คำบรรยาย (ชื่อด่าน) กับจุดบอกหน้า ต้องตรงกับภาพที่เห็นอยู่เสมอ */
+  function paintShotMeta(box, idx) {
+    const dots = box.querySelectorAll('.gdots i');
+    Array.prototype.forEach.call(dots, function (d, k) { d.classList.toggle('on', k === idx); });
+    const cap = box.querySelector('.gcap');
+    if (!cap) return;
+    const im = box.querySelector('.gshot[data-i="' + idx + '"]');
+    const t = im ? (im.getAttribute('data-cap') || '') : '';
+    cap.textContent = t;
+    cap.hidden = !t;
+  }
+
+  /* ชี้ด้วยเมาส์ หรือโฟกัสด้วยคีย์บอร์ด (แท็บเข้าไปที่ปุ่มเล่นเกม) ก็ให้เริ่มเลื่อนเหมือนกัน
+     ใช้ mouseover/mouseout เพราะ mouseenter ไม่ลอยขึ้นมาถึง document (การ์ดวาดใหม่ทุกครั้งที่กรอง) */
+  document.addEventListener('mouseover', function (ev) {
+    const box = ev.target.closest && ev.target.closest('.gshots');
+    if (box) shotsStart(box); else if (shotBox) shotsStop();
+  });
+  document.addEventListener('focusin', function (ev) {
+    const card = ev.target.closest && ev.target.closest('.gcard');
+    const box = card && card.querySelector('.gshots');
+    if (box) shotsStart(box); else if (shotBox) shotsStop();
+  });
+  /* ภาพโหลดไม่ขึ้น (เกมย้ายไฟล์ / เปลี่ยนโดเมน) — ปิดใบนั้นทิ้ง ไม่ให้เป็นช่องว่างขาว
+     error ไม่ลอยขึ้น document จึงต้องดักในขา capture */
+  document.addEventListener('error', function (ev) {
+    const im = ev.target;
+    if (!im || !im.classList || !im.classList.contains('gshot')) return;
+    const box = im.closest('.gcover');
+    const idx = Number(im.getAttribute('data-i'));
+    const wasOn = im.classList.contains('on');
+    im.classList.add('dead'); im.classList.remove('on');
+    /* จุดของใบที่ตายต้อง "ซ่อน" ไม่ใช่ "ลบ" — ลบแล้วลำดับจุดที่เหลือจะเลื่อนไม่ตรงกับ data-i ของภาพ */
+    const dot = box && box.querySelectorAll('.gdots i')[idx];
+    if (dot) dot.classList.add('gone');
+    if (wasOn && box) shotsStep(box, idx);
+  }, true);
 
   function facts(g) {
     const f = [];
@@ -360,10 +499,21 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   /* ================= โหลดข้อมูล ================= */
+  /* คลังภาพยิงคู่ไปกับแคตตาล็อก แล้ววาดทีเดียวจบ — ไม่มีจังหวะที่ปกกระตุกจากไอคอนเป็นภาพ
+     แต่ไม่ยอมให้คำขอนี้ถ่วงหน้าแรกของนักเรียน: เกิน 4 วินาทีก็วาดด้วยปกเดิมไปก่อน
+     ได้ข้อมูลมาทีหลังค่อยวาดซ้ำ (วาดซ้ำเฉพาะตอนมีภาพจริง จะได้ไม่กระพริบฟรี ๆ) */
+  let drawn = false;
+  const mediaJob = loadMedia().then(function (m) {
+    MEDIA = m;
+    if (drawn && Object.keys(m).length) { renderFeatured(); renderList(); }
+    return m;
+  });
+
   Promise.all([
     K.loadCatalog(),
     /* รอค่าตั้งค่าจากหน้า Admin ก่อนวาด — กันแถบ "เกมแนะนำ" กะพริบเพราะใช้ค่าเก่าไปก่อน */
     window.GP_SETTINGS_READY || Promise.resolve({}),
+    Promise.race([mediaJob, new Promise(function (ok) { setTimeout(ok, 4000); })]),
   ]).then(function (r) {
     const res = r[0];
     ALL = res.rows; SOURCE = res.source;
@@ -374,6 +524,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     renderFilters();
     renderFeatured();
     renderList();
+    drawn = true;
 
     if (SOURCE === 'basic') {
       const n = $('basic-note');

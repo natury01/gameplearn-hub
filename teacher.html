@@ -1003,12 +1003,64 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       +   '<a class="btn btn-sm btn-primary" href="#/room/' + r.id + '">ดูผล / รายชื่อ →</a>'
       +   '<button class="btn btn-sm" data-edit-room="' + r.id + '">✏️ แก้ไข</button>'
       +   '<button class="btn btn-sm" data-toggle-room="' + r.id + '">'
-      +     (r.is_active === false ? 'เปิดห้อง' : 'ปิดห้องชั่วคราว') + '</button></div>'
+      +     (r.is_active === false ? 'เปิดห้อง' : 'ปิดห้องชั่วคราว') + '</button>'
+      +   '<button class="btn btn-sm btn-danger" data-del-room="' + r.id + '">🗑 ลบห้อง</button></div>'
+      + '<div class="hidden" data-delbox="' + r.id + '"></div>'
       + '<div class="hidden" data-editbox="' + r.id + '"></div>'
       + '</div>';
   }
 
+  /* ===================== การลบถาวร =====================
+     ครูสั่งให้มีปุ่มลบ (เดิมเว็บกลางตั้งใจไม่มี) — ทำให้ตรงไปตรงมา แต่ยังกันการเผลอ:
+       1. ต้องกดสองจังหวะ · จังหวะที่สองบอกชัดว่าจะเสียอะไรไปบ้าง (ตัวเลขจริงของห้องนั้น)
+       2. ฝั่งฐานบันทึกสำเนาข้อมูลก่อนลบไว้ใน deletion_log (55_DELETE_ROOM_STUDENT.sql)
+          ไม่ใช่ระบบกู้คืนอัตโนมัติ แต่ถ้าเผลอลบ ยังมีข้อมูลให้สร้างกลับด้วยมือได้
+     ใช้กล่องยืนยันในหน้าแทน confirm() ของเบราว์เซอร์ เพราะ confirm() บอกรายละเอียดไม่ได้
+     และครูมักกด OK ด้วยความเคยชินโดยไม่อ่าน */
+  function confirmBox(msg, onYes) {
+    return '<div class="card" style="border-color:var(--critical);margin-top:10px">'
+      + '<div style="color:var(--critical);font-weight:700;margin-bottom:4px">⚠️ ลบถาวร กู้คืนเองไม่ได้</div>'
+      + '<div class="small" style="margin-bottom:10px">' + msg + '</div>'
+      + '<button class="btn btn-sm btn-danger" data-yes="1">ยืนยันลบถาวร</button> '
+      + '<button class="btn btn-sm" data-no="1">ยกเลิก</button></div>';
+  }
+  function bindDelete(sel, boxOf, msgOf, run) {
+    document.querySelectorAll(sel).forEach(function (b) {
+      b.onclick = function () {
+        const id = b.getAttribute(sel.replace(/[\[\]]/g, ''));
+        const box = boxOf(id);
+        if (!box) return;
+        if (!box.classList.contains('hidden')) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+        box.innerHTML = confirmBox(msgOf(id));
+        box.classList.remove('hidden');
+        box.querySelector('[data-no]').onclick = function () {
+          box.classList.add('hidden'); box.innerHTML = ''; };
+        box.querySelector('[data-yes]').onclick = async function (ev) {
+          ev.target.disabled = true; ev.target.textContent = 'กำลังลบ…';
+          try { await run(id); await loadAll(); route(); }
+          catch (e) {
+            showErr('ลบไม่สำเร็จ: ' + e.message
+              + (/PGRST202|does not exist/i.test(e.message)
+                  ? ' — ฐานข้อมูลยังไม่มีคำสั่งลบ ให้รัน 55_DELETE_ROOM_STUDENT.sql บน Supabase ก่อน' : ''));
+            ev.target.disabled = false; ev.target.textContent = 'ยืนยันลบถาวร';
+          }
+        };
+      };
+    });
+  }
+
   function bindRoomActions() {
+    bindDelete('[data-del-room]', (id) => document.querySelector('[data-delbox="' + id + '"]'),
+      function (id) {
+        const r = roomById(id), n = studentsOf(id).length;
+        return 'กำลังจะลบห้อง <b>' + G.esc(r ? r.name : '') + '</b> ทั้งห้อง'
+          + (n ? ' พร้อม<b>นักเรียน ' + n + ' คน</b> และผลการเล่นทั้งหมดของทุกคน'
+               : ' (ยังไม่มีนักเรียนในห้องนี้)')
+          + '<br>โค้ด <b>' + G.esc(r ? r.join_key : '') + '</b> จะใช้ไม่ได้อีก '
+          + 'เครื่องที่เปิดเกมค้างไว้จะส่งคะแนนไม่เข้า'
+          + (n ? '<br><br>ถ้าแค่ต้องการหยุดใช้ชั่วคราว ใช้ปุ่ม "ปิดห้องชั่วคราว" แทน — ข้อมูลไม่หาย' : '');
+      },
+      (id) => G.rpc('rpc_delete_classroom', { p_classroom: id }));
     document.querySelectorAll('[data-edit-room]').forEach(function (b) {
       b.onclick = function () {
         const id = b.getAttribute('data-edit-room');
@@ -1258,8 +1310,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           + '<td class="muted small">' + G.esc(x.join_pin || '–') + '</td>'
           + '<td><button class="btn btn-sm" data-edit-stu="' + x.id + '">✏️ แก้ไข</button> '
           +   '<button class="btn btn-sm" data-off-stu="' + x.id + '">'
-          +     (x.is_active === false ? 'เปิดใช้งาน' : 'ปิดการใช้งาน') + '</button></td></tr>'
-          + '<tr class="hidden" data-sedit="' + x.id + '"><td colspan="5"></td></tr>';
+          +     (x.is_active === false ? 'เปิดใช้งาน' : 'ปิดการใช้งาน') + '</button> '
+          + '<button class="btn btn-sm btn-danger" data-del-stu="' + x.id + '">🗑 ลบ</button></td></tr>'
+          + '<tr class="hidden" data-sedit="' + x.id + '"><td colspan="5"></td></tr>'
+          + '<tr><td colspan="5" class="hidden" data-delbox-stu="' + x.id + '"></td></tr>';
       });
       html += '</tbody></table></div>';
     }
@@ -1274,6 +1328,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   function bindRoster() {
+    bindDelete('[data-del-stu]', (id) => document.querySelector('[data-delbox-stu="' + id + '"]'),
+      function (id) {
+        const x = S.students.find((v) => v.id === id) || {};
+        return 'กำลังจะลบ <b>' + G.esc((x.first_name || '') + ' ' + (x.last_name || '')) + '</b> '
+          + 'พร้อม<b>ผลการเล่นทั้งหมด</b>ของคนนี้ (คะแนน ความคืบหน้า คำตอบ ผลสมรรถนะ)'
+          + '<br><br>ถ้าแค่ต้องการเอาออกจากรายชื่อ ใช้ "ปิดการใช้งาน" แทน — ข้อมูลยังอยู่ครบ เปิดกลับได้';
+      },
+      (id) => G.rpc('rpc_delete_student', { p_student: id }));
     document.querySelectorAll('[data-edit-stu]').forEach(function (b) {
       b.onclick = function () {
         const id = b.getAttribute('data-edit-stu');

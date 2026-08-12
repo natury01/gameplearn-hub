@@ -891,6 +891,11 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
 .c6sub > span:first-child { flex: 0 0 176px; color: var(--ink-2); }
 @media (max-width: 560px) { .c6name, .c6sub > span:first-child { flex-basis: 118px; } }
 
+/* ปุ่มลบถาวร — ต้องดูต่างจากปุ่มอื่นชัดเจน แต่ไม่เด่นจนกลายเป็นปุ่มที่ตาไปหาก่อน
+   (ปุ่มที่ใช้บ่อยที่สุดควรเด่นที่สุด ปุ่มที่กดผิดแล้วเสียหายควรอยู่ท้ายแถวและสีต่าง) */
+.btn-danger { border-color: var(--critical); color: var(--critical); background: transparent; }
+.btn-danger:hover { background: var(--critical); color: #fff; border-color: var(--critical); }
+
 /* ป้ายรุ่นของเว็บกลาง — เล็ก จาง อยู่ท้ายสุดของทุกหน้า (ใส่โดย gp-brand.js) */
 .gp-ver { text-align: center; color: var(--ink-2); font-size: 12.5px;
   padding: 14px 0 22px; opacity: .75; letter-spacing: .2px; }

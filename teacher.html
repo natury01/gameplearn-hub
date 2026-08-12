@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>เกมเพลิน — Dashboardสำหรับครู</title>
-<meta name="description" content="Dashboardสำหรับครู — ดูผลสัมฤทธิ์และสมรรถนะของนักเรียนทุกเกมเพลินในที่เดียว สร้างห้องเรียนและแจกโค้ดให้นักเรียน">
+<title>เกมเพลิน — Dashboard กลางสำหรับครู</title>
+<meta name="description" content="Dashboard กลางสำหรับครู — ดูผลสัมฤทธิ์และสมรรถนะของนักเรียนทุกเกมเพลินในที่เดียว สร้างห้องเรียนและแจกโค้ดให้นักเรียน">
 <script>/* ตั้งธีมก่อนวาดหน้า กันจอกะพริบ · คีย์ gp_theme จองไว้ให้แพลตฟอร์ม */
 try{var _t=JSON.parse(localStorage.getItem('gp_theme')||'{}');
 var d=document.documentElement;d.dataset.theme=_t.m||_t.dm||'light';d.dataset.skin=_t.s||_t.ds||'playful';}
@@ -21,14 +21,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <span class="bname"><span class="th" id="brand-th">เกมเพลิน</span><span class="en">GamePlearn · สำหรับครู</span></span></a>
     <div class="sp"></div>
     <nav class="navlinks" aria-label="เมนูหลัก">
+      <a href="./#games">เกมทั้งหมด</a>
       <!-- เมนูหน้าครู 3 หน้า อยู่บนแถบหัวเว็บ (เดิมเป็นแถบย่อยใต้หัวเว็บ — ครูสั่งให้เอาออก)
            ตัวที่กำลังเปิดอยู่ติด .on + aria-current ผ่าน syncNav() ทุกครั้งที่เปลี่ยน route
            จึงไม่ต้องใส่ class="on" ตายตัวให้ "สำหรับครู" อีก (จะไฮไลต์ซ้อนกันสองอัน) -->
       <a href="#/" data-nav="#/">📊 Dashboard</a>
-      <a href="#/rooms" data-nav="#/rooms">🏫 สร้างห้อง</a>
+      <a href="#/rooms" data-nav="#/rooms">🏫 สร้างห้องเรียน</a>
       <a href="standards.html">📋 มาตรฐาน</a>
       <a href="support.html">สนับสนุน</a>
-      <a href="contact.html">ติดต่อ</a>
+      <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
     </nav>
     <span class="who" id="who"></span>
     <button class="btn btn-sm hidden" id="btn-logout">ออกจากระบบ</button>
@@ -75,6 +76,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
               eventsCount: null, frameworks: [], coverage: [], itemSummary: [], itemProfile: [],
               compDims: [], achieve: [], schools: [] };
   let TAB = 'ach';   // 'ach' = ผลสัมฤทธิ์ | 'comp' = สมรรถนะ
+  /* ตัวกรองห้องบนหน้า Dashboard — '' = รวมทุกห้องของฉัน · ไม่งั้นเป็น id ของห้องเดียว
+     ทุกส่วนบนหน้านี้ (กล่องตัวเลข · เรดาร์ · ผลสัมฤทธิ์ · ตารางรายคน) อ่านค่าเดียวกันนี้
+     ครูจึงเทียบ "ภาพรวมทุกห้อง" กับ "ห้องเดียว" ได้โดยไม่ต้องเปลี่ยนหน้า */
+  let ROOM = '';
 
   function showErr(m) { const b = $('err'); b.textContent = m; b.classList.add('on'); }
   function clearErr() { $('err').classList.remove('on'); }
@@ -101,14 +106,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   // ตารางการวัดผล 2 มิติเป็นของใหม่ (08_ASSESSMENT_CORE.sql) — ถ้ายังไม่ได้รัน ให้เว็บทำงานต่อได้ ไม่พัง
-  /* soft = ยอมให้พัง แล้วเดินต่อ (ฐานที่ยังไม่ได้รัน SQL ชุดใหม่จะ 404)
-     แต่ต้อง "จำไว้ว่าพังเพราะอะไร" — ไม่งั้นหน้าจอจะบอกได้แค่ "ไม่มีข้อมูล"
-     ซึ่งครูแยกไม่ออกว่าเพราะยังไม่ได้รัน SQL หรือเพราะเกมยังไม่ส่งข้อมูลมา — คนละเรื่อง แก้คนละวิธี */
-  const MISS = {};
-  const soft = (p, tag) => G.get(p).catch(function (e) {
-    if (tag) MISS[tag] = e && (e.code || e.status || 'error');
-    return [];
-  });
+  const soft = (p) => G.get(p).catch(() => []);
   const qs = (p, q) => p + (p.indexOf('?') >= 0 ? '&' : '?') + q;
 
   /* ดึงโดยจำกัดด้วยรายการ id — แบ่งเป็นก้อนละ 80 เพราะ in.(...) ที่ยาวมาก
@@ -119,7 +117,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const jobs = [];
     for (let i = 0; i < ids.length; i += 80) {
       const u = qs(path, col + '=in.(' + ids.slice(i, i + 80).join(',') + ')');
-      jobs.push(isSoft ? soft(u, typeof isSoft === 'string' ? isSoft : null) : G.get(u));
+      jobs.push(isSoft ? soft(u) : G.get(u));
     }
     const out = [];
     (await Promise.all(jobs)).forEach((r) => { if (r) out.push.apply(out, r); });
@@ -148,8 +146,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
     const [games, rooms, frameworks, coverage, schools] = await Promise.all([
       G.get('/rest/v1/games?select=id,code,name,status,launch_url,dashboard_url,minimum_grade,maximum_grade&order=name'),
-      G.get('/rest/v1/classrooms?select=*&teacher_id=eq.' + encodeURIComponent(uid) + '&order=created_at.desc')
-        .then((rows) => (rows || []).filter((r) => !isPublicRoom(r))),   /* ห้องผู้เล่นทั่วไปไม่ใช่ของครู */
+      G.get('/rest/v1/classrooms?select=*&teacher_id=eq.' + encodeURIComponent(uid) + '&order=created_at.desc'),
       soft('/rest/v1/assessment_frameworks?select=code,kind,name_th,status,level_scale&status=eq.active'),
       soft('/rest/v1/v_framework_coverage?select=*&depth=eq.1'),
       soft('/rest/v1/schools?select=id,name&order=name'),
@@ -166,8 +163,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       /* ผลสมรรถนะที่ "เกมคิดแล้วส่งลงมา" — เว็บกลางอ่านอย่างเดียว ไม่คิดซ้ำ (38_CENTRAL_DASHBOARD.sql) */
       getIn('/rest/v1/v_student_competency?select=*', 'classroom_id', rid, true),
       /* ใบรายงานผล 2 ใบ (43_REPORT_CARDS.sql): สมรรถนะรายด้าน 6 ด้าน + ผลสัมฤทธิ์สรุปจากเกม */
-      getIn('/rest/v1/v_student_comp_dims?select=*', 'classroom_id', rid, 'compDims'),
-      getIn('/rest/v1/v_student_achievement?select=*', 'classroom_id', rid, 'achieve'),
+      getIn('/rest/v1/v_student_comp_dims?select=*', 'classroom_id', rid, true),
+      getIn('/rest/v1/v_student_achievement?select=*', 'classroom_id', rid, true),
     ]);
 
     /* student_game_progress กับ events ไม่มีคอลัมน์ห้อง จึงจำกัดด้วยรายชื่อนักเรียนแทน */
@@ -191,12 +188,6 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      (คำตอบ #47 ของภาค 2: ยอดรวมไม่นับคนที่ถูกปิด · กระดานอันดับก็ไม่นับ)
      แต่ข้อมูลรายคน "ยังแสดงครบ" ติดป้ายไว้เฉย ๆ — ไม่ซ่อน ไม่ลบ (กฎข้อ 1)
      อ่านแบบทนคอลัมน์หาย: is_active !== false → ฐานที่ยังไม่รัน 46 ถือว่าใช้งานปกติทุกคน */
-  /* ห้อง "ผู้เล่นทั่วไป" = คนที่สมัครเล่นเองจากหน้าเว็บ ไม่ใช่ห้องที่ครูสร้างและดูแล
-     จึงไม่ควรอยู่ใน "ห้องเรียนของฉัน" ของครูคนไหนเลย — ไปอยู่หน้าผู้ดูแลแทน (แท็บห้องเรียนทั้งระบบ)
-     ถ้าปล่อยไว้ ยอดนักเรียนและค่าเฉลี่ยของครูจะถูกปนด้วยคนที่ครูไม่ได้สอน */
-  const PUBLIC_ROOM = 'ผู้เล่นทั่วไป';
-  const isPublicRoom = (r) => !!r
-    && (String(r.name || '').trim() === PUBLIC_ROOM || String(r.grade || '').trim() === PUBLIC_ROOM);
   const isOn = (x) => !!x && x.is_active !== false;
   const offIds = () => new Set(S.students.filter((x) => x.is_active === false).map((x) => x.id));
   const offTag = (x) => (isOn(x) ? '' : ' <span class="badge">ปิดใช้งาน</span>');
@@ -276,40 +267,70 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   /* ===================== หน้ารวม ===================== */
-  function renderHome() {
-    const activeGames = new Set(S.cg.filter((x) => x.is_enabled).map((x) => x.game_id)).size;
-    const off = offIds();
-    const stuOn = S.students.filter(isOn).length;
-    /* ค่าเฉลี่ยของห้องไม่รวมคนที่ปิดการใช้งาน — ไม่งั้นเลขบนเว็บกลางจะไม่ตรงกับหน้าครูของเกม */
-    const prog = S.progress.filter((p) => !off.has(p.student_id));
-    const avgProg = prog.length ? prog.reduce((a, p) => a + (Number(p.progress_percent) || 0), 0) / prog.length : null;
-    const totalAttempts = S.summary.reduce((a, r) => a + (Number(r.total_attempts) || 0), 0);
+  /* แถบเลือกห้อง — ถ้ามีห้องเดียวก็ไม่ต้องมี ไม่มีอะไรให้เลือก */
+  function roomPicker() {
+    if (S.rooms.length < 2) return '';
+    const cur = ROOM;
+    return '<div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">'
+      + '<label for="room-pick" style="font-weight:600">ดูข้อมูลของ</label>'
+      + '<select id="room-pick" style="max-width:320px">'
+      +   '<option value=""' + (cur === '' ? ' selected' : '') + '>ทุกห้องของฉัน ('
+      +     S.rooms.length + ' ห้อง)</option>'
+      +   S.rooms.map((r) => '<option value="' + G.esc(r.id) + '"'
+          + (cur === r.id ? ' selected' : '') + '>' + G.esc(r.name)
+          + ' — นักเรียน ' + studentsOf(r.id).filter(isOn).length + ' คน</option>').join('')
+      + '</select>'
+      + (cur ? '<a class="btn btn-sm" href="#/room/' + G.esc(cur) + '">เปิดหน้าห้องนี้ →</a>' : '')
+      + '</div>';
+  }
 
-    let html = '<div class="tiles">'
-      + tile('ห้องเรียน', G.fmtInt(S.rooms.length))
-      + tile('นักเรียน', G.fmtInt(stuOn), off.size ? '· ปิด ' + off.size : '')
+  function renderHome() {
+    /* กรองทุกอย่างด้วยห้องที่เลือกไว้ — cid = null คือรวมทุกห้อง (ฟังก์ชันด้านล่างรับกติกานี้อยู่แล้ว) */
+    const cid = ROOM || null;
+    const inRoom = (x) => !cid || x.classroom_id === cid;
+    const myStu = S.students.filter((x) => inRoom(x));
+    const stuIds = new Set(myStu.map((x) => x.id));
+    const cgRows = S.cg.filter((x) => x.is_enabled && inRoom(x));
+    const activeGames = new Set(cgRows.map((x) => x.game_id)).size;
+    const off = offIds();
+    const stuOn = myStu.filter(isOn).length;
+    /* ค่าเฉลี่ยของห้องไม่รวมคนที่ปิดการใช้งาน — ไม่งั้นเลขบนเว็บกลางจะไม่ตรงกับหน้าครูของเกม */
+    const prog = S.progress.filter((p) => !off.has(p.student_id) && stuIds.has(p.student_id));
+    const avgProg = prog.length ? prog.reduce((a, p) => a + (Number(p.progress_percent) || 0), 0) / prog.length : null;
+    const totalAttempts = S.summary.filter(inRoom).reduce((a, r) => a + (Number(r.total_attempts) || 0), 0);
+    const offHere = myStu.filter((x) => x.is_active === false).length;
+
+    let html = roomPicker() + '<div class="tiles">'
+      + tile('ห้องเรียน', G.fmtInt(cid ? 1 : S.rooms.length))
+      + tile('นักเรียน', G.fmtInt(stuOn), offHere ? '· ปิด ' + offHere : '')
       + tile('เกมที่ใช้งาน', G.fmtInt(activeGames))
       + tile('ความคืบหน้าเฉลี่ย', avgProg == null ? '–' : Math.round(avgProg), avgProg == null ? '' : '%')
       + tile('รอบที่ส่งผล', G.fmtInt(totalAttempts))
-      + tile('บันทึกการเล่นสะสม', S.eventsCount == null ? '–' : G.fmtInt(S.eventsCount))
+      + tile('บันทึกการเล่นสะสม',
+          cid ? '–' : (S.eventsCount == null ? '–' : G.fmtInt(S.eventsCount)))
       + '</div>';
 
     html += tabs();
 
     if (TAB === 'hots') {
-      html += '<h2 class="sr-only">การคิดขั้นสูง รายเกม</h2>' + hotsSection(null);
+      html += '<h2 class="sr-only">การคิดขั้นสูง รายเกม</h2>' + hotsSection(cid);
     } else if (TAB === 'comp') {
-      html += comp6Section(null) + comp6Table(null) + compSection(null);
+      html += comp6Section(cid) + comp6Table(cid) + compSection(cid);
     } else {
-      html += achSummaryCards(null);
-      html += '<h2 class="section-title">ห้องเรียนของฉัน <span class="sub">' + S.rooms.length + ' ห้อง</span></h2>'
-        + (S.rooms.length ? '<div class="roomlist">' + S.rooms.map(roomCard).join('') + '</div>'
-                          : '<div class="card muted">ยังไม่มีห้องเรียน — สร้างห้องแรกด้านล่าง</div>')
+      html += achSummaryCards(cid);
+      /* รายการห้องตามตัวกรองด้วย — ไม่งั้นครูเลือกห้องเดียวแล้วยังเห็นทุกห้องข้างล่าง
+         จะไม่แน่ใจว่าตัวเลขด้านบนเป็นของห้องไหน */
+      const showRooms = cid ? S.rooms.filter((r) => r.id === cid) : S.rooms;
+      html += '<h2 class="section-title">ห้องเรียนของฉัน <span class="sub">' + showRooms.length + ' ห้อง</span></h2>'
+        + (showRooms.length ? '<div class="roomlist">' + showRooms.map(roomCard).join('') + '</div>'
+                            : '<div class="card muted">ยังไม่มีห้องเรียน — สร้างห้องแรกด้านล่าง</div>')
         + '<div style="margin-top:14px"><a class="btn btn-primary" href="#/rooms">🏫 สร้าง / จัดการห้องเรียน</a></div>';
     }
 
     $('content').innerHTML = html;
     const go = $('nr-go'); if (go) go.onclick = createRoom;
+    const pick = $('room-pick');
+    if (pick) pick.onchange = function () { ROOM = pick.value; renderHome(); };
   }
 
   /** ส่วนสมรรถนะ — classroomId = null หมายถึงรวมทุกห้องของครู */
@@ -542,7 +563,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let html = '<h2 class="section-title">สมรรถนะหลัก 6 ด้าน '
       + '<span class="sub">ค่าที่เกมคิดแล้วส่งมา — เว็บกลางไม่คิดซ้ำ</span></h2>';
     if (!any) {
-      return html + pipeNote('compDims');
+      return html + '<div class="card muted">ยังไม่มีเกมส่งผลสมรรถนะรายด้านเข้ามา — '
+        + 'รัน <code>43_REPORT_CARDS.sql</code> แล้วให้เกมส่ง "ใบรายงานผล" ตัวเลขจะขึ้นที่นี่เอง '
+        + '(ผลการคิดขั้นสูงของเกมที่ส่งผ่านช่องเดิมจะถูกย้ายมาให้อัตโนมัติ)</div>';
     }
     const bars = ds.map(function (d) {
       const meta = d.n ? ('จาก ' + d.games.length + ' เกม · ' + d.students + ' คน') : '';
@@ -659,30 +682,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   function achOf(sid, gid) {
     return (S.achieve || []).find((x) => x.student_id === sid && x.game_id === gid) || null;
   }
-  /* กล่องบอกสถานะท่อข้อมูล — ขึ้นเฉพาะตอนยังไม่มีข้อมูลให้แสดง
-     ตั้งใจแยกสองกรณีให้ชัด เพราะครูต้องทำคนละอย่าง:
-       ยังไม่ได้รัน SQL → ไปรันไฟล์
-       รันแล้วแต่ยังว่าง → ไปเปิดหน้าครูของเกมหนึ่งครั้ง (เกมส่งข้อมูลตอนนั้น) */
-  function pipeNote(which) {
-    const label = which === 'achieve' ? 'ผลสัมฤทธิ์' : 'สมรรถนะหลัก 6 ด้าน';
-    const view  = which === 'achieve' ? 'v_student_achievement' : 'v_student_comp_dims';
-    if (MISS[which]) {
-      return '<div class="card" style="border-color:var(--warning)"><b>ยังไม่ได้เปิดท่อ' + label + '</b>'
-        + '<div class="muted small" style="margin-top:6px">ฐานข้อมูลยังไม่มีวิว <code>' + view + '</code> '
-        + '(' + G.esc(String(MISS[which])) + ') — ต้อง<b>รัน <code>43_REPORT_CARDS.sql</code> บน Supabase</b>ก่อน '
-        + 'จากนั้นอัปเดตเกมทั้งสองภาคเป็นรุ่นที่ส่ง "ใบรายงานผล" แล้วเปิดหน้าครูของเกมหนึ่งครั้ง</div></div>';
-    }
-    return '<div class="card muted"><b>ยังไม่มีข้อมูล' + label + 'ส่งเข้ามา</b>'
-      + '<div class="small" style="margin-top:6px">ฐานข้อมูลพร้อมแล้ว (มีวิว <code>' + view + '</code>) '
-      + 'แต่ยังไม่มีเกมไหนส่งใบรายงานผลเข้ามาเลย — <b>เปิดหน้าครูของเกมหนึ่งครั้ง</b> '
-      + 'เกมจะคำนวณแล้วส่งขึ้นมาเอง (ภาค 1 เปิดหน้าห้องเรียน · ภาค 2 เปิดแท็บ 🧪 เทียบเกณฑ์)</div></div>';
-  }
-
   function achSummaryCards(cid) {
     const off = offIds();
     const rows = (S.achieve || []).filter((r) => (!cid || r.classroom_id === cid) && !off.has(r.student_id));
-    /* เดิมคืนค่าว่างเงียบ ๆ — ครูจึงเห็นแค่หัวข้อ "ผลสัมฤทธิ์" แล้วไม่มีอะไรเลย ไม่รู้ว่าติดตรงไหน */
-    if (!rows.length) return '<h2 class="section-title">ผลสัมฤทธิ์</h2>' + pipeNote('achieve');
+    if (!rows.length) return '';
     const byGame = {};
     rows.forEach(function (r) { (byGame[r.game_name] = byGame[r.game_name] || []).push(r); });
     const cards = Object.keys(byGame).map(function (gn) {
@@ -878,22 +881,18 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const stu = all.filter(isOn).length;
     const stuOff = all.length - stu;
     const en = enabledGames(r.id);
-    /* วางเป็นแถว ไม่ใช่การ์ดสามคอลัมน์ — ชื่อห้องกับโค้ดอยู่ระดับสายตาเดียวกันทุกห้อง
-       กวาดตาหาห้องที่ต้องการได้เร็วกว่า โดยเฉพาะครูที่มีหลายห้อง
-       สวิตช์เปิด/ปิดเกมย้ายเข้าไปในห้องแล้ว — ไม่ใช่ของที่ต้องเห็นตอนไล่ดูรายการห้อง
-       และวางไว้ในรายการเสี่ยงกดโดนตอนเลื่อนหน้าจอด้วย */
+    /* วางเป็นแถว ไม่ใช่การ์ดหลายคอลัมน์ — ชื่อห้องกับโค้ดอยู่ระดับสายตาเดียวกันทุกห้อง
+       สวิตช์เปิด/ปิดเกมย้ายเข้าไปในห้องแล้ว ไม่ใช่ของที่ต้องเห็นตอนไล่ดูรายการห้อง */
     return '<div class="roomrow">'
-      + '<div class="rr-main">'
-      +   '<div class="rr-name">🏫 ' + G.esc(r.name)
-      +     (r.is_active ? '' : ' <span class="badge">ปิดใช้งาน</span>') + '</div>'
+      + '<div class="rr-main"><div class="rr-name">🏫 ' + G.esc(r.name)
+      +   (r.is_active ? '' : ' <span class="badge">ปิดใช้งาน</span>') + '</div>'
       +   '<div class="muted small">นักเรียน ' + stu + ' คน'
       +     (stuOff ? ' · ปิดการใช้งาน ' + stuOff + ' คน' : '') + ' · '
       +     (en.length ? 'เกมที่เปิด: ' + G.esc(en.map((g) => g.name).join(', '))
                        : '<span style="color:var(--critical)">ยังไม่เปิดเกม</span>') + '</div></div>'
       + '<div class="rr-code"><span class="joinkey">' + G.esc(r.join_key) + '</span>'
       +   '<button class="btn btn-sm" data-copy="' + G.esc(r.join_key) + '">คัดลอก</button></div>'
-      + '<div class="rr-act">'
-      +   '<a class="btn btn-sm btn-primary" href="#/room/' + r.id + '">ดูผลของห้องนี้ →</a></div>'
+      + '<div class="rr-act"><a class="btn btn-sm btn-primary" href="#/room/' + r.id + '">ดูผลของห้องนี้ →</a></div>'
       + '</div>';
   }
 
@@ -1024,10 +1023,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const stu = studentsOf(r.id);
     const off = stu.filter((x) => x.is_active === false).length;
     return '<div class="roomrow" data-room="' + r.id + '">'
-      + '<div class="rr-main">'
-      +   '<div class="rr-name">🏫 ' + G.esc(r.name)
-      +     (r.is_active === false ? ' <span class="badge">ปิดใช้งาน</span>' : '')
-      +     (r.listed === false ? ' <span class="badge">โค้ดเท่านั้น</span>' : '') + '</div>'
+      + '<div class="rr-main"><div class="rr-name">🏫 ' + G.esc(r.name)
+      +   (r.is_active === false ? ' <span class="badge">ปิดใช้งาน</span>' : '')
+      +   (r.listed === false ? ' <span class="badge">โค้ดเท่านั้น</span>' : '') + '</div>'
       +   '<div class="muted small">'
       +     (r.academic_year ? 'ปีการศึกษา ' + G.esc(r.academic_year) + ' · ' : '')
       +     'นักเรียน ' + stu.length + ' คน' + (off ? ' (ปิดใช้งาน ' + off + ')' : '') + '</div></div>'
@@ -1164,12 +1162,6 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let html = '<h2 style="margin:0 0 2px;font-size:20px">🏫 ' + G.esc(r.name)
       + ' <span class="muted" style="font-size:14px;font-weight:400">โค้ดเข้าห้อง <span class="joinkey" style="font-size:15px">' + G.esc(r.join_key) + '</span></span></h2>'
       + '<div class="muted small">นักเรียน ' + stu.length + ' คน · เกมที่เปิดใช้ ' + games.length + ' เกม</div>'
-      /* สวิตช์เปิด/ปิดเกม ย้ายมาอยู่ตรงนี้ (เดิมอยู่บนการ์ดในรายการห้อง)
-         เป็นการตั้งค่าของห้องนี้โดยเฉพาะ จึงควรอยู่ในห้อง ไม่ใช่ในรายการที่ครูแค่กวาดตาหาห้อง */
-      + '<div class="card" style="margin-top:12px"><b>เกมที่เปิดให้ห้องนี้เล่น</b>'
-      +   '<div class="muted small" style="margin:2px 0 8px">ปิดไว้ = นักเรียนใช้โค้ดห้องนี้เข้าเกมนั้นไม่ได้ '
-      +   '· ผลการเล่นที่มีอยู่แล้วไม่หาย</div>'
-      +   assignRows(r) + '</div>'
       + tabs();
 
     if (TAB === 'hots') {

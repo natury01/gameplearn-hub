@@ -892,22 +892,17 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
 @media (max-width: 560px) { .c6name, .c6sub > span:first-child { flex-basis: 118px; } }
 
 /* ป้ายรุ่นของเว็บกลาง — เล็ก จาง อยู่ท้ายสุดของทุกหน้า (ใส่โดย gp-brand.js) */
-/* รายการห้องเรียนแบบแถว (ครูสั่ง 12 ส.ค. — เดิมเป็นการ์ดหลายคอลัมน์ ชื่อห้องไม่อยู่ระดับสายตาเดียวกัน)
-   สามส่วนในแถวเดียว: ชื่อ+ยอด · โค้ด · ปุ่ม — จอแคบพับเป็นแนวตั้งเอง ไม่ต้องมี breakpoint แยก */
+/* รายการห้องเรียนแบบแถว */
 .roomlist { display: flex; flex-direction: column; gap: 10px; }
 .roomrow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
-  background: var(--card); border: 1px solid var(--grid); border-radius: var(--r-md);
-  padding: 12px 14px; }
+  background: var(--card); border: 1px solid var(--grid); border-radius: var(--r-md); padding: 12px 14px; }
 .roomrow .rr-main { flex: 1 1 260px; min-width: 0; }
 .roomrow .rr-name { font-weight: 700; font-size: 16px; }
-.roomrow .rr-code,
-.roomrow .rr-act { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; flex-wrap: wrap; }
+.roomrow .rr-code, .roomrow .rr-act { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; flex-wrap: wrap; }
 .roomrow .rr-box { flex-basis: 100%; width: 100%; }
-@media (max-width: 720px) {
-  .roomrow .rr-code, .roomrow .rr-act { flex-basis: 100%; }
-}
+@media (max-width: 720px) { .roomrow .rr-code, .roomrow .rr-act { flex-basis: 100%; } }
 
-/* ปุ่มลบถาวร — ต้องดูต่างจากปุ่มอื่นชัดเจน แต่ไม่เด่นจนตาไปหาก่อนปุ่มที่ใช้บ่อย */
+/* ปุ่มลบถาวร */
 .btn-danger { border-color: var(--critical); color: var(--critical); background: transparent; }
 .btn-danger:hover { background: var(--critical); color: #fff; border-color: var(--critical); }
 

@@ -117,7 +117,7 @@
     try {
       if (document.getElementById('gp-ver')) return;
       var v = C.HUB_VERSION; if (!v) return;
-      var txt = 'เว็บกลาง ' + v + (C.HUB_BUILD ? ' · build ' + C.HUB_BUILD : '');
+      var txt = v + (C.HUB_BUILD ? ' · build ' + C.HUB_BUILD : '');
       var d = document.createElement('div');
       d.id = 'gp-ver';
       d.className = 'gp-ver';

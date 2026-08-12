@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>เกมเพลิน — Dashboard กลางสำหรับครู</title>
-<meta name="description" content="Dashboard กลางสำหรับครู — ดูผลสัมฤทธิ์และสมรรถนะของนักเรียนทุกเกมเพลินในที่เดียว สร้างห้องเรียนและแจกโค้ดให้นักเรียน">
+<title>เกมเพลิน — Dashboardสำหรับครู</title>
+<meta name="description" content="Dashboardสำหรับครู — ดูผลสัมฤทธิ์และสมรรถนะของนักเรียนทุกเกมเพลินในที่เดียว สร้างห้องเรียนและแจกโค้ดให้นักเรียน">
 <script>/* ตั้งธีมก่อนวาดหน้า กันจอกะพริบ · คีย์ gp_theme จองไว้ให้แพลตฟอร์ม */
 try{var _t=JSON.parse(localStorage.getItem('gp_theme')||'{}');
 var d=document.documentElement;d.dataset.theme=_t.m||_t.dm||'light';d.dataset.skin=_t.s||_t.ds||'playful';}
@@ -21,15 +21,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <span class="bname"><span class="th" id="brand-th">เกมเพลิน</span><span class="en">GamePlearn · สำหรับครู</span></span></a>
     <div class="sp"></div>
     <nav class="navlinks" aria-label="เมนูหลัก">
-      <a href="./#games">เกมทั้งหมด</a>
       <!-- เมนูหน้าครู 3 หน้า อยู่บนแถบหัวเว็บ (เดิมเป็นแถบย่อยใต้หัวเว็บ — ครูสั่งให้เอาออก)
            ตัวที่กำลังเปิดอยู่ติด .on + aria-current ผ่าน syncNav() ทุกครั้งที่เปลี่ยน route
            จึงไม่ต้องใส่ class="on" ตายตัวให้ "สำหรับครู" อีก (จะไฮไลต์ซ้อนกันสองอัน) -->
       <a href="#/" data-nav="#/">📊 Dashboard</a>
-      <a href="#/rooms" data-nav="#/rooms">🏫 สร้างห้องเรียน</a>
+      <a href="#/rooms" data-nav="#/rooms">🏫 สร้างห้อง</a>
       <a href="standards.html">📋 มาตรฐาน</a>
       <a href="support.html">สนับสนุน</a>
-      <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
+      <a href="contact.html">ติดต่อ</a>
     </nav>
     <span class="who" id="who"></span>
     <button class="btn btn-sm hidden" id="btn-logout">ออกจากระบบ</button>
@@ -102,7 +101,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   // ตารางการวัดผล 2 มิติเป็นของใหม่ (08_ASSESSMENT_CORE.sql) — ถ้ายังไม่ได้รัน ให้เว็บทำงานต่อได้ ไม่พัง
-  const soft = (p) => G.get(p).catch(() => []);
+  /* soft = ยอมให้พัง แล้วเดินต่อ (ฐานที่ยังไม่ได้รัน SQL ชุดใหม่จะ 404)
+     แต่ต้อง "จำไว้ว่าพังเพราะอะไร" — ไม่งั้นหน้าจอจะบอกได้แค่ "ไม่มีข้อมูล"
+     ซึ่งครูแยกไม่ออกว่าเพราะยังไม่ได้รัน SQL หรือเพราะเกมยังไม่ส่งข้อมูลมา — คนละเรื่อง แก้คนละวิธี */
+  const MISS = {};
+  const soft = (p, tag) => G.get(p).catch(function (e) {
+    if (tag) MISS[tag] = e && (e.code || e.status || 'error');
+    return [];
+  });
   const qs = (p, q) => p + (p.indexOf('?') >= 0 ? '&' : '?') + q;
 
   /* ดึงโดยจำกัดด้วยรายการ id — แบ่งเป็นก้อนละ 80 เพราะ in.(...) ที่ยาวมาก
@@ -113,7 +119,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const jobs = [];
     for (let i = 0; i < ids.length; i += 80) {
       const u = qs(path, col + '=in.(' + ids.slice(i, i + 80).join(',') + ')');
-      jobs.push(isSoft ? soft(u) : G.get(u));
+      jobs.push(isSoft ? soft(u, typeof isSoft === 'string' ? isSoft : null) : G.get(u));
     }
     const out = [];
     (await Promise.all(jobs)).forEach((r) => { if (r) out.push.apply(out, r); });
@@ -142,7 +148,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
     const [games, rooms, frameworks, coverage, schools] = await Promise.all([
       G.get('/rest/v1/games?select=id,code,name,status,launch_url,dashboard_url,minimum_grade,maximum_grade&order=name'),
-      G.get('/rest/v1/classrooms?select=*&teacher_id=eq.' + encodeURIComponent(uid) + '&order=created_at.desc'),
+      G.get('/rest/v1/classrooms?select=*&teacher_id=eq.' + encodeURIComponent(uid) + '&order=created_at.desc')
+        .then((rows) => (rows || []).filter((r) => !isPublicRoom(r))),   /* ห้องผู้เล่นทั่วไปไม่ใช่ของครู */
       soft('/rest/v1/assessment_frameworks?select=code,kind,name_th,status,level_scale&status=eq.active'),
       soft('/rest/v1/v_framework_coverage?select=*&depth=eq.1'),
       soft('/rest/v1/schools?select=id,name&order=name'),
@@ -159,8 +166,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       /* ผลสมรรถนะที่ "เกมคิดแล้วส่งลงมา" — เว็บกลางอ่านอย่างเดียว ไม่คิดซ้ำ (38_CENTRAL_DASHBOARD.sql) */
       getIn('/rest/v1/v_student_competency?select=*', 'classroom_id', rid, true),
       /* ใบรายงานผล 2 ใบ (43_REPORT_CARDS.sql): สมรรถนะรายด้าน 6 ด้าน + ผลสัมฤทธิ์สรุปจากเกม */
-      getIn('/rest/v1/v_student_comp_dims?select=*', 'classroom_id', rid, true),
-      getIn('/rest/v1/v_student_achievement?select=*', 'classroom_id', rid, true),
+      getIn('/rest/v1/v_student_comp_dims?select=*', 'classroom_id', rid, 'compDims'),
+      getIn('/rest/v1/v_student_achievement?select=*', 'classroom_id', rid, 'achieve'),
     ]);
 
     /* student_game_progress กับ events ไม่มีคอลัมน์ห้อง จึงจำกัดด้วยรายชื่อนักเรียนแทน */
@@ -184,6 +191,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      (คำตอบ #47 ของภาค 2: ยอดรวมไม่นับคนที่ถูกปิด · กระดานอันดับก็ไม่นับ)
      แต่ข้อมูลรายคน "ยังแสดงครบ" ติดป้ายไว้เฉย ๆ — ไม่ซ่อน ไม่ลบ (กฎข้อ 1)
      อ่านแบบทนคอลัมน์หาย: is_active !== false → ฐานที่ยังไม่รัน 46 ถือว่าใช้งานปกติทุกคน */
+  /* ห้อง "ผู้เล่นทั่วไป" = คนที่สมัครเล่นเองจากหน้าเว็บ ไม่ใช่ห้องที่ครูสร้างและดูแล
+     จึงไม่ควรอยู่ใน "ห้องเรียนของฉัน" ของครูคนไหนเลย — ไปอยู่หน้าผู้ดูแลแทน (แท็บห้องเรียนทั้งระบบ)
+     ถ้าปล่อยไว้ ยอดนักเรียนและค่าเฉลี่ยของครูจะถูกปนด้วยคนที่ครูไม่ได้สอน */
+  const PUBLIC_ROOM = 'ผู้เล่นทั่วไป';
+  const isPublicRoom = (r) => !!r
+    && (String(r.name || '').trim() === PUBLIC_ROOM || String(r.grade || '').trim() === PUBLIC_ROOM);
   const isOn = (x) => !!x && x.is_active !== false;
   const offIds = () => new Set(S.students.filter((x) => x.is_active === false).map((x) => x.id));
   const offTag = (x) => (isOn(x) ? '' : ' <span class="badge">ปิดใช้งาน</span>');
@@ -290,7 +303,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     } else {
       html += achSummaryCards(null);
       html += '<h2 class="section-title">ห้องเรียนของฉัน <span class="sub">' + S.rooms.length + ' ห้อง</span></h2>'
-        + '<div class="grid cols-3">' + (S.rooms.map(roomCard).join('') || '<div class="card muted">ยังไม่มีห้องเรียน — สร้างห้องแรกด้านล่าง</div>') + '</div>'
+        + (S.rooms.length ? '<div class="roomlist">' + S.rooms.map(roomCard).join('') + '</div>'
+                          : '<div class="card muted">ยังไม่มีห้องเรียน — สร้างห้องแรกด้านล่าง</div>')
         + '<div style="margin-top:14px"><a class="btn btn-primary" href="#/rooms">🏫 สร้าง / จัดการห้องเรียน</a></div>';
     }
 
@@ -528,9 +542,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let html = '<h2 class="section-title">สมรรถนะหลัก 6 ด้าน '
       + '<span class="sub">ค่าที่เกมคิดแล้วส่งมา — เว็บกลางไม่คิดซ้ำ</span></h2>';
     if (!any) {
-      return html + '<div class="card muted">ยังไม่มีเกมส่งผลสมรรถนะรายด้านเข้ามา — '
-        + 'รัน <code>43_REPORT_CARDS.sql</code> แล้วให้เกมส่ง "ใบรายงานผล" ตัวเลขจะขึ้นที่นี่เอง '
-        + '(ผลการคิดขั้นสูงของเกมที่ส่งผ่านช่องเดิมจะถูกย้ายมาให้อัตโนมัติ)</div>';
+      return html + pipeNote('compDims');
     }
     const bars = ds.map(function (d) {
       const meta = d.n ? ('จาก ' + d.games.length + ' เกม · ' + d.students + ' คน') : '';
@@ -647,10 +659,30 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   function achOf(sid, gid) {
     return (S.achieve || []).find((x) => x.student_id === sid && x.game_id === gid) || null;
   }
+  /* กล่องบอกสถานะท่อข้อมูล — ขึ้นเฉพาะตอนยังไม่มีข้อมูลให้แสดง
+     ตั้งใจแยกสองกรณีให้ชัด เพราะครูต้องทำคนละอย่าง:
+       ยังไม่ได้รัน SQL → ไปรันไฟล์
+       รันแล้วแต่ยังว่าง → ไปเปิดหน้าครูของเกมหนึ่งครั้ง (เกมส่งข้อมูลตอนนั้น) */
+  function pipeNote(which) {
+    const label = which === 'achieve' ? 'ผลสัมฤทธิ์' : 'สมรรถนะหลัก 6 ด้าน';
+    const view  = which === 'achieve' ? 'v_student_achievement' : 'v_student_comp_dims';
+    if (MISS[which]) {
+      return '<div class="card" style="border-color:var(--warning)"><b>ยังไม่ได้เปิดท่อ' + label + '</b>'
+        + '<div class="muted small" style="margin-top:6px">ฐานข้อมูลยังไม่มีวิว <code>' + view + '</code> '
+        + '(' + G.esc(String(MISS[which])) + ') — ต้อง<b>รัน <code>43_REPORT_CARDS.sql</code> บน Supabase</b>ก่อน '
+        + 'จากนั้นอัปเดตเกมทั้งสองภาคเป็นรุ่นที่ส่ง "ใบรายงานผล" แล้วเปิดหน้าครูของเกมหนึ่งครั้ง</div></div>';
+    }
+    return '<div class="card muted"><b>ยังไม่มีข้อมูล' + label + 'ส่งเข้ามา</b>'
+      + '<div class="small" style="margin-top:6px">ฐานข้อมูลพร้อมแล้ว (มีวิว <code>' + view + '</code>) '
+      + 'แต่ยังไม่มีเกมไหนส่งใบรายงานผลเข้ามาเลย — <b>เปิดหน้าครูของเกมหนึ่งครั้ง</b> '
+      + 'เกมจะคำนวณแล้วส่งขึ้นมาเอง (ภาค 1 เปิดหน้าห้องเรียน · ภาค 2 เปิดแท็บ 🧪 เทียบเกณฑ์)</div></div>';
+  }
+
   function achSummaryCards(cid) {
     const off = offIds();
     const rows = (S.achieve || []).filter((r) => (!cid || r.classroom_id === cid) && !off.has(r.student_id));
-    if (!rows.length) return '';
+    /* เดิมคืนค่าว่างเงียบ ๆ — ครูจึงเห็นแค่หัวข้อ "ผลสัมฤทธิ์" แล้วไม่มีอะไรเลย ไม่รู้ว่าติดตรงไหน */
+    if (!rows.length) return '<h2 class="section-title">ผลสัมฤทธิ์</h2>' + pipeNote('achieve');
     const byGame = {};
     rows.forEach(function (r) { (byGame[r.game_name] = byGame[r.game_name] || []).push(r); });
     const cards = Object.keys(byGame).map(function (gn) {
@@ -846,17 +878,22 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const stu = all.filter(isOn).length;
     const stuOff = all.length - stu;
     const en = enabledGames(r.id);
-    return '<div class="card">'
-      + '<div style="display:flex;align-items:baseline;gap:8px"><h3 style="margin:0;font-size:16.5px;flex:1">🏫 ' + G.esc(r.name) + '</h3>'
-      + (r.is_active ? '' : '<span class="badge">ปิดใช้งาน</span>') + '</div>'
-      + '<div class="muted small" style="margin:4px 0 8px">นักเรียน ' + stu + ' คน'
-      + (stuOff ? ' · ปิดการใช้งาน ' + stuOff + ' คน' : '') + ' · เกมที่เปิด: '
-      + (en.length ? en.map((g) => G.esc(g.name)).join(', ') : '<span style="color:var(--critical)">ยังไม่เปิดเกม</span>') + '</div>'
-      + '<div style="display:flex;align-items:center;gap:10px;margin:8px 0 12px">'
-      + '<span class="muted small">โค้ดเข้าห้อง</span> <span class="joinkey">' + G.esc(r.join_key) + '</span>'
-      + '<button class="btn btn-sm" data-copy="' + G.esc(r.join_key) + '">คัดลอก</button></div>'
-      + assignRows(r)
-      + '<div style="margin-top:12px"><a class="btn btn-sm btn-primary" href="#/room/' + r.id + '">ดูผลของห้องนี้ →</a></div>'
+    /* วางเป็นแถว ไม่ใช่การ์ดสามคอลัมน์ — ชื่อห้องกับโค้ดอยู่ระดับสายตาเดียวกันทุกห้อง
+       กวาดตาหาห้องที่ต้องการได้เร็วกว่า โดยเฉพาะครูที่มีหลายห้อง
+       สวิตช์เปิด/ปิดเกมย้ายเข้าไปในห้องแล้ว — ไม่ใช่ของที่ต้องเห็นตอนไล่ดูรายการห้อง
+       และวางไว้ในรายการเสี่ยงกดโดนตอนเลื่อนหน้าจอด้วย */
+    return '<div class="roomrow">'
+      + '<div class="rr-main">'
+      +   '<div class="rr-name">🏫 ' + G.esc(r.name)
+      +     (r.is_active ? '' : ' <span class="badge">ปิดใช้งาน</span>') + '</div>'
+      +   '<div class="muted small">นักเรียน ' + stu + ' คน'
+      +     (stuOff ? ' · ปิดการใช้งาน ' + stuOff + ' คน' : '') + ' · '
+      +     (en.length ? 'เกมที่เปิด: ' + G.esc(en.map((g) => g.name).join(', '))
+                       : '<span style="color:var(--critical)">ยังไม่เปิดเกม</span>') + '</div></div>'
+      + '<div class="rr-code"><span class="joinkey">' + G.esc(r.join_key) + '</span>'
+      +   '<button class="btn btn-sm" data-copy="' + G.esc(r.join_key) + '">คัดลอก</button></div>'
+      + '<div class="rr-act">'
+      +   '<a class="btn btn-sm btn-primary" href="#/room/' + r.id + '">ดูผลของห้องนี้ →</a></div>'
       + '</div>';
   }
 
@@ -974,7 +1011,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
     html += '<h2 class="section-title">ห้องเรียนของฉัน <span class="sub">' + rooms.length + ' ห้อง</span></h2>';
     html += rooms.length
-      ? '<div class="grid cols-2">' + rooms.map(roomManageCard).join('') + '</div>'
+      ? '<div class="roomlist">' + rooms.map(roomManageCard).join('') + '</div>'
       : '<div class="card muted">ยังไม่มีห้องเรียน — สร้างห้องแรกด้านบน</div>';
 
     $('content').innerHTML = html;
@@ -986,81 +1023,29 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   function roomManageCard(r) {
     const stu = studentsOf(r.id);
     const off = stu.filter((x) => x.is_active === false).length;
-    return '<div class="card" data-room="' + r.id + '">'
-      + '<div style="display:flex;align-items:baseline;gap:8px">'
-      +   '<h3 style="margin:0;font-size:16.5px;flex:1">🏫 ' + G.esc(r.name) + '</h3>'
-      +   (r.is_active === false ? '<span class="badge">ปิดใช้งาน</span>' : '')
-      +   (r.listed === false ? '<span class="badge">โค้ดเท่านั้น</span>' : '') + '</div>'
-      + '<div class="muted small" style="margin:4px 0 8px">'
-      +   (r.academic_year ? 'ปีการศึกษา ' + G.esc(r.academic_year) + ' · ' : '')
-      +   'นักเรียน ' + stu.length + ' คน' + (off ? ' (ปิดใช้งาน ' + off + ')' : '') + '</div>'
-      + '<div style="display:flex;align-items:center;gap:10px;margin:8px 0 12px;flex-wrap:wrap">'
-      +   '<span class="muted small">โค้ดเข้าห้อง</span> <span class="joinkey">' + G.esc(r.join_key) + '</span>'
+    return '<div class="roomrow" data-room="' + r.id + '">'
+      + '<div class="rr-main">'
+      +   '<div class="rr-name">🏫 ' + G.esc(r.name)
+      +     (r.is_active === false ? ' <span class="badge">ปิดใช้งาน</span>' : '')
+      +     (r.listed === false ? ' <span class="badge">โค้ดเท่านั้น</span>' : '') + '</div>'
+      +   '<div class="muted small">'
+      +     (r.academic_year ? 'ปีการศึกษา ' + G.esc(r.academic_year) + ' · ' : '')
+      +     'นักเรียน ' + stu.length + ' คน' + (off ? ' (ปิดใช้งาน ' + off + ')' : '') + '</div></div>'
+      + '<div class="rr-code"><span class="joinkey">' + G.esc(r.join_key) + '</span>'
       +   '<button class="btn btn-sm" data-copy="' + G.esc(r.join_key) + '">คัดลอก</button>'
       +   '<button class="btn btn-sm" data-sheet="' + r.id + '">🖨 ใบแจกโค้ด</button></div>'
-      + assignRows(r)
-      + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+      + '<div class="rr-act">'
       +   '<a class="btn btn-sm btn-primary" href="#/room/' + r.id + '">ดูผล / รายชื่อ →</a>'
       +   '<button class="btn btn-sm" data-edit-room="' + r.id + '">✏️ แก้ไข</button>'
       +   '<button class="btn btn-sm" data-toggle-room="' + r.id + '">'
       +     (r.is_active === false ? 'เปิดห้อง' : 'ปิดห้องชั่วคราว') + '</button>'
       +   '<button class="btn btn-sm btn-danger" data-del-room="' + r.id + '">🗑 ลบห้อง</button></div>'
-      + '<div class="hidden" data-delbox="' + r.id + '"></div>'
-      + '<div class="hidden" data-editbox="' + r.id + '"></div>'
+      + '<div class="rr-box hidden" data-delbox="' + r.id + '"></div>'
+      + '<div class="rr-box hidden" data-editbox="' + r.id + '"></div>'
       + '</div>';
   }
 
-  /* ===================== การลบถาวร =====================
-     ครูสั่งให้มีปุ่มลบ (เดิมเว็บกลางตั้งใจไม่มี) — ทำให้ตรงไปตรงมา แต่ยังกันการเผลอ:
-       1. ต้องกดสองจังหวะ · จังหวะที่สองบอกชัดว่าจะเสียอะไรไปบ้าง (ตัวเลขจริงของห้องนั้น)
-       2. ฝั่งฐานบันทึกสำเนาข้อมูลก่อนลบไว้ใน deletion_log (55_DELETE_ROOM_STUDENT.sql)
-          ไม่ใช่ระบบกู้คืนอัตโนมัติ แต่ถ้าเผลอลบ ยังมีข้อมูลให้สร้างกลับด้วยมือได้
-     ใช้กล่องยืนยันในหน้าแทน confirm() ของเบราว์เซอร์ เพราะ confirm() บอกรายละเอียดไม่ได้
-     และครูมักกด OK ด้วยความเคยชินโดยไม่อ่าน */
-  function confirmBox(msg, onYes) {
-    return '<div class="card" style="border-color:var(--critical);margin-top:10px">'
-      + '<div style="color:var(--critical);font-weight:700;margin-bottom:4px">⚠️ ลบถาวร กู้คืนเองไม่ได้</div>'
-      + '<div class="small" style="margin-bottom:10px">' + msg + '</div>'
-      + '<button class="btn btn-sm btn-danger" data-yes="1">ยืนยันลบถาวร</button> '
-      + '<button class="btn btn-sm" data-no="1">ยกเลิก</button></div>';
-  }
-  function bindDelete(sel, boxOf, msgOf, run) {
-    document.querySelectorAll(sel).forEach(function (b) {
-      b.onclick = function () {
-        const id = b.getAttribute(sel.replace(/[\[\]]/g, ''));
-        const box = boxOf(id);
-        if (!box) return;
-        if (!box.classList.contains('hidden')) { box.classList.add('hidden'); box.innerHTML = ''; return; }
-        box.innerHTML = confirmBox(msgOf(id));
-        box.classList.remove('hidden');
-        box.querySelector('[data-no]').onclick = function () {
-          box.classList.add('hidden'); box.innerHTML = ''; };
-        box.querySelector('[data-yes]').onclick = async function (ev) {
-          ev.target.disabled = true; ev.target.textContent = 'กำลังลบ…';
-          try { await run(id); await loadAll(); route(); }
-          catch (e) {
-            showErr('ลบไม่สำเร็จ: ' + e.message
-              + (/PGRST202|does not exist/i.test(e.message)
-                  ? ' — ฐานข้อมูลยังไม่มีคำสั่งลบ ให้รัน 55_DELETE_ROOM_STUDENT.sql บน Supabase ก่อน' : ''));
-            ev.target.disabled = false; ev.target.textContent = 'ยืนยันลบถาวร';
-          }
-        };
-      };
-    });
-  }
-
   function bindRoomActions() {
-    bindDelete('[data-del-room]', (id) => document.querySelector('[data-delbox="' + id + '"]'),
-      function (id) {
-        const r = roomById(id), n = studentsOf(id).length;
-        return 'กำลังจะลบห้อง <b>' + G.esc(r ? r.name : '') + '</b> ทั้งห้อง'
-          + (n ? ' พร้อม<b>นักเรียน ' + n + ' คน</b> และผลการเล่นทั้งหมดของทุกคน'
-               : ' (ยังไม่มีนักเรียนในห้องนี้)')
-          + '<br>โค้ด <b>' + G.esc(r ? r.join_key : '') + '</b> จะใช้ไม่ได้อีก '
-          + 'เครื่องที่เปิดเกมค้างไว้จะส่งคะแนนไม่เข้า'
-          + (n ? '<br><br>ถ้าแค่ต้องการหยุดใช้ชั่วคราว ใช้ปุ่ม "ปิดห้องชั่วคราว" แทน — ข้อมูลไม่หาย' : '');
-      },
-      (id) => G.rpc('rpc_delete_classroom', { p_classroom: id }));
     document.querySelectorAll('[data-edit-room]').forEach(function (b) {
       b.onclick = function () {
         const id = b.getAttribute('data-edit-room');
@@ -1179,6 +1164,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let html = '<h2 style="margin:0 0 2px;font-size:20px">🏫 ' + G.esc(r.name)
       + ' <span class="muted" style="font-size:14px;font-weight:400">โค้ดเข้าห้อง <span class="joinkey" style="font-size:15px">' + G.esc(r.join_key) + '</span></span></h2>'
       + '<div class="muted small">นักเรียน ' + stu.length + ' คน · เกมที่เปิดใช้ ' + games.length + ' เกม</div>'
+      /* สวิตช์เปิด/ปิดเกม ย้ายมาอยู่ตรงนี้ (เดิมอยู่บนการ์ดในรายการห้อง)
+         เป็นการตั้งค่าของห้องนี้โดยเฉพาะ จึงควรอยู่ในห้อง ไม่ใช่ในรายการที่ครูแค่กวาดตาหาห้อง */
+      + '<div class="card" style="margin-top:12px"><b>เกมที่เปิดให้ห้องนี้เล่น</b>'
+      +   '<div class="muted small" style="margin:2px 0 8px">ปิดไว้ = นักเรียนใช้โค้ดห้องนี้เข้าเกมนั้นไม่ได้ '
+      +   '· ผลการเล่นที่มีอยู่แล้วไม่หาย</div>'
+      +   assignRows(r) + '</div>'
       + tabs();
 
     if (TAB === 'hots') {
@@ -1310,10 +1301,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           + '<td class="muted small">' + G.esc(x.join_pin || '–') + '</td>'
           + '<td><button class="btn btn-sm" data-edit-stu="' + x.id + '">✏️ แก้ไข</button> '
           +   '<button class="btn btn-sm" data-off-stu="' + x.id + '">'
-          +     (x.is_active === false ? 'เปิดใช้งาน' : 'ปิดการใช้งาน') + '</button> '
-          + '<button class="btn btn-sm btn-danger" data-del-stu="' + x.id + '">🗑 ลบ</button></td></tr>'
-          + '<tr class="hidden" data-sedit="' + x.id + '"><td colspan="5"></td></tr>'
-          + '<tr><td colspan="5" class="hidden" data-delbox-stu="' + x.id + '"></td></tr>';
+          +     (x.is_active === false ? 'เปิดใช้งาน' : 'ปิดการใช้งาน') + '</button></td></tr>'
+          + '<tr class="hidden" data-sedit="' + x.id + '"><td colspan="5"></td></tr>';
       });
       html += '</tbody></table></div>';
     }
@@ -1328,14 +1317,6 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   function bindRoster() {
-    bindDelete('[data-del-stu]', (id) => document.querySelector('[data-delbox-stu="' + id + '"]'),
-      function (id) {
-        const x = S.students.find((v) => v.id === id) || {};
-        return 'กำลังจะลบ <b>' + G.esc((x.first_name || '') + ' ' + (x.last_name || '')) + '</b> '
-          + 'พร้อม<b>ผลการเล่นทั้งหมด</b>ของคนนี้ (คะแนน ความคืบหน้า คำตอบ ผลสมรรถนะ)'
-          + '<br><br>ถ้าแค่ต้องการเอาออกจากรายชื่อ ใช้ "ปิดการใช้งาน" แทน — ข้อมูลยังอยู่ครบ เปิดกลับได้';
-      },
-      (id) => G.rpc('rpc_delete_student', { p_student: id }));
     document.querySelectorAll('[data-edit-stu]').forEach(function (b) {
       b.onclick = function () {
         const id = b.getAttribute('data-edit-stu');

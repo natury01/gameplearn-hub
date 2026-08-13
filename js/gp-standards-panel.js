@@ -24,26 +24,65 @@
   'use strict';
 
   var CSS_ID = 'gp-standards-css';
+  /* ---------- สไตล์ของแผง ----------
+     ทุกสีเขียนเป็น var(--โทเคน, ค่าสำรอง) โดยตั้งใจ:
+       · อยู่ในเว็บกลาง → รับโทเคนของธีม/สกินที่ครูเลือก แผงจึงกลืนไปกับหน้า ทั้งโหมดสว่างและมืด
+       · อยู่ในเกมที่ไม่มีชุดโทเคน → ตกไปใช้ค่าสำรอง ยังเป็นไฟล์เดียวจบเหมือนเดิม
+
+     ⚠️ โหมดมืดอัตโนมัติถูกจำกัดไว้เฉพาะ html ที่ **ไม่มี** data-theme
+        เพราะเว็บกลางตั้ง data-theme เองเสมอ — ถ้าไม่จำกัด ครูที่ตั้งเครื่องเป็นโหมดมืด
+        แต่เลือกธีมสว่างบนเว็บ จะเห็นแผงนี้ดำอยู่กล่องเดียวกลางหน้าขาว (เป็นมาแต่เดิม) */
   var CSS = [
     '.gpstd{font-family:system-ui,-apple-system,"Segoe UI","Sarabun","Noto Sans Thai",sans-serif;',
-    'color:#0b0b0b;background:#fcfcfb;border:1px solid rgba(11,11,11,.1);border-radius:14px;padding:16px 18px;line-height:1.55}',
-    '.gpstd h3{margin:0 0 2px;font-size:16.5px}',
-    '.gpstd .gp-sub{color:#898781;font-size:12.5px;margin-bottom:12px}',
-    '.gpstd .gp-grade{display:inline-block;font-size:12.5px;color:#1c5cab;border:1px solid currentColor;',
-    'border-radius:999px;padding:2px 10px;margin-left:6px}',
-    '.gpstd .gp-sec{margin-top:14px}',
-    '.gpstd .gp-sec-t{font-size:13px;font-weight:600;color:#52514e;border-bottom:1px solid #e1e0d9;padding-bottom:5px;margin-bottom:8px}',
-    '.gpstd .gp-item{padding:5px 0}',
-    '.gpstd .gp-name{font-size:14.5px}',
-    '.gpstd .gp-note{color:#898781;font-size:12.5px}',
-    '.gpstd .gp-kids{margin:4px 0 0 14px;padding-left:12px;border-left:2px solid #e1e0d9}',
-    '.gpstd .gp-kid{font-size:13.5px;color:#52514e;padding:2px 0}',
-    '.gpstd .gp-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:#898781;margin-left:5px}',
-    '.gpstd .gp-empty{color:#898781;font-size:13.5px}',
-    '.gpstd .gp-src{color:#898781;font-size:11.5px;margin-top:12px;border-top:1px solid #e1e0d9;padding-top:8px}',
-    '@media (prefers-color-scheme:dark){.gpstd{color:#fff;background:#1a1a19;border-color:rgba(255,255,255,.1)}',
-    '.gpstd .gp-sec-t,.gpstd .gp-kid{color:#c3c2b7}.gpstd .gp-grade{color:#6da7ec}',
-    '.gpstd .gp-sec-t,.gpstd .gp-kids,.gpstd .gp-src{border-color:#2c2c2a}}',
+    'color:var(--ink,#0b0b0b);background:var(--surface,#fcfcfb);',
+    'border:1px solid var(--border,rgba(11,11,11,.1));border-radius:var(--r-lg,14px);',
+    'padding:18px 20px;line-height:1.55}',
+    '.gpstd h3{margin:0 0 3px;font-size:16.5px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}',
+    '.gpstd .gp-sub{color:var(--muted,#6d6b66);font-size:12.5px;margin-bottom:14px;',
+    'padding-bottom:12px;border-bottom:1px solid var(--grid,#e1e0d9)}',
+    '.gpstd .gp-grade{display:inline-block;font-size:12.5px;font-weight:600;white-space:nowrap;',
+    'color:var(--accent-strong,#1c5cab);background:var(--tint-blue,#eaf2fd);',
+    'border:1px solid var(--accent,#2a78d6);border-radius:999px;padding:1px 11px}',
+    '.gpstd .gp-sec{margin-top:18px}',
+    '.gpstd .gp-sec-head>div>div:first-child{font-size:14px;font-weight:700;color:var(--ink,#0b0b0b)}',
+    /* หัวข้อหมวดมีแถบสีนำหน้า — กวาดตาหาหมวดที่ต้องการเจอก่อนอ่านรายการ */
+    /* แต่ละตัวชี้วัดเป็นแถบมีเส้นซ้าย ไม่ใช่กล่องซ้อนกล่อง — อ่านเป็นรายการได้โดยไม่หนัก */
+    '.gpstd .gp-item{padding:2px 0 2px 12px;margin-bottom:10px;',
+    'border-left:2px solid var(--grid,#e1e0d9)}',
+    '.gpstd .gp-name,.gpstd .gp-kid{display:flex;align-items:baseline;gap:7px}',
+    '.gpstd .gp-name{font-size:14.5px;color:var(--ink,#0b0b0b)}',
+    '.gpstd .gp-txt{flex:1;min-width:0}',
+    /* รหัสตัวชี้วัดขึ้นก่อนชื่อ — ครูค้นด้วยรหัสก่อนเสมอเวลาเขียนแผนการสอน */
+    '.gpstd .gp-code{display:inline-block;font-family:ui-monospace,Menlo,Consolas,monospace;',
+    'font-size:11.5px;font-weight:600;color:var(--accent-strong,#1c5cab);',
+    'background:var(--tint-blue,#eaf2fd);border-radius:5px;padding:1px 7px;flex:none;',
+    'white-space:nowrap;vertical-align:1px}',
+    /* สามบรรทัดกำกับ: วัดที่ไหน · หลักฐานคืออะไร · ตัดสินอย่างไร — จัดเป็นตารางป้าย/ค่า
+       ป้ายอยู่คอลัมน์เดียวกันทุกบรรทัด ครูจึงกวาดตาลงมาหาเฉพาะ "แหล่งหลักฐาน" ได้ทันที */
+    '.gpstd .gp-meta{display:grid;grid-template-columns:auto 1fr;gap:3px 9px;margin:6px 0 0}',
+    '.gpstd .gp-meta dt{margin:0;font-size:12px;font-weight:600;white-space:nowrap;',
+    'color:var(--muted,#6d6b66)}',
+    '.gpstd .gp-meta dd{margin:0;font-size:12.5px;color:var(--ink-2,#52514e)}',
+    '.gpstd .gp-kids{margin:8px 0 0;padding-left:14px;border-left:2px dotted var(--grid,#e1e0d9)}',
+    '.gpstd .gp-kid{font-size:13.5px;color:var(--ink-2,#52514e);padding:3px 0}',
+    '.gpstd .gp-sec-src{font-weight:400;font-size:12px;color:var(--muted,#6d6b66);margin-top:2px}',
+    '.gpstd .gp-sec-head{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px}',
+    '.gpstd .gp-sec-head::before{content:"";flex:none;width:4px;align-self:stretch;border-radius:2px;',
+    'background:var(--accent,#2a78d6)}',
+    '.gpstd .gp-sec.is-ach .gp-sec-head::before{background:var(--good,#0ca30c)}',
+    '.gpstd .gp-sec.is-attr .gp-sec-head::before{background:var(--brand-orange,#eb6834)}',
+    '.gpstd .gp-empty{color:var(--muted,#6d6b66);font-size:13.5px}',
+    '.gpstd .gp-src{color:var(--muted,#6d6b66);font-size:11.5px;margin-top:16px;',
+    'border-top:1px solid var(--grid,#e1e0d9);padding-top:10px}',
+    '@media (max-width:420px){.gpstd{padding:14px 15px}',
+    '.gpstd .gp-meta{grid-template-columns:1fr;gap:1px}}',
+    '@media (prefers-color-scheme:dark){html:not([data-theme]) .gpstd{color:#fff;background:#1a1a19;',
+    'border-color:rgba(255,255,255,.1)}',
+    'html:not([data-theme]) .gpstd .gp-kid{color:#c3c2b7}',
+    'html:not([data-theme]) .gpstd .gp-grade{color:#6da7ec;background:transparent}',
+    'html:not([data-theme]) .gpstd .gp-code{color:#6da7ec;background:rgba(109,167,236,.14)}',
+    'html:not([data-theme]) .gpstd .gp-item,html:not([data-theme]) .gpstd .gp-kids,',
+    'html:not([data-theme]) .gpstd .gp-sub,html:not([data-theme]) .gpstd .gp-src{border-color:#2c2c2a}}',
   ].join('');
 
   function injectCss() {
@@ -88,27 +127,46 @@
     return roots;
   }
 
-  function renderSection(title, roots, compact) {
+  /* สามบรรทัดกำกับนี้ตอบคนละคำถามของครู จึงแยกเป็นป้าย/ค่า ไม่รวมเป็นก้อนเดียว
+     และใช้ **ชื่อเต็ม** ของหัวข้อตามที่ครูสั่ง ("แหล่งหลักฐาน" ไม่ใช่ "หลักฐาน") */
+  function extras(it) {
+    var rows = '';
+    if (it._note) rows += '<dt>📍 วัดที่</dt><dd>' + esc(it._note) + '</dd>';
+    if (it._ev) rows += '<dt>🧾 แหล่งหลักฐาน</dt><dd>' + esc(it._ev) + '</dd>';
+    if (it._cr) rows += '<dt>📏 เกณฑ์การวัด</dt><dd>' + esc(it._cr) + '</dd>';
+    return rows ? '<dl class="gp-meta">' + rows + '</dl>' : '';
+  }
+
+  /* ชื่อรายการเสมอเป็นชื่อเต็มจากทะเบียน · รหัสขึ้นก่อนเป็นชิป (ครูค้นด้วยรหัสก่อน)
+     รายการที่รหัสกับชื่อเป็นตัวเดียวกัน (เช่นสมรรถนะที่ยังไม่มีชื่อไทย) ไม่ต้องโชว์ซ้ำสองที่ */
+  function nameLine(it, cls) {
+    var code = it.code && it.code !== it.name_th
+      ? '<span class="gp-code">' + esc(it.code) + '</span>' : '';
+    return '<div class="' + cls + '">' + code
+      + '<span class="gp-txt">' + esc(it.name_th || it.code) + '</span></div>';
+  }
+
+  /* หัวข้อหมวด = ชื่อหมวดสั้นบรรทัดบน + ชื่อเต็มของกรอบหลักสูตรบรรทัดรอง
+     เอาชื่อเต็มมาต่อท้ายบรรทัดเดียวกันแล้วหัวข้อยาวสองบรรทัดจนหาไม่เจอว่าหมวดไหนเริ่มตรงไหน
+     แต่ตัดชื่อเต็มทิ้งก็ไม่ได้ ครูต้องใช้อ้างอิงในแผนการสอน — จึงแยกเป็นสองบรรทัด */
+  function sectionHead(title, source) {
+    return '<div class="gp-sec-head"><div><div>' + esc(title) + '</div>'
+      + (source ? '<div class="gp-sec-src">' + esc(source) + '</div>' : '') + '</div></div>';
+  }
+
+  function renderSection(title, source, roots, compact, kind) {
     if (!roots.length) return '';
+    var cls = 'gp-sec' + (kind ? ' is-' + kind : '');
     if (compact) {
-      return '<div class="gp-sec"><div class="gp-sec-t">' + esc(title) + '</div><div class="gp-name">'
+      return '<div class="' + cls + '">' + sectionHead(title, source) + '<div class="gp-name">'
         + roots.map(function (n) { return esc(n.it.name_th); }).join(' · ') + '</div></div>';
     }
-    /* สามบรรทัดนี้ตอบคนละคำถามของครู จึงติดป้ายกำกับไว้ ไม่รวมเป็นก้อนเดียว:
-       วัดที่ไหน · หลักฐานคืออะไร · ตัดสินอย่างไร */
-    function extras(it) {
-      return (it._note ? '<div class="gp-note">📍 ' + esc(it._note) + '</div>' : '')
-        + (it._ev ? '<div class="gp-note">🧾 <b>หลักฐาน:</b> ' + esc(it._ev) + '</div>' : '')
-        + (it._cr ? '<div class="gp-note">📏 <b>เกณฑ์:</b> ' + esc(it._cr) + '</div>' : '');
-    }
-    return '<div class="gp-sec"><div class="gp-sec-t">' + esc(title) + '</div>'
+    return '<div class="' + cls + '">' + sectionHead(title, source)
       + roots.map(function (n) {
-        return '<div class="gp-item"><div class="gp-name">' + esc(n.it.name_th)
-          + '<span class="gp-code">' + esc(n.it.code) + '</span></div>'
+        return '<div class="gp-item">' + nameLine(n.it, 'gp-name')
           + extras(n.it)
           + (n.kids.length ? '<div class="gp-kids">' + n.kids.map(function (k) {
-              return '<div class="gp-kid">• ' + esc(k.it.name_th) + '<span class="gp-code">' + esc(k.it.code) + '</span>'
-                + extras(k.it) + '</div>';
+              return nameLine(k.it, 'gp-kid') + extras(k.it);
             }).join('') + '</div>' : '')
           + '</div>';
       }).join('') + '</div>';
@@ -130,7 +188,7 @@
       + encodeURIComponent(cfg.gameCode) + '&limit=1')
       .then(function (rows) {
         var game = rows && rows[0];
-        if (!game) throw new Error('ไม่พบเกม ' + cfg.gameCode + ' ใน Game Registry');
+        if (!game) throw new Error('ไม่พบเกมรหัส ' + cfg.gameCode + ' ในทะเบียนกลาง');
         return get(cfg, '/rest/v1/game_framework_items?game_id=eq.' + game.id
           + '&select=note,weight,evidence,criteria,framework_items(id,code,name_th,depth,sort_order,parent_id,'
           + 'assessment_frameworks(code,kind,name_th,status))')
@@ -152,19 +210,24 @@
 
         var html = '<h3>มาตรฐานการเรียนรู้ที่เกมนี้วัด'
           + '<span class="gp-grade">' + esc(gradeText(data.game)) + '</span></h3>'
-          + '<div class="gp-sub">' + esc(data.game.name) + ' · ข้อมูลจาก Game Registry กลางของเกมเพลิน</div>';
+          + '<div class="gp-sub">' + esc(data.game.name) + ' · ข้อมูลจากทะเบียนกลางของเกมเพลิน</div>';
 
+        /* หัวข้อหมวดใช้ชื่อเต็มของกรอบหลักสูตรจากฐานข้อมูล ไม่ตั้งชื่อย่อเอง */
         var sections =
-          renderSection('ผลสัมฤทธิ์ — ' + (fwNames.achievement || 'กลุ่มสาระ/ตัวชี้วัด'), toTree(ach), cfg.compact)
-          + renderSection('สมรรถนะหลัก — ' + (fwNames.competency || ''), toTree(comp), cfg.compact)
-          + renderSection('คุณลักษณะ — ' + (fwNames.attribute || ''), toTree(attr), cfg.compact);
+          renderSection('ผลสัมฤทธิ์ตามหลักสูตร — ตัวชี้วัดที่เกมนี้วัด',
+            fwNames.achievement, toTree(ach), cfg.compact, 'ach')
+          + renderSection('สมรรถนะหลักที่เกมนี้วัด',
+            fwNames.competency, toTree(comp), cfg.compact, 'comp')
+          + renderSection('คุณลักษณะอันพึงประสงค์',
+            fwNames.attribute, toTree(attr), cfg.compact, 'attr');
 
-        html += sections || '<div class="gp-empty">เกมนี้ยังไม่ได้ลงทะเบียนมาตรฐานการเรียนรู้ — '
-          + 'ดูวิธีลงทะเบียนใน 07_CONTENT_STANDARDS.md ข้อ 4</div>';
+        html += sections || '<div class="gp-empty">เกมนี้ยังไม่ได้ลงทะเบียนมาตรฐานการเรียนรู้ '
+          + '— เจ้าของเกมเป็นผู้ระบุว่าเกมวัดอะไร เมื่อลงทะเบียนแล้วรายการจะขึ้นที่นี่เอง</div>';
 
         if (!cfg.compact) {
-          html += '<div class="gp-src">อ้างอิงหลักสูตรตาม 07_CONTENT_STANDARDS.md · '
-            + 'รายการที่แสดงมาจากทะเบียน game_framework_items — แก้ที่ฐานข้อมูลกลางแล้วทุกหน้าจะอัปเดตพร้อมกัน</div>';
+          html += '<div class="gp-src">ข้อมูลทั้งหมดมาจาก<b>ทะเบียนกลางของเกมเพลิน</b> '
+            + 'ชุดเดียวกับที่แสดงในหน้า Dashboard ของตัวเกม — '
+            + 'เจ้าของเกมแก้ที่ทะเบียนแล้วทุกหน้าจออัปเดตพร้อมกัน</div>';
         }
         el.innerHTML = html;
         return data;

@@ -6,7 +6,7 @@
 set -u
 cd "$(dirname "$0")"
 bad=0
-for t in t_shots.mjs t_teacher.mjs t_round2.mjs t_regress.mjs; do
+for t in t_shots.mjs t_teacher.mjs t_round2.mjs t_names.mjs t_regress.mjs; do
   echo ""
   echo "████ $t ████"
   node "$t" || bad=$((bad+1))

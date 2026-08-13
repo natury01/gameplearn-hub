@@ -29,7 +29,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     </a>
     <div class="sp"></div>
     <nav class="navlinks" aria-label="เมนูหลัก">
-      <a href="#games">เกมทั้งหมด</a>
+      <!-- ⭐ V.1.4.3 — ครูสั่ง: ปุ่ม "สร้างห้องเรียน" มา **แทนที่** เมนู "เกมทั้งหมด"
+           ตัด "เกมทั้งหมด" ออกได้โดยไม่เสียทางเข้า: หน้าแรกมีแคตตาล็อกเกมอยู่กลางหน้าอยู่แล้ว
+           และโลโก้มุมซ้ายบนกลับหน้าแรกได้จากทุกหน้า · ปุ่มย้ายจากขวาสุดมาอยู่ตรงนี้แทน
+           ทำให้หัวเว็บเหลือปุ่มบัญชีฝั่งขวาชุดเดียว ไม่แย่งสายตากับปุ่มหลัก -->
+      <a class="btn btn-primary" id="new-room-btn" href="teacher.html#/rooms">🏫 สร้างห้องเรียน</a>
       <!-- เดิมชี้ไปบล็อก "สำหรับคุณครู" กลางหน้า — บล็อกนั้นถูกเอาออกแล้ว (ซ้ำกับเมนูนี้เอง)
            จึงชี้ไปหน้าครูตรง ๆ · ถ้าปล่อยเป็น #teacher-zone ไว้ กดแล้วจะไม่ไปไหนเลย -->
       <a href="teacher.html">สำหรับครู</a>
@@ -37,7 +41,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <a href="support.html">สนับสนุน</a>
       <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
     </nav>
-    <a class="btn btn-primary" id="auth-btn" href="teacher.html">👩‍🏫 เข้าสู่ระบบครู</a>
+    <a class="btn" id="auth-btn" href="teacher.html">👩‍🏫 เข้าสู่ระบบครู</a>
   </header>
 
   <main id="content">
@@ -343,37 +347,32 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   /* แถวข้อมูลบนการ์ด — ครูต้องตอบได้ใน 3 วินาทีว่า "เกมนี้สอนอะไร วัดอะไร"
      จึงใช้หัวข้อกำกับชัด ๆ แทนป้ายลอย ๆ ที่ไม่รู้ว่าอันไหนคืออะไร */
+  /* ป้ายชื่อเต็ม — ครูสั่งให้เลิกใช้ชื่อย่อ เพราะชื่อที่เขียนลงแผนการสอนได้คือชื่อเต็มเท่านั้น
+     วางเป็นป้ายที่ตัดบรรทัดเองได้ ไม่ใช่ข้อความยาวคั่นด้วยจุด — ชื่อหลักสูตรยาวจนอ่านติดกันไม่ออก */
+  function tagRow(list, cls) {
+    if (!list.length) return '';
+    return '<div class="tagrow">'
+      + list.map((t) => '<span class="tag ' + cls + '">' + G.esc(t) + '</span>').join('')
+      + '</div>';
+  }
+
   function infoRows(g) {
     const rows = [];
 
-    /* กลุ่มสาระ — ใช้ชื่อย่อ ชื่อเต็มตามหลักสูตรยาวเกินการ์ด */
-    if (g.subject_codes.length || g.subject_areas.length) {
-      const subs = g.subject_codes.length
-        ? g.subject_codes.map((c) => K.SUBJ_SHORT[c] || c)
-        : g.subject_areas;
-      rows.push(['กลุ่มสาระ', G.esc(subs.join(' · '))]);
-    }
+    const subs = K.subjectNames(g);
+    if (subs.length) rows.push(['กลุ่มสาระ', tagRow(subs, 'subj')]);
 
     if (g.topic) rows.push(['เรื่อง', G.esc(g.topic)]);
 
-    /* รูปแบบการประเมิน — บอกทั้งว่าวัด 2 มิติไหน และสมรรถนะด้านใดบ้าง */
+    /* รูปแบบการประเมิน — บอกว่าวัด 2 มิติไหน แล้วตามด้วยชื่อเต็มของสมรรถนะที่วัดจริง */
+    const comps = K.competencyNames(g);
     const modes = [];
-    if (g.subject_areas.length) modes.push('ผลสัมฤทธิ์');
-    const nc = g.competency_codes.length || g.competencies.length;
-    if (nc) {
-      modes.push(nc >= K.CBE_TOTAL ? 'สมรรถนะหลักครบ ' + K.CBE_TOTAL + ' ด้าน'
-                                   : 'สมรรถนะหลัก ' + nc + ' ด้าน');
+    if (subs.length) modes.push('ผลสัมฤทธิ์');
+    if (comps.length) {
+      modes.push(comps.length >= K.CBE_TOTAL ? 'สมรรถนะหลักครบ ' + K.CBE_TOTAL + ' ด้าน'
+                                             : 'สมรรถนะหลัก ' + comps.length + ' ด้าน');
     }
-    if (modes.length) {
-      let detail = '';
-      if (g.competency_codes.length) {
-        detail = '<div class="gsub">' + G.esc(g.competency_codes
-          .map((c) => K.COMP_SHORT[c] || c).join(' · ')) + '</div>';
-      } else if (g.competencies.length) {
-        detail = '<div class="gsub">' + G.esc(g.competencies.join(' · ')) + '</div>';
-      }
-      rows.push(['ประเมิน', modes.join(' · ') + detail]);
-    }
+    if (modes.length) rows.push(['ประเมิน', modes.join(' · ') + tagRow(comps, 'comp')]);
 
     if (!rows.length) return '';
     return '<dl class="ginfo">' + rows.map(function (r) {

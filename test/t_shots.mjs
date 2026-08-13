@@ -157,24 +157,35 @@ console.log('\n═══ 4) ชุดจริงจากภาค 1 — 14 ด
       isSlide: cover.classList.contains('gshots'),
       dots: c.querySelectorAll('.gdots i').length,
       firstSrc: shots[0].getAttribute('src'),
+      /* ใบที่มี src ต้องเป็นใบที่อยู่ตำแหน่งแรกของอาเรย์ ไม่ใช่ใบที่ชื่อไฟล์ดูเหมือนใบแรก */
+      firstIsFirstSorted: shots[0].classList.contains('on')
+        && shots.slice(1).every((i) => !i.getAttribute('src')),
       loaded: shots.filter((i) => i.getAttribute('src')).length,
       firstCap: cap.textContent,
       alts: shots.slice(0, 3).map((i) => i.getAttribute('alt')),
       coverW: Math.round(r.width), coverH: Math.round(r.height),
       ratio: +(r.width / r.height).toFixed(3),
       dotsFit: dr.width <= r.width - 12,
-      capBandPct: Math.round((cr.height / r.height) * 100),
+      capBandPct: +((cr.height / r.height) * 100).toFixed(1),
+      /* อยู่เฉย ๆ ต้องไม่มีแถบทับภาพเลย — ภาพเป็นเนื้อหาของเจ้าของเกม ไม่ใช่พื้นที่ของเว็บกลาง */
+      capHiddenAtRest: +getComputedStyle(cap).opacity === 0,
     };
   });
   ok('การ์ดภาค 1 เป็นสไลด์ครบ 14 ใบ', st.isSlide && st.n === 14, st);
   ok('จุดบอกหน้า 14 จุด และยังอยู่ในกรอบปก ไม่ล้น', st.dots === 14 && st.dotsFit, st);
   ok('ตอนเปิดหน้าโหลดภาพจริงใบเดียว', st.loaded === 1, st);
-  ok('ใบที่โหลดคือ sort 1 = ด่านสะพานข้ามแม่น้ำแคว',
-    /stage_bridge\.jpg$/.test(st.firstSrc) && st.firstCap.includes('สะพานข้ามแม่น้ำแคว'), st);
+  /* ⚠️ ห้ามผูกกับชื่อไฟล์ — รหัสด่านของภาค 1 ไม่ใช่เลข 1-14 เรียงกัน (มี mg1 · hellfire · pilok ปนอยู่)
+     ยึด "ใบแรกของอาเรย์ที่เรียงตาม sort" อย่างเดียว ซึ่งเป็นสัญญาที่ตกลงกันไว้จริง */
+  ok('ใบที่โหลดคือใบแรกตามลำดับ sort (ด่านสะพานข้ามแม่น้ำแคว)',
+    st.firstIsFirstSorted && st.firstCap.includes('สะพานข้ามแม่น้ำแคว'), st);
   ok('alt ที่ภาค 1 ส่งมาถูกใส่ให้โปรแกรมอ่านหน้าจอครบ',
     st.alts.every((a) => a && a.length > 5), st.alts);
   ok('กรอบปกเป็น 16:9 พอดี (ภาพ 1200×675 จึงไม่ถูกตัดขอบ)',
     Math.abs(st.ratio - 16 / 9) < 0.02, st);
+  ok('อยู่เฉย ๆ ไม่มีแถบชื่อด่านทับภาพเลย (ภาค 1 พบว่าแผงเล่นของ 3 ด่านอยู่ริมล่างพอดี)',
+    st.capHiddenAtRest, st);
+  ok('แถบชื่อด่านตอนเอาเมาส์ชี้ ทับไม่เกิน 16% ของความสูง (เดิม 21%)',
+    st.capBandPct <= 16, st.capBandPct);
   ok('สคริปต์ไม่พังกับชุด 14 ใบ', realErrors(calls).length === 0, realErrors(calls));
   console.log('     ℹ️  กรอบปกจริงบนจอนี้: ' + st.coverW + '×' + st.coverH + ' css px'
     + ' · แถบชื่อด่านคลุมส่วนล่างราว ' + st.capBandPct + '% ของภาพ');

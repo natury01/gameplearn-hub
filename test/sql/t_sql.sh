@@ -237,5 +237,157 @@ n=$($Q -c "select count(*) from standards_publish_log;")
 ok "บันทึกการส่งลง log ครบทุกครั้ง (3 ครั้ง)" "$n" "3"
 
 echo ""
+echo "═══ 8) 64 — ใบรายงานผลบอกได้ว่าตกอะไรไป เพราะอะไร ═══"
+out=$($PSQL -f $SQLDIR/64_REPORT_SKIPPED.sql 2>&1)
+if [ $? -eq 0 ]; then echo "  ✅ 64_REPORT_SKIPPED.sql รันผ่าน 0 error"; else echo "  ❌ 64 ล้ม"; echo "$out" | tail -8; bad=$((bad+1)); fi
+out=$($PSQL -f $SQLDIR/64_REPORT_SKIPPED.sql 2>&1)
+if [ $? -eq 0 ]; then echo "  ✅ รันซ้ำได้"; else echo "  ❌ รันซ้ำแล้วล้ม"; bad=$((bad+1)); fi
+
+# นักเรียนจริง 3 คนในห้อง ป.5/1 (ใช้จำลอง "ยิงทีละคน วนทั้งห้อง" แบบที่ภาค 1 ทำ)
+S1=$($Q -c "select id from students where last_name='หนึ่ง' limit 1;")
+S2=$($Q -c "select id from students where last_name='สอง'  limit 1;")
+S3=$($Q -c "select id from students where last_name='สาม'  limit 1;")
+GV="V.7.99.30-IX2050-2569.71"
+
+# ── ส่งชุดที่ถูกทุกอย่าง — ต้องไม่มีอะไรตก และค่าที่คืนต้องเหมือนของเดิมเป๊ะ ──
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S1',
+  '{\"score\":78,\"max_score\":100,\"grade_label\":\"ดีมาก\"}'::jsonb,
+  '[{\"code\":\"HT\",\"score\":72,\"level\":5},{\"code\":\"TW\",\"level\":4,\"evidence\":\"observed\"}]'::jsonb); commit;")
+okc "ส่งชุดที่ถูกต้อง = รับครบ ไม่มีอะไรตก" "$res" '"skipped_total": 0'
+okc "ช่องเดิม ok ยังอยู่" "$res" '"ok": true'
+okc "ช่องเดิม achievement ยังอยู่" "$res" '"achievement": true'
+okc "ช่องเดิม competencies ยังอยู่และนับถูก" "$res" '"competencies": 2'
+okc "ช่องใหม่ stored นับใบที่ 1 รวมด้วย" "$res" '"stored": 3'
+okc "ช่องใหม่ partial = false เมื่อไม่มีอะไรตก" "$res" '"partial": false'
+n=$($Q -c "select count(*) from achievement_results where student_id='$S1';")
+ok "ใบผลสัมฤทธิ์ถูกเขียนจริง" "$n" "1"
+n=$($Q -c "select count(*) from competency_dim_results where student_id='$S1';")
+ok "ใบสมรรถนะถูกเขียนจริง 2 ด้าน" "$n" "2"
+n=$($Q -c "select count(*) from competency_dim_results where student_id='$S1' and comp_code='HOT';")
+ok "แปลง HT เป็น HOT ให้เหมือนเดิม" "$n" "1"
+n=$($Q -c "select level_label from competency_dim_results where student_id='$S1' and comp_code='HOT';")
+ok "ป้ายระดับเป็นคำยังเติมให้เอง" "$n" "สามารถ"
+
+# ส่งซ้ำต้องทับของเดิม ไม่ใช่เพิ่มแถวใหม่
+$Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S1',
+  '{\"score\":90,\"max_score\":100}'::jsonb, null); commit;" >/dev/null
+n=$($Q -c "select count(*) from achievement_results where student_id='$S1';")
+ok "ส่งซ้ำทับของเดิม ไม่เพิ่มแถว" "$n" "1"
+n=$($Q -c "select score::int from achievement_results where student_id='$S1';")
+ok "ส่งซ้ำแล้วค่าอัปเดตจริง" "$n" "90"
+
+# ── ⭐ ข้อสำคัญที่สุด: รายการเดียวผิด ต้องไม่ลากใบที่เหลือตกไปด้วย ──
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+  '{\"score\":55,\"max_score\":100}'::jsonb,
+  '[{\"code\":\"HOT\",\"score\":60},{\"code\":\"XX\",\"score\":50}]'::jsonb); commit;")
+okc "รหัสผิดหนึ่งด้าน — ใบผลสัมฤทธิ์ยังถูกเก็บ (ของเดิมย้อนกลับทั้งใบ)" "$res" '"achievement": true'
+okc "ด้านที่ถูกต้องยังถูกเก็บ" "$res" '"competencies": 1'
+okc "บอกว่ามีของตก" "$res" '"partial": true'
+okc "นับจำนวนที่ตกได้" "$res" '"skipped_total": 1'
+okc "เหตุผล: ไม่รู้จักรหัสสมรรถนะ (ภาษาไทย)" "$res" "ไม่รู้จักรหัสสมรรถนะ"
+okc "รายการที่ตกบอกรหัสด้วย" "$res" '"code": "XX"'
+okc "รายการที่ตกบอกด้วยว่าเป็นใบไหน" "$res" '"part": "competency"'
+n=$($Q -c "select count(*) from achievement_results where student_id='$S2';")
+ok "ยืนยันจากตารางจริง: ใบผลสัมฤทธิ์ของเด็กคนนี้อยู่ในฐาน" "$n" "1"
+
+# ── เหตุผลแต่ละแบบ ──
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+  '{\"score\":55}'::jsonb, '[{\"score\":10},{\"code\":\"  \"}]'::jsonb); rollback;")
+okc "เหตุผล: ไม่มีรหัสด้านสมรรถนะ" "$res" "ไม่มีรหัสด้านสมรรถนะ"
+okc "ไม่มีรหัส 2 รายการ นับครบทั้งสอง" "$res" '"skipped_total": 2'
+
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+  null, '[{\"code\":\"HT\",\"score\":70},{\"code\":\"HOT\",\"score\":10}]'::jsonb); rollback;")
+okc "เหตุผล: รหัสซ้ำในคำขอเดียวกัน (หลังแปลง HT→HOT แล้วชนกัน)" "$res" "ซ้ำกับรายการก่อนหน้า"
+okc "รหัสซ้ำ — เก็บของที่ส่งมาก่อน" "$res" '"competencies": 1'
+
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+  '{\"score\":10}'::jsonb, '[{\"code\":\"TW\",\"level\":\"สูง\"}]'::jsonb); rollback;")
+okc "เหตุผล: ระดับต้องเป็นจำนวนเต็ม (ของเดิมพังทั้งใบด้วย error อังกฤษ)" "$res" "ต้องเป็นจำนวนเต็ม"
+okc "ระดับผิด — ใบผลสัมฤทธิ์ยังรอด" "$res" '"stored": 1'
+
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+  '{\"score\":\"ดีมาก\"}'::jsonb, '[{\"code\":\"CM\",\"level\":4}]'::jsonb); rollback;")
+okc "เหตุผล: คะแนนในใบผลสัมฤทธิ์ไม่ใช่ตัวเลข" "$res" "ต้องเป็นตัวเลข"
+okc "คะแนนผิด — ใบสมรรถนะยังรอด" "$res" '"achievement": false'
+okc "รายการที่ตกบอกว่าเป็นใบผลสัมฤทธิ์" "$res" '"part": "achievement"'
+
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+  '{\"score\":10}'::jsonb, '[{\"code\":\"CZ\",\"level\":4,\"evidence\":\"ครูดูเอา\"}]'::jsonb); rollback;")
+okc "เหตุผล: evidence ไม่ถูกต้อง — บอกเป็นไทย ไม่ใช่ check constraint อังกฤษ" "$res" "ไม่ถูกต้อง"
+okc "evidence ผิด ไม่โผล่ข้อความดิบของ PostgreSQL ใส่ครู" "$res" "scored (คิดจากคะแนน)"
+
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+  '{\"score\":10}'::jsonb, '\"ไม่ใช่อาเรย์\"'::jsonb); rollback;")
+okc "รูปแบบใบสมรรถนะผิด — บอกเป็นไทย ไม่ทำให้ใบที่ 1 ตก" "$res" "ต้องเป็นอาเรย์"
+
+# ── อาเรย์ที่ตกถูกตัดที่ 25 แต่ยอดรวมต้องตรง ──
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+  '{\"score\":10}'::jsonb,
+  (select jsonb_agg(jsonb_build_object('code','ZZ'||g)) from generate_series(1,30) g)); rollback;")
+okc "ตกเกิน 25 รายการ — ยอดรวมยังตรง" "$res" '"skipped_total": 30'
+n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_submit_report('kanchanaburi2050','$GV','$S2',
+  '{\"score\":10}'::jsonb,
+  (select jsonb_agg(jsonb_build_object('code','ZZ'||g)) from generate_series(1,30) g))->'skipped'); rollback;")
+ok "อาเรย์ที่ตกถูกตัดไว้ที่ 25 รายการ (กันคำตอบบวม)" "$n" "25"
+
+# ── เก็บไม่ได้เลย = ต้องโยน error ไม่ใช่ตอบ 200 พร้อม ok:false ──
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+  null, '[{\"code\":\"XX\"}]'::jsonb); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
+okc "เก็บไม่ได้เลย = โยน error (ห้ามตอบ ok:false — ภาค 2 ดักด้วย .catch อย่างเดียว)" "$res" "ERROR"
+okc "ข้อความ error บอกเหตุผลแรกเป็นภาษาไทย" "$res" "ไม่รู้จักรหัสสมรรถนะ"
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+  null, '[{\"code\":\"XX\"}]'::jsonb); rollback;" 2>&1)
+okc "ยืนยันว่าไม่มีทางคืน ok:false" "$res" "ERROR"
+
+# ── ด่านเดิมของไฟล์ 43 ต้องไม่หายไปสักข้อ ──
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV',null,'{\"score\":1}'::jsonb,null); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
+okc "ด่านเดิม: ไม่ระบุนักเรียน" "$res" "ต้องระบุนักเรียน"
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S1','{\"score\":1}'::jsonb,null,'LEGACY-SHEETS'); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
+okc "ด่านเดิม: run_id LEGACY-SHEETS สงวนไว้" "$res" "LEGACY-SHEETS"
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S1',null,'[]'::jsonb); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
+okc "ด่านเดิม: ต้องส่งอย่างน้อยหนึ่งใบ" "$res" "อย่างน้อยหนึ่งใบ"
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('ไม่มีเกมนี้','$GV','$S1','{\"score\":1}'::jsonb,null); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
+okc "ด่านเดิม: ไม่พบเกม" "$res" "ไม่พบเกม"
+res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','99999999-9999-4999-8999-999999999999','{\"score\":1}'::jsonb,null); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
+okc "ด่านเดิม: ไม่พบนักเรียน" "$res" "ไม่พบนักเรียนรหัสนี้"
+
+# ── ครูตัดสินระดับทับ ต้องยังทำงาน (กติกาเดิมของไฟล์ 43) ──
+$Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S3',null,
+  '[{\"code\":\"SM\",\"level\":6,\"decided_by\":\"teacher\",\"system_level\":4,\"system_score\":55}]'::jsonb); commit;" >/dev/null
+n=$($Q -c "select decided_by from competency_dim_results where student_id='$S3' and comp_code='SM';")
+ok "ครูตัดสินระดับทับยังบันทึกได้ (decided_by)" "$n" "teacher"
+n=$($Q -c "select system_level from competency_dim_results where student_id='$S3' and comp_code='SM';")
+ok "ค่าที่ระบบคิดไว้เดิมยังถูกเก็บคู่กัน" "$n" "4"
+
+# ── ⭐ เคสที่ภาค 1 ขอ: ยิงทีละคนจนครบห้อง ใบกลางล้ม ──
+$Q -c "delete from achievement_results; delete from competency_dim_results;" >/dev/null
+fail=0; okn=0
+for st in "$S1|78" "$S2|BAD" "$S3|91"; do
+  sid=${st%%|*}; sc=${st##*|}
+  if [ "$sc" = "BAD" ]; then
+    r=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$sid',null,'[{\"code\":\"XX\"}]'::jsonb); commit;" 2>&1)
+  else
+    r=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$sid','{\"score\":$sc,\"max_score\":100}'::jsonb,null); commit;" 2>&1)
+  fi
+  if echo "$r" | grep -q ERROR; then fail=$((fail+1)); else okn=$((okn+1)); fi
+done
+ok "ยิงทีละคนทั้งห้อง 3 ใบ — สำเร็จ 2 ใบ" "$okn" "2"
+ok "ยิงทีละคนทั้งห้อง 3 ใบ — ไม่สำเร็จ 1 ใบ (เกมสรุปเองได้)" "$fail" "1"
+n=$($Q -c "select count(*) from achievement_results;")
+ok "ใบที่ล้มไม่ลากใบของคนอื่นตกไปด้วย (ในฐานมี 2 ใบจริง)" "$n" "2"
+
+# ── สิทธิ์ ──
+n=$($Q -c "select has_function_privilege('anon','public.rpc_submit_report(text,text,uuid,jsonb,jsonb,text)','execute')::text;")
+ok "anon เรียกได้ (เกมยิงโดยไม่ล็อกอิน)" "$n" "true"
+n=$($Q -c "select has_function_privilege('authenticated','public.rpc_submit_report(text,text,uuid,jsonb,jsonb,text)','execute')::text;")
+ok "authenticated เรียกได้" "$n" "true"
+
+# ── ตัวช่วยตัวเลข ──
+n=$($Q -c "select gp_num_bad('12.5')::text || gp_num_bad('')::text || gp_num_bad(null)::text || gp_num_bad('ดีมาก')::text;")
+ok "gp_num_bad: ตัวเลขผ่าน · ว่าง/ไม่ส่งไม่นับผิด · ข้อความจับได้" "$n" "falsefalsefalsetrue"
+n=$($Q -c "select gp_int_bad('5')::text || gp_int_bad('5.5')::text || gp_int_bad('สูง')::text;")
+ok "gp_int_bad: จำนวนเต็มผ่าน · ทศนิยม/ข้อความจับได้" "$n" "falsetruetrue"
+echo ""
 if [ "$bad" -eq 0 ]; then echo "✅ ผ่านครบทุกข้อ"; else echo "❌ ไม่ผ่าน $bad ข้อ"; fi
 exit "$bad"

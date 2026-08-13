@@ -18,20 +18,41 @@
   };
   const STATUS_TH = { published: 'เปิดใช้งาน', maintenance: 'ปิดปรับปรุงชั่วคราว', testing: 'รุ่นทดสอบ' };
 
-  /* ชื่อย่อสมรรถนะหลัก 6 ด้าน (CBE) — ชื่อเต็มยาวเกินกว่าจะใส่บนการ์ดได้ทั้ง 6 */
+  /* ---------- ชื่อกลุ่มสาระและสมรรถนะ ----------
+     ครูสั่งให้ใช้ **ชื่อเต็ม** ทุกที่ที่แสดงให้คนอ่าน — เพราะเป็นชื่อที่ต้องเขียนลงแผนการสอน
+     และงานประกันคุณภาพจริง ๆ ชื่อย่อที่เราตั้งเองเอาไปใช้อ้างอิงที่ไหนไม่ได้เลย
+
+     ⚠️ ลำดับการเลือกชื่อที่ถูกต้อง: **ชื่อจากฐานข้อมูลมาก่อนเสมอ**
+     (v_game_catalog ส่ง subject_areas / competencies ซึ่งเป็น name_th จากทะเบียนหลักสูตร)
+     ตารางข้างล่างเป็นแค่ตัวสำรองตอนฐานส่งมาแต่ "รหัส" — ถ้าหลักสูตรเปลี่ยนชื่อ
+     ฐานข้อมูลจะเปลี่ยนตามเอง ส่วนตารางนี้ต้องมาแก้มือ จึงห้ามใช้เป็นตัวหลัก */
+  const COMP_FULL = {
+    SM: 'การจัดการตนเอง', HOT: 'การคิดขั้นสูง', CM: 'การสื่อสาร',
+    TW: 'การรวมพลังทำงานเป็นทีม', CZ: 'การเป็นพลเมืองที่เข้มแข็ง',
+    SN: 'การอยู่ร่วมกับธรรมชาติและวิทยาการอย่างยั่งยืน',
+  };
+  const SUBJ_FULL = {
+    TH: 'ภาษาไทย', MA: 'คณิตศาสตร์', SC: 'วิทยาศาสตร์และเทคโนโลยี',
+    SO: 'สังคมศึกษา ศาสนา และวัฒนธรรม', PE: 'สุขศึกษาและพลศึกษา',
+    AR: 'ศิลปะ', OC: 'การงานอาชีพ', FL: 'ภาษาต่างประเทศ',
+  };
+  /* ชื่อย่อ — เหลือที่ใช้ที่เดียวคือ **ป้ายรอบเรดาร์ 6 แฉก** ซึ่งเป็นกราฟิกที่ใส่ชื่อเต็มไม่ลงจริง ๆ
+     (ชื่อเต็มยังอยู่ใน aria-label ของเรดาร์และในแถบด้านล่างกราฟ) ห้ามเอาไปใช้ที่อื่นอีก */
   const COMP_SHORT = {
     SM: 'จัดการตนเอง', HOT: 'คิดขั้นสูง', CM: 'สื่อสาร',
     TW: 'ทำงานเป็นทีม', CZ: 'พลเมืองเข้มแข็ง', SN: 'อยู่กับธรรมชาติ',
   };
+  const SUBJ_SHORT = SUBJ_FULL;   /* คงชื่อเดิมไว้ให้โค้ดเก่าเรียกได้ แต่ได้ชื่อเต็มแล้ว */
   const CBE_TOTAL = 6;
   /* ค่าเทียมสำหรับตัวกรอง "ครบ 6 ด้าน" — ขึ้นต้นด้วย __ กันชนกับรหัสสมรรถนะจริง */
   const ALL6 = '__ALL6';
 
-  /* ชื่อย่อกลุ่มสาระ — ชื่อเต็มตามหลักสูตรยาวมาก */
-  const SUBJ_SHORT = {
-    TH: 'ภาษาไทย', MA: 'คณิตศาสตร์', SC: 'วิทยาศาสตร์ฯ', SO: 'สังคมศึกษาฯ',
-    PE: 'สุขศึกษาฯ', AR: 'ศิลปะ', OC: 'การงานอาชีพ', FL: 'ภาษาต่างประเทศ',
-  };
+  /* ชื่อที่จะเอาไปแสดง — ฐานส่งชื่อมาก็ใช้ชื่อนั้น · ส่งมาแต่รหัสค่อยเปิดตาราง · ไม่รู้จักก็โชว์รหัสตามจริง
+     (ไม่เดาแทนเจ้าของเกม ตามกฎเดิมของแพลตฟอร์ม) */
+  const subjectNames = (g) => (g.subject_areas.length ? g.subject_areas
+    : g.subject_codes.map((c) => SUBJ_FULL[c] || c));
+  const competencyNames = (g) => (g.competencies.length ? g.competencies
+    : g.competency_codes.map((c) => COMP_FULL[c] || c));
 
   /* ช่วงชั้นแบบกว้าง — ต้องให้ผลเหมือน grade_band ใน v_game_catalog เป๊ะ ๆ */
   function gradeBand(g) {
@@ -167,7 +188,7 @@
       labelOf: (v, g) => (g.genre_icon ? g.genre_icon + ' ' : '') + (g.genre_name || v) },
     { key: 'subject',     label: 'กลุ่มสาระ', ui: 'chips',
       pick: (g) => (g.subject_codes.length ? g.subject_codes : g.subject_areas),
-      labelOf: (v) => SUBJ_SHORT[v] || v },
+      labelOf: (v) => SUBJ_FULL[v] || v },
     { key: 'competency',  label: 'สมรรถนะหลัก', ui: 'chips',
       /* ALL6 = ตัวเลือกพิเศษ "ครบ 6 ด้าน" สำหรับเกมที่ประเมินได้ทุกด้าน
          ครูที่อยากได้เกมประเมินรอบด้านจะได้กดทีเดียว ไม่ต้องไล่กดทีละด้าน */
@@ -176,7 +197,7 @@
         return codes.length >= CBE_TOTAL ? [ALL6].concat(codes) : codes;
       },
       labelOf: (v) => (v === ALL6 ? '⭐ ครบ ' + CBE_TOTAL + ' ด้าน'
-                                  : (COMP_SHORT[v] || String(v).replace(/^สมรรถนะ/, ''))),
+                                  : (COMP_FULL[v] || String(v).replace(/^สมรรถนะ/, ''))),
       /* ให้ "ครบ 6 ด้าน" อยู่หัวแถวเสมอ ไม่ปนกับด้านย่อย */
       sortBy: (o) => (o.value === ALL6 ? -1 : 0) },
     { key: 'series',      label: 'ชุดเกม', ui: 'select',
@@ -243,6 +264,8 @@
   }
 
   window.GPCatalog = { loadCatalog, buildFilters, apply, matches, SORTS, DIMENSIONS,
-    GENRE_ICON, GENRE_TH, STATUS_TH, COMP_SHORT, SUBJ_SHORT, CBE_TOTAL, ALL6,
+    GENRE_ICON, GENRE_TH, STATUS_TH, CBE_TOTAL, ALL6,
+    COMP_FULL, SUBJ_FULL, COMP_SHORT, SUBJ_SHORT,
+    subjectNames, competencyNames,
     gradeBand, gradeText, gradeList, gradeLabel, playTime };
 })();

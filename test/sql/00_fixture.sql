@@ -177,3 +177,78 @@ returns uuid language sql stable security definer set search_path = public as $$
    where g.code = case when p_version like '%-p2-%' then p_code || '-p2' else p_code end
    limit 1
 $$;
+
+
+-- ============================================================
+-- จาก 43_REPORT_CARDS.sql — ใบรายงานผล 2 ใบ (ยกโครงมาตรงตัว)
+--
+-- ยกมาเฉพาะส่วนที่ไฟล์ 64 ต้องใช้จริง: สองตาราง + ตัวช่วยสองตัว
+-- **คัดลอกทีละอักษรจาก 43** โดยเฉพาะ check constraint ของ evidence และคีย์ unique
+-- เพราะสองอย่างนี้คือกับดักที่ไฟล์ 64 ต้องดักให้ได้ (ของเดิมชนแล้วโยน error อังกฤษใส่ครู)
+-- ============================================================
+
+create table if not exists public.achievement_results (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.students(id) on delete cascade,
+  game_id    uuid not null references public.games(id) on delete cascade,
+  run_id     text not null default 'live',
+  game_version text,
+  score numeric,
+  max_score numeric,
+  percent numeric,
+  grade_label text,
+  progress_percent numeric,
+  unit_scores jsonb,
+  criteria_note text,
+  detail jsonb,
+  computed_at timestamptz not null default now(),
+  unique (student_id, game_id, run_id)
+);
+
+create table if not exists public.competency_dim_results (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.students(id) on delete cascade,
+  game_id    uuid not null references public.games(id) on delete cascade,
+  run_id     text not null default 'live',
+  comp_code  text not null,
+  game_version text,
+  score numeric,
+  level integer,
+  level_label text,
+  sub_scores jsonb,
+  evidence text not null default 'scored'
+    check (evidence in ('scored','observed','self_report')),
+  criteria_note text,
+  detail jsonb,
+  computed_at timestamptz not null default now(),
+  decided_by   text not null default 'game',
+  system_level integer,
+  system_score numeric,
+  unique (student_id, game_id, run_id, comp_code)
+);
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'cdr_decided_by_chk') then
+    alter table public.competency_dim_results
+      add constraint cdr_decided_by_chk check (decided_by in ('game','teacher'));
+  end if;
+end $$;
+
+create or replace function public.gp_level_label(p_level integer)
+returns text language sql immutable as $$
+  select case p_level
+    when 3 then 'เริ่มต้น'
+    when 4 then 'กำลังพัฒนา'
+    when 5 then 'สามารถ'
+    when 6 then 'เหนือความคาดหวัง'
+    else null end
+$$;
+
+create or replace function public.gp_ts(p_text text)
+returns timestamptz language plpgsql immutable as $$
+begin
+  return nullif(btrim(coalesce(p_text, '')), '')::timestamptz;
+exception when others then
+  return null;
+end $$;

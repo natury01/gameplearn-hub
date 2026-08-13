@@ -24,13 +24,16 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     </a>
     <div class="sp"></div>
     <nav class="navlinks" aria-label="เมนูหลัก">
-      <a href="./#games">เกมทั้งหมด</a>
-      <a href="./#teacher-zone">สำหรับครู</a>
+      <!-- ⭐ V.1.4.3 — ครูสั่ง: ปุ่ม "สร้างห้องเรียน" มา **แทนที่** เมนู "เกมทั้งหมด"
+           กลับหน้าแรก/ดูเกมทั้งหมดได้จากโลโก้มุมซ้ายบน ซึ่งมีอยู่ทุกหน้าอยู่แล้ว
+           ปุ่มย้ายจากขวาสุดมาอยู่ตรงนี้ หัวเว็บจึงเหลือปุ่มบัญชีฝั่งขวาชุดเดียว -->
+      <a class="btn btn-primary" id="new-room-btn" href="teacher.html#/rooms">🏫 สร้างห้องเรียน</a>
+      <a href="teacher.html">สำหรับครู</a>
       <a href="standards.html" class="on">มาตรฐาน</a>
       <a href="support.html">สนับสนุน</a>
       <a href="contact.html">ติดต่อ / แจ้งปัญหา</a>
     </nav>
-    <a class="btn btn-primary" id="auth-btn" href="teacher.html">👩‍🏫 เข้าสู่ระบบครู</a>
+    <a class="btn" id="auth-btn" href="teacher.html">👩‍🏫 เข้าสู่ระบบครู</a>
   </header>
 
   <main id="content">
@@ -70,7 +73,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   </main>
 
   <footer class="foot">
-    <div>เกมเพลิน (GamePlearn) · ทุกเกม คือลิ๊กชั้นของการเรียนรู้</div>
+    <div>เกมเพลิน (GamePlearn) · ทุกเกม คืออีกขั้นของการเรียนรู้</div>
+    <!-- V.1.4.3 — เมนู "เกมทั้งหมด" บนหัวเว็บถูกปุ่มสร้างห้องเรียนแทนที่ตามที่ครูสั่ง
+         หน้าอื่นมีลิงก์นี้อยู่ในท้ายหน้าอยู่แล้ว หน้านี้ท้ายหน้าโล่งจึงเติมให้เท่ากัน
+         (ยังกลับหน้าแรกจากโลโก้มุมซ้ายบนได้เหมือนเดิม นี่เป็นทางที่สองไม่ใช่ทางเดียว) -->
+    <div style="margin-top:6px"><a href="./#games">ดูเกมทั้งหมด</a></div>
   </footer>
 </div>
 
@@ -86,32 +93,44 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   /* ตารางสรุปมาตรฐาน — 1 แถวต่อเกม · ช่องที่เกมยังไม่ระบุเขียนว่า "รอยืนยัน" ไม่เดาแทนเจ้าของเกม
      (โค้ดชุดเดียวกับที่เคยอยู่หน้าแรก — ย้ายมาทั้งก้อนเพื่อไม่ให้มีสองที่ที่ต้องแก้) */
+  /* ป้ายชื่อเต็ม — เลิกต่อกันด้วย " · " เพราะชื่อตามหลักสูตรยาว พอมาต่อกันจะกลายเป็นก้อนข้อความ
+     ที่ต้องเพ่งหาว่าอันไหนจบอันไหนเริ่ม · ป้ายแยกใบทำให้กวาดตาทีเดียวรู้ว่ามีกี่อย่างและอะไรบ้าง */
+  function tagRow(list, cls) {
+    return '<div class="tagrow">'
+      + list.map((t) => '<span class="tag ' + cls + '">' + G.esc(t) + '</span>').join('')
+      + '</div>';
+  }
+
   function renderStandards(list) {
     if (!list.length) { $('std-wrap').innerHTML = '<div class="muted">ยังไม่มีเกมในระบบ</div>'; return; }
-    const wait = '<span class="muted small">รอยืนยัน</span>';
-    let html = '<table class="gol"><thead><tr>'
+    const wait = '<span class="muted small">รอเจ้าของเกมยืนยัน</span>';
+    let html = '<table class="gol stdtable"><thead><tr>'
       + '<th scope="col">เกม</th><th scope="col">ระดับชั้น</th><th scope="col">เรื่อง</th>'
-      + '<th scope="col">กลุ่มสาระ (ผลสัมฤทธิ์)</th><th scope="col">สมรรถนะหลักที่วัด</th>'
+      + '<th scope="col">กลุ่มสาระการเรียนรู้ (ผลสัมฤทธิ์)</th>'
+      + '<th scope="col">สมรรถนะหลักที่วัด</th>'
       + '</tr></thead><tbody>';
     list.forEach(function (g) {
-      const subs = g.subject_codes.length ? g.subject_codes.map((c) => K.SUBJ_SHORT[c] || c) : g.subject_areas;
-      const comps = g.competency_codes.length ? g.competency_codes.map((c) => K.COMP_SHORT[c] || c) : g.competencies;
-      const full = g.competency_codes.length >= K.CBE_TOTAL;
+      const subs = K.subjectNames(g);
+      const comps = K.competencyNames(g);
+      const full = comps.length >= K.CBE_TOTAL;
       html += '<tr>'
         + '<td><b>' + G.esc(g.name) + '</b>'
-          + (g.name_en ? '<div class="muted small">' + G.esc(g.name_en) + '</div>' : '') + '</td>'
-        + '<td>' + G.esc(g.grade_band || '–') + '</td>'
+          + (g.series && g.series_order
+              ? '<div class="muted small">ชุด' + G.esc(g.series) + ' ภาค ' + g.series_order + '</div>' : '')
+        + '</td>'
+        + '<td><span class="gradechip">' + G.esc(g.grade_band || '–') + '</span></td>'
         + '<td>' + (g.topic ? G.esc(g.topic) : wait) + '</td>'
-        + '<td>' + (subs.length ? G.esc(subs.join(' · ')) : wait) + '</td>'
+        + '<td>' + (subs.length ? tagRow(subs, 'subj') : wait) + '</td>'
         + '<td>' + (comps.length
-            ? (full ? '<b>ครบ ' + K.CBE_TOTAL + ' ด้าน</b><div class="muted small">' + G.esc(comps.join(' · ')) + '</div>'
-                    : G.esc(comps.join(' · ')))
+            ? (full ? '<span class="tag all6">⭐ ครบ ' + K.CBE_TOTAL + ' ด้าน</span>' : '')
+              + tagRow(comps, 'comp')
             : wait) + '</td>'
         + '</tr>';
     });
     html += '</tbody></table>'
-      + '<div class="form-hint">อ้างอิงหลักสูตรแกนกลางฯ 2551 (ปรับปรุง 2560) และกรอบสมรรถนะหลัก 6 ประการ · '
-      + 'ช่องที่เขียนว่า "รอยืนยัน" คือเจ้าของเกมยังไม่ได้ระบุ — ไม่ใช่ว่าเกมไม่ได้วัด</div>';
+      + '<div class="form-hint">อ้างอิง<b>หลักสูตรแกนกลางการศึกษาขั้นพื้นฐาน พุทธศักราช 2551 '
+      + '(ฉบับปรับปรุง พ.ศ. 2560)</b> และ<b>กรอบสมรรถนะหลัก 6 ประการ</b> · '
+      + 'ช่องที่เขียนว่า "รอเจ้าของเกมยืนยัน" คือเจ้าของเกมยังไม่ได้ระบุ — ไม่ใช่ว่าเกมไม่ได้วัด</div>';
     $('std-wrap').innerHTML = html;
   }
 

@@ -21,12 +21,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <span class="bname"><span class="th" id="brand-th">เกมเพลิน</span><span class="en">GamePlearn · สำหรับครู</span></span></a>
     <div class="sp"></div>
     <nav class="navlinks" aria-label="เมนูหลัก">
-      <a href="./#games">เกมทั้งหมด</a>
-      <!-- เมนูหน้าครู 3 หน้า อยู่บนแถบหัวเว็บ (เดิมเป็นแถบย่อยใต้หัวเว็บ — ครูสั่งให้เอาออก)
+      <!-- ⭐ V.1.4.3 — ครูสั่ง: "สร้างห้องเรียน" มาแทนที่ "เกมทั้งหมด" ตัวแรกของเมนู
+           หน้านี้มีตัวนี้อยู่แล้วกลางเมนู จึงไม่ใส่ซ้ำ — ย้ายขึ้นมาเป็นตัวแรกแทน
+           และคงเป็นลิงก์เมนู (ไม่ใช่ปุ่มสีทึบ) เพราะต้องใช้ขีดใต้บอก "กำลังอยู่หน้านี้" ร่วมกับเพื่อน ๆ
+
+           เมนูหน้าครู 3 หน้า อยู่บนแถบหัวเว็บ (เดิมเป็นแถบย่อยใต้หัวเว็บ — ครูสั่งให้เอาออก)
            ตัวที่กำลังเปิดอยู่ติด .on + aria-current ผ่าน syncNav() ทุกครั้งที่เปลี่ยน route
            จึงไม่ต้องใส่ class="on" ตายตัวให้ "สำหรับครู" อีก (จะไฮไลต์ซ้อนกันสองอัน) -->
-      <a href="#/" data-nav="#/">📊 Dashboard</a>
       <a href="#/rooms" data-nav="#/rooms">🏫 สร้างห้องเรียน</a>
+      <a href="#/" data-nav="#/">📊 Dashboard</a>
       <a href="#/browse" data-nav="#/browse">🔎 ห้องของครูคนอื่น</a>
       <a href="standards.html">📋 มาตรฐาน</a>
       <a href="support.html">สนับสนุน</a>
@@ -271,7 +274,16 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   async function boot() {
     G.captureOAuthReturn();
     const ok = await G.ensure();
-    if (!ok) { $('v-login').classList.remove('hidden'); mountOpenRoom(); return; }
+    if (!ok) {
+      $('v-login').classList.remove('hidden');
+      mountOpenRoom();
+      /* มาจากปุ่ม "🏫 สร้างห้องเรียน" บนหัวเว็บสาธารณะ (ชี้มาที่ #/rooms) — กางฟอร์มให้เลย
+         ครูกดปุ่มที่เขียนว่า "สร้างห้องเรียน" แล้วต้องมากดปุ่มชื่อเดียวกันอีกทีคือทางอ้อมโดยไม่จำเป็น */
+      if ((location.hash || '').indexOf('#/rooms') === 0) {
+        const b = $('btn-open-room'); if (b) b.click();
+      }
+      return;
+    }
     $('v-login').classList.add('hidden');
     $('v-app').classList.remove('hidden');
     $('btn-logout').classList.remove('hidden');
@@ -652,7 +664,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      เว็บกลางรวม-เฉลี่ยเพื่อแสดงเท่านั้น ไม่คิดคะแนนแทนเกม · แบบประเมินตนเองแสดงแยกส่วนเสมอ */
   const COMP6 = [['SM','การจัดการตนเอง','จัดการตนเอง'], ['HOT','การคิดขั้นสูง','คิดขั้นสูง'],
     ['CM','การสื่อสาร','สื่อสาร'], ['TW','การรวมพลังทำงานเป็นทีม','ทำงานทีม'],
-    ['CZ','การเป็นพลเมืองที่เข้มแข็ง','พลเมือง'], ['SN','การอยู่ร่วมกับธรรมชาติฯ','ธรรมชาติฯ']];
+    ['CZ','การเป็นพลเมืองที่เข้มแข็ง','พลเมือง'],
+    /* ชื่อเต็มของด้านนี้ยาวที่สุดในหกด้าน เดิมตัดด้วย ฯ ไว้ — ครูสั่งให้ใช้ชื่อเต็ม
+       ช่องที่สามคือชื่อย่อสำหรับป้ายรอบเรดาร์เท่านั้น (กราฟิกใส่ชื่อเต็มไม่ลงจริง ๆ) */
+    ['SN','การอยู่ร่วมกับธรรมชาติและวิทยาการอย่างยั่งยืน','ธรรมชาติฯ']];
   const HOT_SUB = { ctc: 'คิดอย่างมีวิจารณญาณ', stm: 'คิดเชิงระบบ', crt: 'คิดสร้างสรรค์', prb: 'คิดแก้ปัญหา' };
   /* ด้านย่อยชุด 19 ตัวที่เกมใช้ร่วมกัน (SELF_SUB_LABEL) — ใช้แสดงชื่อไทยเมื่อเกมส่งรหัสมา */
   const SUB_LABEL = {
@@ -803,7 +818,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let html = '<h2 class="section-title">สมรรถนะรายคน <span class="sub">ครบ 6 ด้าน · รวมทุกเกม</span></h2>'
       + '<div class="card table-scroll"><table class="gol"><thead><tr>'
       + '<th scope="col" class="num">เลขที่</th><th scope="col" class="name">ชื่อ</th>'
-      + COMP6.map((c) => '<th scope="col">' + G.esc(c[2]) + '</th>').join('')
+      /* หัวตารางใช้ชื่อเต็มตามที่ครูสั่ง — ตารางนี้เลื่อนแนวนอนได้อยู่แล้วจึงมีที่พอ
+         ชื่อย่อเหลือใช้ที่เดียวคือป้ายรอบเรดาร์ ซึ่งเป็นกราฟิกที่ใส่ชื่อเต็มไม่ลงจริง ๆ */
+      + COMP6.map((c) => '<th scope="col">' + G.esc(c[1]) + '</th>').join('')
       + '</tr></thead><tbody>';
     stu.forEach(function (st) {
       html += '<tr' + (isOn(st) ? '' : ' style="opacity:.6"') + '><td class="num">' + G.esc(st.student_number || '–') + '</td>'

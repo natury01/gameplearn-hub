@@ -102,6 +102,7 @@ export async function stub(page, opt = {}) {
     }
     if (has('v_student_competency')) return json(opt.noData ? [] : inIds(F.comp, 'classroom_id'));
     if (has('game_media')) return opt.noMedia ? gone() : json(opt.p1media ? F.p1Media : F.media);
+    if (has('game_framework_items')) return json(F.stdMaps);
     if (has('assessment_frameworks')) return json([]);
     if (has('v_framework_coverage')) return json([]);
     /* ---- งานรอบ 2: ห้องสาธารณะ (59) + สร้างห้องก่อนล็อกอิน (60) ---- */

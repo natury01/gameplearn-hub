@@ -6,7 +6,7 @@ import * as F from './fixtures.mjs';
 import fs from 'fs';
 
 const PORT = 8933, BASE = 'http://localhost:' + PORT;
-const VER = 'V.1.4.1';
+const VER = 'V.1.4.4';
 const srv = await serve(PORT);
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const ok = reporter();
@@ -46,7 +46,7 @@ for (const page of PAGES) {
   await p.goto(BASE + page);
   await sleep(1200);
   const ver = await p.evaluate(() => document.body.textContent);
-  ok(`${page} แสดงป้ายรุ่น ${VER}`, ver.includes(VER) && !ver.includes('V.1.4.0'),
+  ok(`${page} แสดงป้ายรุ่น ${VER}`, ver.includes(VER) && !ver.includes('V.1.4.1'),
     (ver.match(/V\.1\.\d\.\d/g) || []).slice(0, 3));
   await p.close();
 }
@@ -133,6 +133,29 @@ console.log('\n═══ 4) ตรวจจากซอร์ส — เคร�
   ok('ลำดับ SQL ใน README_DEPLOY มีไฟล์ใหม่ครบ',
     /59_ROOM_BROWSE\.sql/.test(fs.readFileSync(ROOT + '/README_DEPLOY.md', 'utf8'))
     && /60_ROOM_CLAIM\.sql/.test(fs.readFileSync(ROOT + '/README_DEPLOY.md', 'utf8')));
+  /* ชื่อย่อที่ตัดด้วย ฯ ห้ามกลับมาในไฟล์ที่ครูอ่านอีก — ตรวจจากซอร์สกันเผลอใส่กลับ
+     (ยกเว้นช่องที่สามของ COMP6 ในหน้าครู ซึ่งเป็นป้ายรอบเรดาร์ กราฟิกใส่ชื่อเต็มไม่ลง) */
+  const banned = ['วิทยาศาสตร์ฯ', 'สังคมศึกษาฯ', 'สุขศึกษาฯ'];
+  ok('ไม่มีชื่อย่อที่ตัดด้วย ฯ หลงเหลือใน index/standards/admin',
+    !banned.some((w) => src.index.includes(w) || src.admin.includes(w)
+      || fs.readFileSync(ROOT + '/standards.html', 'utf8').includes(w)), banned);
+  ok('ชื่อกลุ่มสาระ/สมรรถนะเก็บที่เดียวใน gp-catalog.js และหน้า Admin ก็ใช้ชุดเดียวกัน',
+    /COMP_FULL/.test(fs.readFileSync(ROOT + '/js/gp-catalog.js', 'utf8'))
+    && /js\/gp-catalog\.js/.test(src.admin) && /KC\.SUBJ_FULL|SUBJ_FULL/.test(src.admin));
+  ok('ปุ่มสร้างห้องเรียนอยู่บนหัวเว็บครบทุกหน้าสาธารณะ',
+    ['index.html', 'standards.html', 'support.html', 'contact.html']
+      .every((f) => /id="new-room-btn"/.test(fs.readFileSync(ROOT + '/' + f, 'utf8'))));
+  /* V.1.4.3 — ปุ่มย้ายเข้าไปอยู่ใน .navlinks แล้ว ตัวหา anchor ของปุ่มสลับธีมจึงต้องเป็น ":scope >"
+     ถ้ามีคนลบทิ้ง insertBefore จะโยน NotFoundError → ปุ่มสลับสว่าง/มืดหายทั้งเว็บแบบเงียบ ๆ */
+  ok('ตัวหาที่วางปุ่มสลับธีมยังจำกัดเฉพาะลูกตรงของหัวเว็บ (:scope >)',
+    /:scope > \.btn-primary/.test(fs.readFileSync(ROOT + '/js/gp-brand.js', 'utf8')));
+  /* ตัดเมนู "เกมทั้งหมด" ออกได้ แต่ทางไปแคตตาล็อกต้องไม่หายจากหน้าไหนเลย */
+  ok('ทุกหน้าสาธารณะยังมีทางไปแคตตาล็อกเกม (ท้ายหน้า) ไม่ได้หายไปพร้อมเมนูเดิม',
+    ['index.html', 'standards.html', 'support.html', 'contact.html']
+      .every((f) => /#games/.test(fs.readFileSync(ROOT + '/' + f, 'utf8').split('</main>')[1] || '')));
+  ok('แผงมาตรฐานผูกสีกับโทเคนของธีม ไม่ฝังสีตายตัว',
+    /var\(--surface,/.test(fs.readFileSync(ROOT + '/js/gp-standards-panel.js', 'utf8'))
+    && /html:not\(\[data-theme\]\)/.test(fs.readFileSync(ROOT + '/js/gp-standards-panel.js', 'utf8')));
   ok('ป้ายรุ่นในไฟล์ตั้งค่าเป็น ' + VER, src.cfg.includes("HUB_VERSION: '" + VER + "'"));
   ok('ไม่มี service role key หลุดเข้ามา (กฎเหล็ก)',
     !/service_role/.test(src.cfg) && !/service_role/.test(src.teacher));

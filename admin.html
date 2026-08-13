@@ -215,6 +215,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 <script src="js/config.js"></script>
 <script src="js/gp-core.js"></script>
 <script src="js/gp-brand.js"></script>
+<!-- ชื่อกลุ่มสาระ/สมรรถนะเก็บไว้ที่เดียวใน gp-catalog.js — หน้านี้ใช้ชุดเดียวกับหน้าที่ครูเห็น -->
+<script src="js/gp-catalog.js"></script>
 <script>
 (function () {
   const C = window.GP_CONFIG, G = window.GP;
@@ -645,11 +647,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   /* ============ ทะเบียนเกม ============ */
 
-  /* รหัสกลุ่มสาระ/สมรรถนะที่ติ๊กได้ — ชื่อย่อไว้ให้ช่องติ๊กไม่ล้น */
-  const SUBJECTS = [['TH','ภาษาไทย'],['MA','คณิตศาสตร์'],['SC','วิทยาศาสตร์ฯ'],['SO','สังคมศึกษาฯ'],
-                    ['PE','สุขศึกษาฯ'],['AR','ศิลปะ'],['OC','การงานอาชีพ'],['FL','ภาษาต่างประเทศ']];
-  const COMPS    = [['SM','จัดการตนเอง'],['HOT','คิดขั้นสูง'],['CM','สื่อสาร'],
-                    ['TW','ทำงานเป็นทีม'],['CZ','พลเมืองเข้มแข็ง'],['SN','อยู่กับธรรมชาติ']];
+  /* รหัสกลุ่มสาระ/สมรรถนะที่ติ๊กได้ — ใช้ **ชื่อเต็ม** ชุดเดียวกับที่ครูเห็นบนหน้าเว็บ
+     (ดึงจาก gp-catalog.js ที่เดียว ไม่ตั้งชื่อซ้ำอีกชุด — ไม่งั้นวันหนึ่งสองที่จะไม่ตรงกัน)
+     ที่นี่คือจุดที่ผู้ดูแล "ประกาศว่าเกมวัดอะไร" ชื่อที่ติ๊กจึงต้องเป็นชื่อเดียวกับที่ครูอ่านเจอ */
+  const KC = window.GPCatalog || {};
+  const SUBJECTS = ['TH','MA','SC','SO','PE','AR','OC','FL']
+    .map((c) => [c, (KC.SUBJ_FULL || {})[c] || c]);
+  const COMPS = ['SM','HOT','CM','TW','CZ','SN']
+    .map((c) => [c, (KC.COMP_FULL || {})[c] || c]);
   const GENRES   = [['adventure','ผจญภัย / สำรวจ'],['quiz','ตอบคำถาม / แข่งตอบ'],['simulation','จำลองสถานการณ์'],
                     ['puzzle','ปริศนา / ตรรกะ'],['drill','ฝึกทักษะ'],['story','เล่าเรื่อง / ตัดสินใจ'],
                     ['creative','สร้างสรรค์ / ออกแบบ'],['board','เกมกระดาน / ผลัดกันเล่น']];

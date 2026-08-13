@@ -343,6 +343,19 @@ a:hover { text-decoration: underline; }
 .navlinks a[data-nav] { display: inline-flex; align-items: center; min-height: 24px;
   border-bottom: 2px solid transparent; border-radius: var(--r-sm) var(--r-sm) 0 0; }
 .navlinks a[aria-current="page"] { border-bottom-color: var(--accent-strong); }
+
+/* ปุ่ม "สร้างห้องเรียน" นั่งอยู่ในแถวเมนู ตำแหน่งเดิมของ "เกมทั้งหมด" (ครูสั่ง V.1.4.3)
+   ⚠️ ต้องเขียนสีทับตรงนี้ ห้ามพึ่ง .btn-primary เฉย ๆ — ตัวเลือก `.navlinks a` หนัก (0,1,1)
+   ส่วน `.btn-primary` หนักแค่ (0,1,0) ลำดับในไฟล์จึงช่วยไม่ได้ ต่อให้เขียนไว้ท้ายไฟล์
+   ถ้าไม่เขียน ปุ่มจะได้ตัวอักษรสีเทาของลิงก์เมนูทับบนพื้นน้ำเงินเข้ม เหลือคอนทราสต์ ~2:1
+   ใช้โทเคนชุดเดียวกับกฎรวมสีท้ายไฟล์ (--accent-strong / --on-accent) จึงตามธีมมืดและ 7 สกินครบ */
+.navlinks a.btn { padding: 7px 13px; font-size: 14px; margin-right: 6px; font-weight: 600; }
+.navlinks a.btn-primary,
+.navlinks a.btn-primary:hover,
+.navlinks a.btn-primary:focus-visible {
+  background: var(--accent-strong); border-color: var(--accent-strong); color: var(--on-accent);
+}
+.navlinks a.btn-primary:hover { filter: brightness(1.08); }
 /* หน้าครู/ผู้ดูแล มีชื่อผู้ใช้เพิ่มมาอีกชิ้น รวมแล้วกว้างเกินความกว้างสูงสุดของ .wrap เสมอ
    ไม่ว่าจอจะกว้างแค่ไหน — จึงให้เมนูอยู่แถวล่างตายตัว ดูตั้งใจกว่าปล่อยให้ปุ่มหล่นทีละตัว */
 .topbar-app .navlinks {
@@ -350,10 +363,14 @@ a:hover { text-decoration: underline; }
   overflow-x: auto; padding: 6px 0 0; margin-top: 2px;
   border-top: 1px dashed var(--grid); scrollbar-width: thin;
 }
-.topbar-app .navlinks a:first-child { padding-left: 4px; }
+.topbar-app .navlinks a:first-child:not(.btn) { padding-left: 4px; }
 
 /* จอกลาง — ของในหัวเว็บเริ่มไม่พอที่ (โดยเฉพาะบัญชีผู้ดูแลที่มีปุ่มสลับโหมดเพิ่มมา)
-   ยกเมนูหลักลงไปเป็นแถวที่สองทั้งก้อน แถวบนเหลือ แบรนด์ · สลับโหมด · ปุ่มบัญชี */
+   ยกเมนูหลักลงไปเป็นแถวที่สองทั้งก้อน แถวบนเหลือ แบรนด์ · สลับโหมด · ปุ่มบัญชี
+
+   ⚠️ เพิ่ม breakpoint ให้ใหญ่ขึ้นแก้ปัญหาปุ่มตกบรรทัด **ไม่ได้** — .wrap กว้างสูงสุด 1080px
+   ต่อให้จอ 4K พื้นที่หัวเว็บก็เท่าเดิม ต้นเหตุจริงคือจำนวนปุ่ม ไม่ใช่ความกว้างจอ
+   (ดูวิธีแก้ที่ renderAuthButton ใน gp-brand.js — จำกัดปุ่มบนหัวเว็บไว้ที่ 2 ใบ) */
 @media (max-width: 1180px) {
   .topbar .navlinks {
     order: 10; flex-basis: 100%; width: 100%;
@@ -363,7 +380,7 @@ a:hover { text-decoration: underline; }
   }
   /* ไม่ตัด padding ซ้ายของลิงก์แรก — สระหน้าอย่าง "เ" กินพื้นที่เลยกรอบตัวอักษร
      พอกล่องมี overflow-x หัวอักษรจะโดนเฉือนหายไปครึ่งตัว */
-  .topbar .navlinks a:first-child { padding-left: 4px; }
+  .topbar .navlinks a:first-child:not(.btn) { padding-left: 4px; }
 }
 
 @media (max-width: 720px) {
@@ -683,12 +700,24 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
   opacity: 0; transition: opacity .5s ease; }
 .gcover .gshot.on { opacity: 1; }
 .gcover .gshot.dead { display: none; }
-/* ชื่อด่าน — ไล่สีดำจาง ๆ ใต้ตัวอักษร ให้อ่านออกไม่ว่าภาพข้างหลังจะสว่างหรือมืด */
+/* ชื่อด่าน — ไล่สีดำจาง ๆ ใต้ตัวอักษร ให้อ่านออกไม่ว่าภาพข้างหลังจะสว่างหรือมืด
+   ⚠️ แถบนี้ทับ "ภาพของเกม" ซึ่งเป็นเนื้อหาของเจ้าของเกม ไม่ใช่พื้นที่ของเว็บกลาง
+   ภาค 1 ตรวจภาพ 14 ใบเทียบโซนนี้แล้วพบว่า 3 ด่านมีแผงที่ใช้เล่นอยู่ริมล่างพอดี
+   (จัดกลุ่มการ์ด · ควบคุมระดับน้ำ · ช่องเรียงลำดับ) ถูกแถบทับแล้วดูไม่ออกว่าด่านนั้นเล่นอะไร
+
+   แก้ที่เว็บกลาง ไม่ใช่ให้เกมไปถ่ายใหม่ 14 ใบเพื่อหลบ UI ของเรา:
+     · อยู่เฉย ๆ = ไม่มีแถบเลย ภาพเห็นเต็มใบ 100%
+     · เอาเมาส์ชี้/แท็บเข้ามา (ตอนที่สไลด์เริ่มเลื่อน) ค่อยขึ้นชื่อด่าน — ตอนนั้นภาพกำลังเปลี่ยนอยู่แล้ว
+     · แถบบางลงจาก 21% เหลือราว 14% ของความสูง
+   ความหมายของภาพไม่ได้หายไปกับแถบ เพราะ alt ของแต่ละใบยังบอกครบสำหรับโปรแกรมอ่านหน้าจอ */
 .gcover .gcap { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
-  padding: 18px 10px 6px; font-size: 12px; font-weight: 600; line-height: 1.3;
-  color: #fff; text-align: left; text-shadow: 0 1px 2px rgba(0,0,0,.55);
-  background: linear-gradient(to top, rgba(11,11,11,.75), rgba(11,11,11,0));
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  padding: 8px 10px 5px; font-size: 11.5px; font-weight: 600; line-height: 1.3;
+  color: #fff; text-align: left; text-shadow: 0 1px 2px rgba(0,0,0,.6);
+  background: linear-gradient(to top, rgba(11,11,11,.8), rgba(11,11,11,0));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  opacity: 0; transition: opacity .2s ease; }
+.gcover.gshots:hover .gcap,
+.gcard:focus-within .gcover.gshots .gcap { opacity: 1; }
 .gcover .gdots { position: absolute; right: 9px; bottom: 8px; z-index: 3; display: flex; gap: 4px; }
 .gcover .gdots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.5);
   box-shadow: 0 0 2px rgba(0,0,0,.55); transition: background .2s; }
@@ -738,12 +767,42 @@ button.zcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
 .sitefoot a { display: block; padding: 2px 0; color: var(--ink-2); }
 .sitefoot a:hover { color: var(--accent-strong); }
 
-/* ---------- tag (สมรรถนะ/กลุ่มสาระที่เกมวัด) ---------- */
-.tagrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.tag { font-size: 11.5px; color: var(--ink-2); background: var(--page);
-  border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; }
-.tag.subj { background: var(--tint-teal); color: var(--ink-2); }
-.tag.comp { background: var(--tint-blue); color: var(--ink-2); }
+/* ---------- ป้ายชื่อเต็ม (กลุ่มสาระ / สมรรถนะที่เกมวัด) ----------
+   ครูสั่งให้ใช้ชื่อเต็มตามหลักสูตรทุกที่ · ชื่อพวกนี้ยาว (บางชื่อ 40+ ตัวอักษร)
+   จึงต้องออกแบบให้ "ยาวแล้วยังอ่านง่าย" ไม่ใช่บีบให้สั้น:
+     · ป้ายละบรรทัดของตัวเอง ตัดคำเองได้ ไม่บังคับให้อยู่บรรทัดเดียว
+     · มีเส้นขอบซ้ายหนาเป็นสีประจำมิติ — กวาดตาแยกออกทันทีว่าอันไหนกลุ่มสาระ อันไหนสมรรถนะ
+       (ใช้สีคู่กับรูปทรง ไม่ใช่สีอย่างเดียว — คนตาบอดสียังแยกได้จากตำแหน่งและหัวข้อกำกับ) */
+.tagrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.tag {
+  display: inline-block; max-width: 100%;
+  font-size: 12.5px; line-height: 1.45; color: var(--ink);
+  background: var(--page); border: 1px solid var(--border);
+  border-left: 3px solid var(--baseline);
+  border-radius: 4px var(--r-sm) var(--r-sm) 4px;
+  padding: 3px 10px; word-break: break-word;
+}
+.tag.subj { background: var(--tint-teal); border-color: var(--border); border-left-color: var(--good); }
+.tag.comp { background: var(--tint-blue); border-color: var(--border); border-left-color: var(--accent); }
+/* "ครบ 6 ด้าน" — ป้ายสรุปที่ต้องเด่นกว่าป้ายรายด้าน เพราะเป็นคำตอบที่ครูมองหาก่อน */
+.tag.all6 {
+  background: var(--tint-orange); border-left-color: var(--brand-orange);
+  font-weight: 700; color: var(--ink); margin-bottom: 2px;
+}
+.gradechip {
+  display: inline-block; white-space: nowrap; font-size: 12.5px; font-weight: 600;
+  color: var(--accent-strong); background: var(--tint-blue);
+  border: 1px solid var(--accent); border-radius: 999px; padding: 2px 11px;
+}
+
+/* ตารางมาตรฐาน — ให้แต่ละคอลัมน์มีที่พอสำหรับชื่อเต็ม และแถวไม่ติดกันจนอ่านข้ามบรรทัด */
+.stdtable td { vertical-align: top; padding-top: 12px; padding-bottom: 12px; }
+.stdtable th { white-space: nowrap; }
+.stdtable td:nth-child(1) { min-width: 190px; }
+.stdtable td:nth-child(3) { min-width: 150px; }
+.stdtable td:nth-child(4) { min-width: 210px; }
+.stdtable td:nth-child(5) { min-width: 250px; }
+.stdtable tbody tr:nth-child(even) { background: var(--page); }
 
 /* ---------- tabs (ผลสัมฤทธิ์ / สมรรถนะ) ---------- */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--grid); margin: 20px 0 14px; }

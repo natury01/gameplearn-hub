@@ -1,0 +1,1018 @@
+/* เกมเพลิน (GamePlearn) — สไตล์กลาง
+ * ทิศทางออกแบบ: "สนุกอย่างมีระเบียบ" (Playful Professional)
+ *   สีสดใช้อย่างมีวินัย · มุมมนใหญ่ · ไอคอนใหญ่ · ตัวอักษรอ่านง่าย
+ *   เด็ก ป.4 กดถูก · ครูกล้าเปิดในห้องประชุม
+ * โทเคนสีข้อมูล (accent/good/warning/critical) ตามมาตรฐาน dataviz — ห้ามใช้สีแบรนด์แทนสีข้อมูล
+ */
+/* ============================================================
+   ธีม — คุมด้วย 2 อย่างที่แยกจากกัน
+     data-theme = light | dark | auto   (โหมดสว่าง/มืด)
+     data-skin  = playful | soft | contrast   (บุคลิกของสี)
+   ค่าเริ่มต้น: light + playful
+   ตั้งค่ากลางได้จากหน้า Admin · ผู้ใช้กดสลับเองได้จากปุ่มบนหัวเว็บ
+   ============================================================ */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #6d6b66;          /* รอบ ก: เดิม #898781 = 3.6:1 → 5.3:1 */
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --accent: #2a78d6;          /* series-1 (blue) */
+  --accent-strong: #1c5cab;
+  --meter-track: #cde2fb;     /* ขั้นอ่อนของ ramp เดียวกัน */
+  --good: #0ca30c;
+  --good-text: #006300;
+  --warning: #fab219;
+  --critical: #d03b3b;
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.05);
+  --base-size: 15.5px;
+  --border-w: 1px;
+
+  /* รอบ ก (W3C 41_W3C_AUDIT.md): โทเคนคอนทราสต์
+     --on-accent      = สีตัวอักษรบนพื้น accent-strong (โหมดมืดกลับขั้วเป็นตัวเข้ม)
+     --on-brand-orange= สีตัวอักษรบนปุ่มส้ม "เล่นเกม" (contrast สว่างใช้ขาว · โหมดมืดกลับเป็นตัวเข้มทุกสกิน)
+     --btn-play-bg    = พื้นปุ่ม "เล่นเกม" (ปกติ = ส้มแบรนด์ · สกิน warm ใช้ส้มเข้มพิเศษเพราะส้มเดิมไม่ผ่านกับสีตัวอักษรใดเลย)
+     --control-border = เส้นขอบช่องกรอก ≥3:1 ตาม WCAG 1.4.11 (ของเดิม --baseline ได้แค่ 1.5:1) */
+  --on-accent: #ffffff;
+  --on-brand-orange: #2a1505;
+  --btn-play-bg: var(--brand-orange);
+  --control-border: #858378;
+
+  /* --- สีแบรนด์ (ใช้เป็นสีตกแต่ง/หมวดหมู่เท่านั้น ไม่ใช้กับกราฟ) --- */
+  --brand-blue: #2a78d6;
+  --brand-orange: #eb6834;
+  --brand-teal: #1baf7a;
+  --brand-yellow: #eda100;
+  --tint-blue: #eaf2fd;
+  --tint-orange: #fdeee8;
+  --tint-teal: #e6f7f1;
+  --tint-yellow: #fdf3dc;
+
+  /* --- รูปทรง (มุมมนใหญ่ = เป็นมิตร) --- */
+  --r-sm: 9px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 26px;
+  --lift: 0 6px 18px rgba(11, 11, 11, 0.08);
+}
+/* ---------- สกิน ข · นุ่มตา (Soft) — สีอ่อนลง มุมมนขึ้น เหมาะกับการใช้งานนาน ---------- */
+[data-skin="soft"] {
+  --page: #f5f7fb;
+  --surface: #ffffff;
+  --ink: #1b2230;
+  --ink-2: #5a657a;
+  --muted: #5e6a80;          /* รอบ ก: เดิม 2.7:1 → 5.5:1 */
+  --grid: #e6ecf5;
+  --baseline: #c6d2e3;
+  --border: rgba(27, 34, 48, 0.09);
+  --accent: #4a89dc;
+  --accent-strong: #2f66b0;
+  --meter-track: #dbe8fa;
+  --brand-blue: #4a89dc;
+  --brand-orange: #f08b62;
+  --brand-teal: #4ec5a0;
+  --brand-yellow: #f2c25c;
+  --tint-blue: #eaf1fc;
+  --tint-orange: #fdf0ea;
+  --tint-teal: #e9f8f3;
+  --tint-yellow: #fdf6e6;
+  --r-sm: 11px; --r-md: 17px; --r-lg: 24px; --r-xl: 30px;
+  --shadow: 0 1px 3px rgba(27, 34, 48, 0.05);
+}
+
+/* ---------- สกิน ค · คมชัด (Contrast) — เน้นอ่านง่าย เหมาะกับโปรเจกเตอร์เก่าและสายตาไม่ดี ---------- */
+[data-skin="contrast"] {
+  --page: #ffffff;
+  --surface: #ffffff;
+  --ink: #000000;
+  --ink-2: #2c2c2c;
+  --muted: #5a5a5a;          /* ผ่าน AA บนพื้นขาว (4.5:1) */
+  --grid: #c9c9c9;
+  --baseline: #767676;
+  --border: rgba(0, 0, 0, 0.42);
+  --accent: #14539e;          /* เข้มพอให้ตัวอักษรสีขาวบนปุ่มผ่าน AA */
+  --accent-strong: #0d3d78;
+  --meter-track: #d6e4f5;
+  --good-text: #005c00;
+  --critical: #b3261e;
+  --brand-orange: #b5410f;    /* ส้มเข้มขึ้นให้อ่านออกบนพื้นขาว */
+  --on-brand-orange: #ffffff;  /* รอบ ก: ขาวบนส้มเข้ม = 5.6:1 */
+  --control-border: #5a5a5a;   /* รอบ ก: สกินคมชัดใช้เส้นเข้มพิเศษ (7:1) */
+  --tint-blue: #eaf1fa;
+  --tint-orange: #fbeee7;
+  --tint-teal: #e6f5ef;
+  --tint-yellow: #fbf2dd;
+  --base-size: 16.5px;
+  --border-w: 2px;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px;
+  --shadow: none;
+}
+
+
+/* ---------- สกิน ง · ธรรมชาติ (Nature) — เขียวใบไม้ สงบ เหมาะกับเนื้อหาสิ่งแวดล้อม ---------- */
+[data-skin="nature"] {
+  --page: #f6f8f3;
+  --surface: #ffffff;
+  --ink: #17251b;
+  --ink-2: #4a5c50;
+  --muted: #5d6e62;          /* รอบ ก: เดิม 3.0:1 → 5.4:1 */
+  --grid: #e2ebe2;
+  --baseline: #bfd0c2;
+  --border: rgba(23, 37, 27, 0.10);
+  --accent: #2f7d4f;
+  --accent-strong: #1f5c39;
+  --meter-track: #d3ead9;
+  --brand-blue: #2f7d4f;
+  --brand-orange: #d9772e;
+  --brand-teal: #189a86;
+  --brand-yellow: #d2a11a;
+  --tint-blue: #e8f3ec;
+  --tint-orange: #fbf0e6;
+  --tint-teal: #e4f4f1;
+  --tint-yellow: #faf3e0;
+}
+
+/* ---------- สกิน จ · อบอุ่น (Warm) — ครีม-ส้ม เป็นมิตร เหมาะกับเด็กเล็ก ---------- */
+[data-skin="warm"] {
+  --page: #fdf8f2;
+  --surface: #ffffff;
+  --ink: #2a1f16;
+  --ink-2: #6b5647;
+  --muted: #7a6455;          /* รอบ ก: เดิม 3.1:1 → 5.6:1 */
+  --btn-play-bg: #b04f1b;    /* รอบ ก: ส้ม warm #c2571c ได้แค่ ขาว 4.49 / ตัวเข้ม 3.92 → ปุ่มเล่นใช้ส้มเข้มขึ้น ขาว 5.28:1 */
+  --on-brand-orange: #ffffff;
+  --grid: #f0e5d8;
+  --baseline: #d9c5b0;
+  --border: rgba(42, 31, 22, 0.10);
+  --accent: #c2571c;
+  --accent-strong: #9c4314;
+  --meter-track: #f7ddc9;
+  --brand-blue: #2f6fb5;
+  --brand-orange: #c2571c;
+  --brand-teal: #1f9b83;
+  --brand-yellow: #c98f10;
+  --tint-blue: #eaf1fa;
+  --tint-orange: #fcece0;
+  --tint-teal: #e6f5f2;
+  --tint-yellow: #fbf2df;
+  --r-sm: 11px; --r-md: 17px; --r-lg: 24px; --r-xl: 30px;
+}
+
+/* ---------- สกิน ฉ · ทะเล (Ocean) — ฟ้าอมเขียว สดชื่น ---------- */
+[data-skin="ocean"] {
+  --page: #f2f8fa;
+  --surface: #ffffff;
+  --ink: #10262c;
+  --ink-2: #43626b;
+  --muted: #567680;          /* รอบ ก: เดิม 2.7:1 → 4.9:1 */
+  --grid: #dceaef;
+  --baseline: #b4cfd8;
+  --border: rgba(16, 38, 44, 0.10);
+  --accent: #0b7285;
+  --accent-strong: #075462;
+  --meter-track: #cbe6ed;
+  --brand-blue: #0b7285;
+  --brand-orange: #d2691e;
+  --brand-teal: #12a594;
+  --brand-yellow: #c99a10;
+  --tint-blue: #e3f2f6;
+  --tint-orange: #fbeee3;
+  --tint-teal: #e2f6f3;
+  --tint-yellow: #faf3e0;
+}
+
+/* ---------- สกิน ช · สร้างสรรค์ (Creative) — ม่วง ทันสมัย เหมาะกับเกมแนวคิดสร้างสรรค์ ---------- */
+[data-skin="creative"] {
+  --page: #f8f6fd;
+  --surface: #ffffff;
+  --ink: #1e1830;
+  --ink-2: #574c73;
+  --muted: #655b80;          /* รอบ ก: เดิม 3.3:1 → 6.3:1 */
+  --grid: #e9e3f6;
+  --baseline: #c9bfe2;
+  --border: rgba(30, 24, 48, 0.10);
+  --accent: #6741b8;
+  --accent-strong: #4d2f8f;
+  --meter-track: #e0d6f7;
+  --brand-blue: #6741b8;
+  --brand-orange: #d95f8c;
+  --brand-teal: #1f9b96;
+  --brand-yellow: #c9931a;
+  --tint-blue: #efeafc;
+  --tint-orange: #fbe9f0;
+  --tint-teal: #e4f5f4;
+  --tint-yellow: #faf2e0;
+  --r-sm: 11px; --r-md: 17px; --r-lg: 24px; --r-xl: 30px;
+}
+
+/* ---------- โหมดมืด ---------- */
+/* ใช้กับทุกสกิน — คงสีเน้นของสกินนั้นไว้ เปลี่ยนแค่พื้นหลังและตัวอักษร */
+[data-theme="dark"],
+[data-theme="auto"] {
+  --dark-page: #0d0d0d;
+  --dark-surface: #1a1a19;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --accent: #3987e5;
+  --accent-strong: #6da7ec;
+  --meter-track: #184f95;
+  --good-text: #0ca30c;
+  --shadow: none;
+  --brand-blue: #5b9bea;
+  --brand-orange: #f08256;
+  --brand-teal: #35c391;
+  --brand-yellow: #f0b840;
+  --tint-blue: #16283f;
+  --tint-orange: #3a2118;
+  --tint-teal: #123026;
+  --tint-yellow: #33260c;
+  --on-accent: #0d1626;       /* รอบ ก: accent-strong โหมดมืดเป็นฟ้าอ่อน → ตัวเข้ม 7.2:1 */
+  --control-border: #7a7975;  /* รอบ ก: 4.0:1 บนพื้นการ์ดมืด */
+  --on-brand-orange: #2a1505; /* รอบ ก: ส้มโหมดมืด #f08256 อ่อน → ตัวเข้ม 6.7:1 (ทับค่าขาวของสกิน contrast) */
+  --btn-play-bg: var(--brand-orange);
+  --lift: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+/* auto = ตามเครื่องของผู้ใช้ */
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5;
+    --accent-strong: #6da7ec;
+    --meter-track: #184f95;
+    --good-text: #0ca30c;
+    --shadow: none;
+    --brand-blue: #5b9bea;
+    --brand-orange: #f08256;
+    --brand-teal: #35c391;
+    --brand-yellow: #f0b840;
+    --tint-blue: #16283f;
+    --tint-orange: #3a2118;
+    --tint-teal: #123026;
+    --tint-yellow: #33260c;
+    --on-accent: #0d1626;       /* รอบ ก: accent-strong โหมดมืดเป็นฟ้าอ่อน → ตัวเข้ม 7.2:1 */
+    --control-border: #7a7975;  /* รอบ ก: 4.0:1 บนพื้นการ์ดมืด */
+    --on-brand-orange: #2a1505; /* รอบ ก: ส้มโหมดมืด #f08256 อ่อน → ตัวเข้ม 6.7:1 (ทับค่าขาวของสกิน contrast) */
+    --btn-play-bg: var(--brand-orange);
+    --lift: 0 6px 18px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", "Sarabun", "Noto Sans Thai", sans-serif;
+  font-size: var(--base-size);
+  line-height: 1.55;
+}
+a { color: var(--accent-strong); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 18px 56px; }
+
+/* ---------- header ---------- */
+/* หัวเว็บ — ของในแถวนี้เพิ่มขึ้นตามสิทธิ์ผู้ใช้
+   ครูทั่วไปเห็น 6 ชิ้น · แต่ผู้ดูแลระบบเห็นถึง 8 ชิ้น (มีปุ่มสลับโหมดเพิ่ม)
+   ถ้าไม่กำหนดการตัดบรรทัดไว้ ข้อความในปุ่มจะถูกบีบจนขึ้นบรรทัดใหม่กลางคำ
+   จึงใช้วิธี: ห้ามตัดคำในทุกชิ้น แล้วให้ "เมนูหลัก" ยกไปทั้งแถวเมื่อที่ไม่พอ */
+.topbar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
+  padding: 12px 0; margin-bottom: 18px;
+  border-bottom: 1px solid var(--grid);
+}
+.topbar > * { flex: none; }
+.topbar .btn, .topbar .theme-btn { white-space: nowrap; }
+.brand { font-weight: 700; font-size: 19px; color: var(--ink); display: flex; align-items: center; gap: 9px; }
+.brand .logo { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 15px; flex: none; }
+
+/* ชื่อไทยเป็นบรรทัดหลัก ชื่ออังกฤษเป็นบรรทัดรอง — เรียงซ้อนกัน ไม่ใช่ต่อกันเป็นแถวเดียว
+   เพราะเรียงต่อกันแล้วอ่านเหมือนเป็นชื่อเดียวกันยาว ๆ และแย่งสายตากับโลโก้ */
+.brand .bname { display: flex; flex-direction: column; justify-content: center; line-height: 1.15; }
+/* nowrap สำคัญ — ไม่งั้นพอหัวเว็บแน่น "เกมเพลิน" จะถูกหักเป็น "เกม" / "เพลิน" */
+.brand .bname .th { font-size: 18px; font-weight: 700; white-space: nowrap; }
+.brand .bname .en { font-size: 11.5px; font-weight: 500; color: var(--muted);
+  letter-spacing: .02em; white-space: nowrap; }
+/* โลโก้ที่อัปโหลดมักมีคำว่า GamePlearn อยู่ในภาพแล้ว — ซ่อนบรรทัดอังกฤษไม่ให้ซ้ำ */
+.brand[data-haslogo="1"] .bname .en { display: none; }
+@media (max-width: 560px) { .brand .bname .en { display: none; } }
+.topbar .sp { flex: 1; }
+/* ชื่อผู้ใช้บนหัวเว็บ — ยอมให้ย่อได้ (flex-shrink 1 + min-width 0)
+   เป็นชิ้นเดียวในแถวที่ยอมเสียพื้นที่ได้ เพราะชื่อเต็มอยู่ใน tooltip อยู่แล้ว
+   ถ้าตั้ง flex:none เหมือนชิ้นอื่น ปุ่มออกจากระบบจะถูกดันตกบรรทัด */
+.topbar .who { color: var(--ink-2); font-size: 14px; max-width: 190px;
+  flex: 0 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 720px) { .topbar .who { max-width: 120px; } }
+
+/* เมนูหลักบนหัวเว็บ */
+/* nowrap — ให้เมนูยกไปทั้งก้อน ดีกว่าปล่อยให้หักกลางรายการ
+   ("ติดต่อ / แจ้งปัญหา" เคยตกไปอยู่บรรทัดล่างตัวเดียว ดูเหมือนหน้าเว็บพัง) */
+.navlinks { display: flex; align-items: center; gap: 2px; flex-wrap: nowrap; }
+.navlinks a {
+  color: var(--ink-2); font-size: 14.5px; padding: 7px 11px; border-radius: var(--r-sm);
+  text-decoration: none; white-space: nowrap;
+}
+.navlinks a:hover { background: var(--tint-blue); color: var(--accent-strong); text-decoration: none; }
+.navlinks a.on { color: var(--accent-strong); font-weight: 600; background: var(--tint-blue); }
+/* ลิงก์เมนูหน้าครู (Dashboard · สร้างห้องเรียน · มาตรฐาน) อยู่แถวเดียวกับเมนูหลัก
+   ใส่ขีดใต้เพิ่มให้ตัวที่เปิดอยู่ เพราะพื้นหลังจาง ๆ อย่างเดียวแยกยากเมื่อมีลิงก์ 6 ตัว */
+.navlinks a[data-nav] { display: inline-flex; align-items: center; min-height: 24px;
+  border-bottom: 2px solid transparent; border-radius: var(--r-sm) var(--r-sm) 0 0; }
+.navlinks a[aria-current="page"] { border-bottom-color: var(--accent-strong); }
+
+/* ปุ่ม "สร้างห้องเรียน" นั่งอยู่ในแถวเมนู ตำแหน่งเดิมของ "เกมทั้งหมด" (ครูสั่ง V.1.4.3)
+   ⚠️ ต้องเขียนสีทับตรงนี้ ห้ามพึ่ง .btn-primary เฉย ๆ — ตัวเลือก `.navlinks a` หนัก (0,1,1)
+   ส่วน `.btn-primary` หนักแค่ (0,1,0) ลำดับในไฟล์จึงช่วยไม่ได้ ต่อให้เขียนไว้ท้ายไฟล์
+   ถ้าไม่เขียน ปุ่มจะได้ตัวอักษรสีเทาของลิงก์เมนูทับบนพื้นน้ำเงินเข้ม เหลือคอนทราสต์ ~2:1
+   ใช้โทเคนชุดเดียวกับกฎรวมสีท้ายไฟล์ (--accent-strong / --on-accent) จึงตามธีมมืดและ 7 สกินครบ */
+.navlinks a.btn { padding: 7px 13px; font-size: 14px; margin-right: 6px; font-weight: 600; }
+.navlinks a.btn-primary,
+.navlinks a.btn-primary:hover,
+.navlinks a.btn-primary:focus-visible {
+  background: var(--accent-strong); border-color: var(--accent-strong); color: var(--on-accent);
+}
+.navlinks a.btn-primary:hover { filter: brightness(1.08); }
+/* หน้าครู/ผู้ดูแล มีชื่อผู้ใช้เพิ่มมาอีกชิ้น รวมแล้วกว้างเกินความกว้างสูงสุดของ .wrap เสมอ
+   ไม่ว่าจอจะกว้างแค่ไหน — จึงให้เมนูอยู่แถวล่างตายตัว ดูตั้งใจกว่าปล่อยให้ปุ่มหล่นทีละตัว */
+.topbar-app .navlinks {
+  order: 10; flex-basis: 100%; width: 100%;
+  overflow-x: auto; padding: 6px 0 0; margin-top: 2px;
+  border-top: 1px dashed var(--grid); scrollbar-width: thin;
+}
+.topbar-app .navlinks a:first-child:not(.btn) { padding-left: 4px; }
+
+/* จอกลาง — ของในหัวเว็บเริ่มไม่พอที่ (โดยเฉพาะบัญชีผู้ดูแลที่มีปุ่มสลับโหมดเพิ่มมา)
+   ยกเมนูหลักลงไปเป็นแถวที่สองทั้งก้อน แถวบนเหลือ แบรนด์ · สลับโหมด · ปุ่มบัญชี
+
+   ⚠️ เพิ่ม breakpoint ให้ใหญ่ขึ้นแก้ปัญหาปุ่มตกบรรทัด **ไม่ได้** — .wrap กว้างสูงสุด 1080px
+   ต่อให้จอ 4K พื้นที่หัวเว็บก็เท่าเดิม ต้นเหตุจริงคือจำนวนปุ่ม ไม่ใช่ความกว้างจอ
+   (ดูวิธีแก้ที่ renderAuthButton ใน gp-brand.js — จำกัดปุ่มบนหัวเว็บไว้ที่ 2 ใบ) */
+@media (max-width: 1180px) {
+  .topbar .navlinks {
+    order: 10; flex-basis: 100%; width: 100%;
+    overflow-x: auto; padding: 6px 0 0; margin-top: 2px;
+    border-top: 1px dashed var(--grid);
+    scrollbar-width: thin;
+  }
+  /* ไม่ตัด padding ซ้ายของลิงก์แรก — สระหน้าอย่าง "เ" กินพื้นที่เลยกรอบตัวอักษร
+     พอกล่องมี overflow-x หัวอักษรจะโดนเฉือนหายไปครึ่งตัว */
+  .topbar .navlinks a:first-child:not(.btn) { padding-left: 4px; }
+}
+
+@media (max-width: 720px) {
+  .topbar { row-gap: 8px; padding: 10px 0; }
+  .topbar .sp { flex-basis: 100%; height: 0; }
+  .brand .bname .th { font-size: 16.5px; }
+}
+
+/* ---------- ปุ่ม ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  border: var(--border-w) solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--ink);
+  padding: 8px 14px; font-size: 14.5px; font-family: inherit;
+  transition: transform .12s ease, background .12s ease, border-color .12s ease;
+}
+.btn:hover { border-color: var(--baseline); text-decoration: none; }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn-primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
+.btn-ghost { border-color: transparent; background: transparent; color: var(--accent-strong); }
+.btn-sm { padding: 4px 10px; font-size: 13px; border-radius: 7px; }
+.btn-lg { padding: 13px 26px; font-size: 17px; border-radius: var(--r-md); font-weight: 700; }
+.btn-play { background: var(--brand-orange); border-color: var(--brand-orange); color: #fff; font-weight: 700; }
+.btn-play:hover { background: #d2542a; border-color: #d2542a; color: #fff; }
+.btn[disabled] { opacity: .55; cursor: default; transform: none; }
+
+/* ---------- การ์ด/กริด ---------- */
+.card {
+  background: var(--surface); border: var(--border-w) solid var(--border);
+  border-radius: var(--r-md); padding: 18px; box-shadow: var(--shadow);
+}
+.grid { display: grid; gap: 14px; }
+/* min(กว้างขั้นต่ำ, 100%) ไม่ใช่ความกว้างตายตัว —
+   บนจอ 320px พื้นที่จริงเหลือ ~284px หลังหักขอบของ .wrap ถ้าสั่งขั้นต่ำเป็น 280–320px ตรง ๆ
+   ช่องกริดจะกว้างเกินพื้นที่แล้วดันทั้งหน้าให้เลื่อนแนวนอนได้ (เจอจริงที่หน้ามาตรฐาน ล้น 18px)
+   จอที่กว้างพอยังได้ความกว้างขั้นต่ำเดิมทุกประการ — min() เลือกตัวเลข px ให้เองเมื่อมีที่พอ */
+.grid.cols-3 { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
+.grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+.section-title { font-size: 16.5px; font-weight: 700; margin: 26px 0 12px;
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.section-title .sub { color: var(--muted); font-weight: 400; font-size: 13.5px; }
+.section-title .sp { flex: 1; }
+
+/* ---------- stat tiles ---------- */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; }
+.tile .label { color: var(--ink-2); font-size: 13px; }
+.tile .value { font-size: 26px; font-weight: 600; margin-top: 2px; }
+.tile .unit { color: var(--muted); font-size: 13px; font-weight: 400; margin-left: 3px; }
+
+/* ---------- meter (ความคืบหน้า) ---------- */
+.meter { height: 8px; border-radius: 5px; background: var(--meter-track); overflow: hidden; min-width: 70px; }
+.meter > i { display: block; height: 100%; border-radius: 5px; background: var(--accent); }
+.meter-row { display: flex; align-items: center; gap: 8px; }
+.meter-row .pct { color: var(--ink-2); font-size: 12.5px; min-width: 34px; text-align: right;
+  font-variant-numeric: tabular-nums; }
+
+/* ---------- ตาราง ---------- */
+table.gol { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.gol th {
+  text-align: left; color: var(--muted); font-weight: 600; font-size: 12.5px;
+  padding: 8px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap;
+}
+table.gol td { padding: 9px 10px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+table.gol tr:last-child td { border-bottom: 0; }
+table.gol td.num { font-variant-numeric: tabular-nums; text-align: right; }
+.table-scroll { overflow-x: auto; }
+
+/* ---------- badge/สถานะ ---------- */
+.badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px;
+  font-size: 12px; padding: 2.5px 10px; border: 1px solid var(--border); color: var(--ink-2); }
+.badge.published { color: var(--good-text); border-color: currentColor; }
+.badge.maintenance { color: var(--critical); border-color: currentColor; }
+.badge.testing { color: var(--ink-2); }
+.joinkey { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700;
+  letter-spacing: 2px; font-size: 17px; color: var(--accent-strong); }
+
+/* ---------- สวิตช์มอบหมายเกม ---------- */
+/* display:inline-block จำเป็น — <label> เป็น inline โดยปริยาย ซึ่ง width/height ไม่มีผล
+   ทำให้สวิตช์ยุบเหลือ 0×0 และกดไม่ได้เมื่อวางนอกกล่อง flex (เช่นในตารางหน้า Admin) */
+.switch { position: relative; display: inline-block; vertical-align: middle;
+  width: 44px; height: 24px; flex: none; }  /* รอบ ข: เดิม 38×22 — เป้ากด ≥24px ตาม WCAG 2.5.8 */
+.switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; position: absolute; z-index: 2; }
+.switch i { position: absolute; inset: 0; border-radius: 999px; background: var(--baseline); transition: background .15s; }
+.switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
+  border-radius: 50%; background: #fff; transition: left .15s; }
+.switch input:checked + i { background: var(--good); }
+.switch input:checked + i::after { left: 23px; }
+.assign-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--grid); }
+.assign-row:first-of-type { border-top: 0; }
+
+/* ---------- ฟอร์ม ---------- */
+input[type=text], input[type=password], input[type=email], select, textarea {
+  font-family: inherit; font-size: 14.5px; color: var(--ink);
+  background: var(--surface); border: var(--border-w) solid var(--control-border); border-radius: var(--r-sm);
+  padding: 8px 11px; width: 100%;
+}
+textarea { min-height: 92px; resize: vertical; }
+label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4px; }
+.form-hint { color: var(--muted); font-size: 12.5px; margin-top: 5px; }
+
+/* ---------- อื่น ๆ ---------- */
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.err-box { background: var(--surface); border: 1px solid var(--critical); color: var(--critical);
+  border-radius: 10px; padding: 10px 14px; font-size: 14px; display: none; }
+.err-box.on { display: block; }
+.loading { display: inline-block; width: 15px; height: 15px; border: 2px solid var(--accent);
+  border-top-color: transparent; border-radius: 50%; animation: sp 0.8s linear infinite; vertical-align: -3px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+.crumb { font-size: 13.5px; color: var(--muted); margin-bottom: 10px; }
+.hidden { display: none !important; }
+.warn-note { border-left: 3px solid var(--warning); padding: 8px 12px; background: var(--surface);
+  border-radius: 0 9px 9px 0; color: var(--ink-2); font-size: 13.5px; }
+
+/* ---------- hero + แถบเข้าห้องเรียน (นักเรียนมาก่อน) ---------- */
+.hero { margin-bottom: 22px; }
+.hero h1 { margin: 2px 0 8px; font-size: 22px; }
+.hero-slogan { color: var(--accent-strong); font-weight: 700; letter-spacing: .3px; font-size: 14px; }
+
+/* กล่องใหญ่บนสุด — งานเดียวของนักเรียนคือกรอกรหัสห้อง */
+.joinhero {
+  border-radius: var(--r-xl);
+  background:
+    radial-gradient(120% 120% at 8% 0%, var(--tint-yellow) 0%, transparent 46%),
+    radial-gradient(110% 130% at 100% 6%, var(--tint-teal) 0%, transparent 44%),
+    linear-gradient(135deg, var(--tint-blue), var(--surface) 68%);
+  border: 1px solid var(--border);
+  padding: 26px 24px 24px;
+  margin-bottom: 8px;
+}
+.joinhero .eyebrow { color: var(--accent-strong); font-weight: 700; font-size: 13.5px; letter-spacing: .4px; }
+.joinhero h1 { margin: 4px 0 4px; font-size: clamp(21px, 3.6vw, 28px); line-height: 1.3; }
+.joinhero .lede { color: var(--ink-2); font-size: 15px; margin-bottom: 18px; }
+
+/* ---------- แบบย่อ 2 บรรทัด ----------
+   หัวข้อ · สโลแกน อยู่บรรทัดเดียวกัน แล้วช่องกรอก · ปุ่ม · คำใบ้ อยู่อีกบรรทัด
+   เหตุผล: แบบเดิมสูง 5 บรรทัดจนแคตตาล็อกเกมตกจอ ทั้งที่หน้านี้ตั้งใจให้ "นักเรียนมาก่อน"
+   จอแคบ (≤760px) ปล่อยให้ตัดบรรทัดตามธรรมชาติ ไม่บีบจนอ่านไม่ออก */
+.joinhero.compact { padding: 16px 20px; }
+.joinhero.compact .joinhead {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 12px;
+}
+.joinhero.compact h1 { margin: 0; font-size: clamp(19px, 2.9vw, 24px); }
+.joinhero.compact .lede { margin: 0; font-size: 14px; }
+.joinhero.compact .eyebrow { font-size: 12.5px; }
+.joinhero.compact .joinbox { align-items: center; }
+/* บรรทัดที่ 3 — ครูขอให้คำใบ้แยกบรรทัดของตัวเอง ไม่เบียดข้างปุ่ม */
+.joinhero.compact .joinhint { margin: 8px 2px 0; font-size: 13px; }
+@media (max-width: 760px) {
+  .joinhero.compact .eyebrow { display: none; }   /* สโลแกนอังกฤษยังอยู่ท้ายหน้า */
+}
+
+.joinbox { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+.code-input {
+  flex: 1 1 230px; min-width: 0;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: clamp(22px, 5vw, 30px); font-weight: 800; letter-spacing: 10px;
+  text-align: center; text-transform: uppercase;
+  padding: 12px 10px; border-radius: var(--r-md);
+  border: 2.5px solid var(--accent); background: var(--surface); color: var(--ink);
+  width: auto;
+}
+.code-input::placeholder { letter-spacing: 6px; font-weight: 600; color: var(--baseline); font-size: 20px; }
+.code-input:focus { outline: none; border-color: var(--brand-orange); box-shadow: 0 0 0 4px var(--tint-orange); }
+.joinbox .btn-lg { flex: 0 0 auto; }
+@media (max-width: 520px) { .joinbox .btn-lg { width: 100%; justify-content: center; } }
+
+.joinhint { color: var(--ink-2); font-size: 13.5px; margin-top: 12px; }
+.joinhint b { color: var(--ink); }
+
+/* ผลลัพธ์หลังตรวจโค้ด */
+.roomcard { margin-top: 16px; border-radius: var(--r-lg); border: 1px solid var(--border);
+  background: var(--surface); padding: 16px 18px; }
+.roomcard .rname { font-size: 18px; font-weight: 700; }
+.roomcard .rmeta { color: var(--ink-2); font-size: 13.5px; margin-top: 2px; }
+.codechip { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px;
+  background: var(--tint-blue); color: var(--accent-strong); border: 1px solid var(--border);
+  padding: 5px 8px 5px 14px; font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-weight: 800; letter-spacing: 3px; font-size: 16px; }
+.steps { counter-reset: s; margin: 14px 0 0; padding: 0; list-style: none; }
+.steps li { counter-increment: s; position: relative; padding: 5px 0 5px 34px; color: var(--ink-2); font-size: 14px; }
+.steps li::before { content: counter(s); position: absolute; left: 0; top: 5px;
+  width: 23px; height: 23px; border-radius: 50%; background: var(--accent); color: #fff;
+  font-size: 12.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+/* ---------- ตัวกรองเกม ---------- */
+.filterbar { background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 14px 16px; margin-bottom: 16px; }
+.searchrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+.searchrow .search { flex: 1 1 220px; min-width: 0; }
+.searchrow .search input { padding-left: 34px; background-image: none; }
+.search { position: relative; }
+.search::before { content: "🔎"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  font-size: 14px; pointer-events: none; opacity: .65; }
+
+.fgroup { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-top: 1px dashed var(--grid); }
+.fgroup:first-of-type { border-top: 0; }
+.fgroup .flabel { flex: 0 0 96px; color: var(--muted); font-size: 12.5px; padding-top: 5px; }
+.chiprow { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+
+/* Dropdown ของตัวกรองที่โตตามจำนวนเกม (ชุดเกม · หัวข้อ)
+   max-width กันไว้ไม่ให้ยืดเต็มแถวจนดูเหมือนช่องกรอก */
+.fselect { font-size: 13px; padding: 5px 10px; max-width: 280px; width: 100%; }
+
+/* สโลแกนสลับวน — จางออกแล้วจางเข้า ไม่ให้ข้อความกระตุกเปลี่ยนทันที */
+/* ---------- แถบเทียบเกณฑ์ระดับสมรรถนะ (หน้าครู) ---------- */
+.lvbar { display: flex; height: 26px; border-radius: 8px; overflow: hidden;
+  background: var(--grid); border: 1px solid var(--border); }
+.lvbar > div { display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 12px; font-weight: 700; min-width: 0; }
+.lvlegend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 7px;
+  font-size: 12.5px; color: var(--ink-2); }
+.lvkey { display: inline-flex; align-items: center; gap: 5px; }
+.lvkey i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; flex: none; }
+.lvpill { display: inline-block; min-width: 22px; padding: 1px 8px; border-radius: 999px;
+  color: #fff; font-weight: 800; font-size: 12px; text-align: center; }
+
+/* ช่องติ๊กกลุ่มสาระ/สมรรถนะในหน้า Admin */
+.ckrow { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 6px; }
+.ck { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px 5px 8px;
+  font-size: 13px; background: var(--page); user-select: none; }
+.ck:hover { border-color: var(--baseline); }
+.ck input { margin: 0; width: 15px; height: 15px; flex: none; cursor: pointer; }
+.ck:has(input:checked) { background: var(--tint-blue); border-color: var(--accent);
+  color: var(--accent-strong); font-weight: 600; }
+.ck:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+
+/* ตัวแก้สโลแกนในหน้า Admin */
+.slogan-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; }
+.slogan-row + .slogan-row { border-top: 1px dashed var(--grid); }
+.slogan-no { flex: none; width: 22px; height: 22px; border-radius: 999px; background: var(--tint-blue);
+  color: var(--accent-strong); font-size: 12px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; }
+.slogan-in { flex: 1; display: grid; gap: 6px; }
+.slogan-in input { margin: 0; }
+
+.slogan-fx { transition: opacity .3s ease; }
+.slogan-fx.is-out { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .slogan-fx { transition: none; } }
+.chip {
+  cursor: pointer; font-family: inherit; font-size: 13px;
+  border: var(--border-w) solid var(--border); background: var(--page); color: var(--ink-2);
+  border-radius: 999px; padding: 4px 12px; display: inline-flex; align-items: center; gap: 5px;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.chip:hover { border-color: var(--baseline); color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.chip .n { font-size: 11.5px; opacity: .72; font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="true"] .n { opacity: .85; }
+.filter-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--grid); font-size: 13.5px; color: var(--ink-2); }
+.filter-foot .sp { flex: 1; }
+@media (max-width: 620px) {
+  .fgroup { flex-direction: column; gap: 4px; }
+  .fgroup .flabel { flex: none; padding-top: 0; font-weight: 600; }
+}
+/* บนมือถือ ตัวกรอง 6 กลุ่มกินพื้นที่จนต้องเลื่อนนาน — พับเก็บไว้ก่อน กดเปิดเมื่ออยากใช้
+   บนจอใหญ่ปุ่มนี้ถูกซ่อน และตัวกรองแสดงเสมอ (คลาส .collapsed ไม่มีผล) */
+.mobile-only { display: none; }
+@media (max-width: 720px) {
+  .mobile-only { display: inline-flex; }
+  #fgroups.collapsed { display: none; }
+}
+
+/* ---------- catalog (การ์ดเกม) ---------- */
+.game-card { display: flex; flex-direction: column; gap: 12px; }
+.game-cover { height: 120px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  font-size: 42px; background: linear-gradient(135deg, #cde2fb, #86b6ef); }
+.game-card h3 { margin: 0; font-size: 17px; }
+.game-meta { color: var(--ink-2); font-size: 13.5px; }
+.game-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+
+/* การ์ดเกมแบบใหม่ (หน้าแรก) */
+.gcard {
+  display: flex; flex-direction: column; overflow: hidden; padding: 0;
+  border-radius: var(--r-lg); background: var(--surface);
+  border: 1px solid var(--border); box-shadow: var(--shadow);
+  transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
+}
+.gcard:hover { transform: translateY(-3px); box-shadow: var(--lift); border-color: var(--baseline); }
+/* ปกเกมเป็น 16:9 เสมอ — ปกทุกใบสูงเท่ากัน การ์ดในแถวเดียวกันจึงเรียงตรง
+   ใช้ aspect-ratio แทนความสูงตายตัว เพราะการ์ดกว้างไม่เท่ากันในแต่ละขนาดจอ */
+.gcover {
+  aspect-ratio: 16 / 9; width: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 50px; position: relative; flex: none;
+  background: linear-gradient(135deg, var(--tint-blue), #86b6ef);
+}
+/* เบราว์เซอร์เก่าที่ยังไม่รู้จัก aspect-ratio — ยังได้ความสูงเดิมไปก่อน */
+@supports not (aspect-ratio: 16 / 9) { .gcover { height: 128px; } }
+.gcover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gcover.g-adventure  { background: linear-gradient(135deg, #ffe1b8, #f2a25c); }
+.gcover.g-drill      { background: linear-gradient(135deg, #cde2fb, #7fb0eb); }
+.gcover.g-quiz       { background: linear-gradient(135deg, #d9f2e8, #6fcaa8); }
+.gcover.g-puzzle     { background: linear-gradient(135deg, #e6dcfa, #a78de0); }
+.gcover.g-simulation { background: linear-gradient(135deg, #d6eef5, #77bdd2); }
+.gcover.g-story      { background: linear-gradient(135deg, #fbdfe6, #e491a8); }
+.gcover.g-creative   { background: linear-gradient(135deg, #fdf0c8, #ecc75c); }
+.gcover.g-board      { background: linear-gradient(135deg, #e2e6ea, #a4adb6); }
+.gcover .ribbon {
+  position: absolute; top: 10px; left: 10px; background: var(--brand-orange); color: #fff;
+  font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 3px 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+}
+.gcover .partno {
+  position: absolute; top: 10px; right: 10px; background: rgba(11,11,11,.62); color: #fff;
+  font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 3px 10px;
+}
+/* ---------- สไลด์ภาพรายด่านบนปกการ์ด (57_GAME_MEDIA.sql) ----------
+   ปกซ้อน 2 ชั้น: ปกเดิมอยู่ล่าง (ไอคอน/cover_url) · ภาพด่านซ้อนทับด้านบน
+   ภาพไหนโหลดไม่ขึ้นก็แค่ซ่อนใบนั้น ปกเดิมโผล่ขึ้นมาแทนเอง ไม่มีช่องว่างขาว */
+.gcover .gbase { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.gcover .gshot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  opacity: 0; transition: opacity .5s ease; }
+.gcover .gshot.on { opacity: 1; }
+.gcover .gshot.dead { display: none; }
+/* ชื่อด่าน — ไล่สีดำจาง ๆ ใต้ตัวอักษร ให้อ่านออกไม่ว่าภาพข้างหลังจะสว่างหรือมืด
+   ⚠️ แถบนี้ทับ "ภาพของเกม" ซึ่งเป็นเนื้อหาของเจ้าของเกม ไม่ใช่พื้นที่ของเว็บกลาง
+   ภาค 1 ตรวจภาพ 14 ใบเทียบโซนนี้แล้วพบว่า 3 ด่านมีแผงที่ใช้เล่นอยู่ริมล่างพอดี
+   (จัดกลุ่มการ์ด · ควบคุมระดับน้ำ · ช่องเรียงลำดับ) ถูกแถบทับแล้วดูไม่ออกว่าด่านนั้นเล่นอะไร
+
+   แก้ที่เว็บกลาง ไม่ใช่ให้เกมไปถ่ายใหม่ 14 ใบเพื่อหลบ UI ของเรา:
+     · อยู่เฉย ๆ = ไม่มีแถบเลย ภาพเห็นเต็มใบ 100%
+     · เอาเมาส์ชี้/แท็บเข้ามา (ตอนที่สไลด์เริ่มเลื่อน) ค่อยขึ้นชื่อด่าน — ตอนนั้นภาพกำลังเปลี่ยนอยู่แล้ว
+     · แถบบางลงจาก 21% เหลือราว 14% ของความสูง
+   ความหมายของภาพไม่ได้หายไปกับแถบ เพราะ alt ของแต่ละใบยังบอกครบสำหรับโปรแกรมอ่านหน้าจอ */
+.gcover .gcap { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  padding: 8px 10px 5px; font-size: 11.5px; font-weight: 600; line-height: 1.3;
+  color: #fff; text-align: left; text-shadow: 0 1px 2px rgba(0,0,0,.6);
+  background: linear-gradient(to top, rgba(11,11,11,.8), rgba(11,11,11,0));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  opacity: 0; transition: opacity .2s ease; }
+.gcover.gshots:hover .gcap,
+.gcard:focus-within .gcover.gshots .gcap { opacity: 1; }
+.gcover .gdots { position: absolute; right: 9px; bottom: 8px; z-index: 3; display: flex; gap: 4px; }
+.gcover .gdots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.5);
+  box-shadow: 0 0 2px rgba(0,0,0,.55); transition: background .2s; }
+.gcover .gdots i.on { background: #fff; }
+.gcover .gdots i.gone { display: none; }
+/* ตั้งค่าเครื่องว่าลดการเคลื่อนไหว = ไม่ค่อย ๆ จาง (สคริปต์ก็ไม่เลื่อนให้อยู่แล้ว) */
+@media (prefers-reduced-motion: reduce) { .gcover .gshot { transition: none; } }
+
+.gbody { padding: 14px 16px 0; display: flex; flex-direction: column; gap: 7px; flex: 1; }
+.gbody h3 { margin: 0; font-size: 16.5px; line-height: 1.35; }
+.gdesc { color: var(--ink-2); font-size: 13.5px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.gfacts { display: flex; flex-wrap: wrap; gap: 5px 10px; color: var(--muted); font-size: 12.5px; }
+.gfacts .f { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.gfoot { padding: 12px 16px 16px; display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+.gfoot .btn { flex: 1 1 auto; justify-content: center; }
+
+/* แถวเกมแนะนำแบบเลื่อนแนวนอน */
+.strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(268px, 1fr);
+  gap: 14px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
+.strip > * { scroll-snap-align: start; }
+@media (min-width: 900px) { .strip.fit-3 { grid-auto-columns: minmax(0, 1fr); overflow: visible; } }
+
+/* ---------- โซนครู / ลิงก์ปลายหน้า ---------- */
+.zone { border-radius: var(--r-lg); border: 1px solid var(--border); padding: 20px 22px;
+  background: linear-gradient(135deg, var(--tint-teal), var(--surface) 70%); }
+.zone h3 { margin: 0 0 4px; font-size: 19px; }  /* รอบ ข: เดิม h2 — ลดชั้นให้อยู่ใต้หัวข้อหมวด */
+.zone .lede { color: var(--ink-2); font-size: 14px; margin-bottom: 16px; }
+.zcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 12px; }
+.zcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; text-decoration: none; color: var(--ink); }
+.zcard:hover { border-color: var(--accent); text-decoration: none; box-shadow: var(--lift); }
+/* การ์ดที่เป็นปุ่ม (เช่น ปุ่มแชร์) — เบราว์เซอร์ใส่สไตล์ปุ่มมาเอง ต้องล้างให้เหมือนการ์ดอื่น */
+button.zcard { font: inherit; text-align: left; cursor: pointer; width: 100%; }
+button.zcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.zcard .ic { font-size: 24px; }
+.zcard .t { font-weight: 700; font-size: 15px; }
+.zcard .d { color: var(--ink-2); font-size: 13px; }
+
+.sitefoot { margin-top: 42px; padding-top: 20px; border-top: 1px solid var(--grid);
+  display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; color: var(--muted); font-size: 13px; }
+.sitefoot .col { flex: 1 1 190px; }
+.sitefoot .col b { display: block; color: var(--ink-2); font-size: 13px; margin-bottom: 6px; }
+/* สโลแกนท้ายหน้า — สองบรรทัด ไม่หักกลางประโยค */
+.sitefoot .fs-en { display: block; font-weight: 600; color: var(--ink-2); }
+.sitefoot .fs-th { display: block; margin-top: 2px; }
+.sitefoot a { display: block; padding: 2px 0; color: var(--ink-2); }
+.sitefoot a:hover { color: var(--accent-strong); }
+
+/* ---------- ป้ายชื่อเต็ม (กลุ่มสาระ / สมรรถนะที่เกมวัด) ----------
+   ครูสั่งให้ใช้ชื่อเต็มตามหลักสูตรทุกที่ · ชื่อพวกนี้ยาว (บางชื่อ 40+ ตัวอักษร)
+   จึงต้องออกแบบให้ "ยาวแล้วยังอ่านง่าย" ไม่ใช่บีบให้สั้น:
+     · ป้ายละบรรทัดของตัวเอง ตัดคำเองได้ ไม่บังคับให้อยู่บรรทัดเดียว
+     · มีเส้นขอบซ้ายหนาเป็นสีประจำมิติ — กวาดตาแยกออกทันทีว่าอันไหนกลุ่มสาระ อันไหนสมรรถนะ
+       (ใช้สีคู่กับรูปทรง ไม่ใช่สีอย่างเดียว — คนตาบอดสียังแยกได้จากตำแหน่งและหัวข้อกำกับ) */
+.tagrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.tag {
+  display: inline-block; max-width: 100%;
+  font-size: 12.5px; line-height: 1.45; color: var(--ink);
+  background: var(--page); border: 1px solid var(--border);
+  border-left: 3px solid var(--baseline);
+  border-radius: 4px var(--r-sm) var(--r-sm) 4px;
+  padding: 3px 10px; word-break: break-word;
+}
+.tag.subj { background: var(--tint-teal); border-color: var(--border); border-left-color: var(--good); }
+.tag.comp { background: var(--tint-blue); border-color: var(--border); border-left-color: var(--accent); }
+/* "ครบ 6 ด้าน" — ป้ายสรุปที่ต้องเด่นกว่าป้ายรายด้าน เพราะเป็นคำตอบที่ครูมองหาก่อน */
+.tag.all6 {
+  background: var(--tint-orange); border-left-color: var(--brand-orange);
+  font-weight: 700; color: var(--ink); margin-bottom: 2px;
+}
+.gradechip {
+  display: inline-block; white-space: nowrap; font-size: 12.5px; font-weight: 600;
+  color: var(--accent-strong); background: var(--tint-blue);
+  border: 1px solid var(--accent); border-radius: 999px; padding: 2px 11px;
+}
+
+/* ตารางมาตรฐาน — ให้แต่ละคอลัมน์มีที่พอสำหรับชื่อเต็ม และแถวไม่ติดกันจนอ่านข้ามบรรทัด */
+.stdtable td { vertical-align: top; padding-top: 12px; padding-bottom: 12px; }
+.stdtable th { white-space: nowrap; }
+.stdtable td:nth-child(1) { min-width: 190px; }
+.stdtable td:nth-child(3) { min-width: 150px; }
+.stdtable td:nth-child(4) { min-width: 210px; }
+.stdtable td:nth-child(5) { min-width: 250px; }
+.stdtable tbody tr:nth-child(even) { background: var(--page); }
+
+/* ---------- tabs (ผลสัมฤทธิ์ / สมรรถนะ) ---------- */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--grid); margin: 20px 0 14px; }
+.tab { cursor: pointer; border: 0; background: transparent; font-family: inherit; font-size: 15px;
+  color: var(--ink-2); padding: 9px 15px; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--accent-strong); border-bottom-color: var(--accent); font-weight: 600; }
+
+/* ---------- แถบสมรรถนะ (bar chart แนวนอน ซีรีส์เดียว จึงไม่ต้องมี legend) ---------- */
+.cbar { display: grid; grid-template-columns: minmax(150px, 1.1fr) 1fr auto; gap: 12px;
+  align-items: center; padding: 9px 0; border-top: 1px solid var(--grid); }
+.cbar:first-of-type { border-top: 0; }
+.cbar .cname { font-size: 14px; }
+.cbar .csub { color: var(--muted); font-size: 12px; }
+.cbar .ctrack { height: 12px; border-radius: 4px; background: var(--meter-track); overflow: hidden; }
+.cbar .ctrack > i { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--accent); }
+.cbar .cval { font-size: 14px; font-variant-numeric: tabular-nums; min-width: 78px; text-align: right; }
+.cbar.nodata .ctrack { background: var(--grid); }
+.cbar.nodata .cval { color: var(--muted); font-size: 12.5px; }
+.lvl { display: inline-block; font-size: 11.5px; color: var(--ink-2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
+.panel-note { color: var(--muted); font-size: 12.5px; margin-top: 10px; line-height: 1.5; }
+.std-slot { margin-top: 10px; }
+
+/* ---------- ลดการเคลื่อนไหวตามค่าระบบของผู้ใช้ ---------- */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  .gcard:hover { transform: none; }
+}
+
+/* ---------- ปุ่มสลับโหมดสว่าง/มืด บนหัวเว็บ ---------- */
+.theme-btn {
+  border: var(--border-w) solid var(--border); background: var(--surface); color: var(--ink);
+  border-radius: 999px; width: 38px; height: 38px; flex: none; cursor: pointer;
+  font-size: 17px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+  transition: background .12s, border-color .12s;
+}
+.theme-btn:hover { border-color: var(--baseline); background: var(--tint-blue); }
+
+/* ---------- ปุ่มสลับโหมดผู้ดูแล / ครู (เห็นเฉพาะบัญชี admin) ---------- */
+.modeswitch {
+  display: inline-flex; border: var(--border-w) solid var(--border);
+  border-radius: 999px; overflow: hidden; background: var(--surface); flex: none;
+}
+.modeswitch a {
+  padding: 7px 14px; font-size: 13.5px; color: var(--ink-2);
+  text-decoration: none; white-space: nowrap; line-height: 1.4;
+}
+.modeswitch a:hover { background: var(--tint-blue); color: var(--accent-strong); text-decoration: none; }
+.modeswitch a[aria-current="page"] { background: var(--accent); color: #fff; font-weight: 600; }
+@media (max-width: 720px) { .modeswitch a { padding: 7px 10px; font-size: 12.5px; } }
+
+/* ---------- แถวข้อมูลบนการ์ดเกม (กลุ่มสาระ · เรื่อง · การประเมิน) ---------- */
+.ginfo {
+  margin: 4px 0 0; padding: 10px 0 0; border-top: 1px dashed var(--grid);
+  display: grid; grid-template-columns: 68px 1fr; gap: 4px 10px; font-size: 13px;
+}
+.ginfo dt { color: var(--muted); font-size: 12.5px; }
+.ginfo dd { margin: 0; color: var(--ink-2); }
+.ginfo .gsub { color: var(--muted); font-size: 12px; margin-top: 2px; line-height: 1.45; }
+@media (max-width: 380px) { .ginfo { grid-template-columns: 60px 1fr; } }
+
+
+/* ============================================================
+   รอบ ก — แก้คอนทราสต์ตาม 41_W3C_AUDIT.md (WCAG 1.4.3 / 1.4.11)
+   หลักการ: พื้นทึบสีเน้นใช้ accent-strong เสมอ (ทุกสกินคำนวณแล้ว 5.8–10.7:1)
+   โหมดมืด accent-strong เป็นสีอ่อน จึงกลับขั้วตัวอักษรด้วย --on-accent
+   รวมไว้ท้ายไฟล์ที่เดียวให้ตรวจย้อนง่าย — อย่าแทรกกฎสีทับหลังบรรทัดนี้
+   ============================================================ */
+.btn-primary {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: var(--on-accent);
+}
+.btn-primary:hover { filter: brightness(1.08); background: var(--accent-strong); color: var(--on-accent); }
+
+.brand .logo { background: var(--accent-strong); color: var(--on-accent); }
+
+.chip[aria-pressed="true"] {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: var(--on-accent);
+}
+
+.modeswitch a[aria-current="page"] { background: var(--accent-strong); color: var(--on-accent); }
+
+/* ปุ่มเล่นเกม — เดิมตัวขาวบนส้ม 2.6–3.2:1 · ตัวเข้ม #2a1505 ผ่านทุกสกินสว่างและโหมดมืด
+   ยกเว้น warm/contrast ที่ส้มเข้มพอให้ตัวขาวผ่าน (ตั้งไว้ในโทเคนรายสกินแล้ว) */
+.btn-play { background: var(--btn-play-bg); border-color: var(--btn-play-bg); color: var(--on-brand-orange); }
+.btn-play:hover { background: var(--btn-play-bg); border-color: var(--btn-play-bg);
+  color: var(--on-brand-orange); filter: brightness(1.06); }
+
+/* ป้าย ⭐ แนะนำ บนปกเกม — ลอกแบบป้าย "ภาค 2" ที่วัดแล้วผ่าน 8.8:1 อยู่แล้ว */
+.gcover .ribbon { background: rgba(11, 11, 11, 0.62); }
+
+/* ═══════════ รอบ ข — โครงหน้าและเป้ากด ตาม 41_W3C_AUDIT.md ข้อ 4.4–4.7 ═══════════ */
+
+/* ลิงก์ "ข้ามไปเนื้อหาหลัก" — ซ่อนนอกจอ โผล่เมื่อโฟกัสด้วยคีย์บอร์ด (WCAG 2.4.1) */
+.skip-link { position: absolute; left: -9999px; top: 0; z-index: 120;
+  background: var(--accent-strong); color: var(--on-accent);
+  padding: 10px 18px; border-radius: 0 0 var(--r-md) 0; font-weight: 700; text-decoration: none; }
+.skip-link:focus { left: 0; }
+
+/* ซ่อนจากสายตาแต่โปรแกรมอ่านจอยังเห็น — ต่างจาก .hidden ที่หายไปทั้งคู่ */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* h2.section-title ต้องหน้าตาเหมือน div เดิมทุกประการ (คลาสกำหนด font-size/margin อยู่แล้ว) */
+h2.section-title { line-height: inherit; }
+
+/* เป้ากด ≥24px (WCAG 2.5.8) */
+.crumb a { display: inline-flex; align-items: center; min-height: 24px; }
+input[type=number], input[inputmode="numeric"] { min-height: 26px; }
+
+/* แถวแท็บ Admin พับบรรทัดได้ — เดิมดันหน้ากว้าง 436px บนจอ 320px (WCAG 1.4.10) */
+.tabs { flex-wrap: wrap; }
+
+/* ═══════════ รอบ ค — เกินเกณฑ์ ตาม 41_W3C_AUDIT.md ข้อ 5 ═══════════ */
+
+/* วงโฟกัสคีย์บอร์ดสีตามสกิน — ชัดกว่า outline ค่าเริ่มต้นของเบราว์เซอร์
+   :focus-visible = ขึ้นเฉพาะตอนใช้คีย์บอร์ด ไม่รบกวนการคลิกเมาส์
+   ใช้ --accent-strong ซึ่งทุกสกิน (และโหมดมืด) ผ่าน ≥3:1 กับพื้นอยู่แล้วโดยนิยาม */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+/* พิมพ์ออกกระดาษ — ครูปริ้นต์ตารางคะแนนส่งฝ่ายวิชาการ
+   ซ่อนส่วนที่เป็นเปลือกเว็บ เหลือเนื้อหา/ตารางเต็มหน้า หมึกน้อย อ่านง่าย */
+@media print {
+  .skip-link, .topbar, .sitefoot, .crumb, .tabs, .filterbar, .joinhero,
+  button, .btn, input, select, textarea,
+  .err-box, .warn-note, #saved, .zone, .theme-btn { display: none !important; }
+  /* การ์ด "สร้างห้องเรียนใหม่" เหลือแต่ป้ายว่างหลังซ่อนช่องกรอก — ซ่อนทั้งใบ */
+  .card:has(#nr-name) { display: none !important; }
+
+  body { background: #fff !important; color: #000 !important; }
+  .wrap { max-width: none; padding: 0; }
+  .card { box-shadow: none !important; border: 1px solid #999; break-inside: avoid; }
+  .table-scroll { overflow: visible !important; }
+  table.gol { width: 100%; font-size: 12px; }
+  table.gol th, table.gol td { border-bottom: 1px solid #bbb; }
+  tr { break-inside: avoid; }
+  thead { display: table-header-group; }   /* หัวตารางซ้ำทุกหน้ากระดาษ */
+  a { color: inherit; text-decoration: none; }
+  h2.section-title { margin-top: 14px; }
+
+  /* สีป้ายระดับ/แถบสัดส่วนต้องติดหมึก — ไม่งั้นครูเห็นแต่กล่องว่าง */
+  .lvpill, .lvbar > div, .lvkey, .meter, .meter > i, .gp-lv {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* ═══════════ สมรรถนะหลัก 6 ด้าน + ใบรายงานผล (43_REPORT_CARDS) ═══════════ */
+.c6wrap { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+.c6radar { flex: 0 1 340px; min-width: 260px; }
+.c6list { flex: 1 1 320px; min-width: 280px; }
+.c6row { border-top: 1px solid var(--grid); }
+.c6row:first-child { border-top: 0; }
+.c6head { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0;
+  padding: 9px 2px; font: inherit; color: inherit; cursor: pointer; text-align: left; min-height: 34px; }
+.c6head:disabled { cursor: default; }
+.c6name { flex: 0 0 176px; font-weight: 600; font-size: 13.5px; }
+.c6bar { flex: 1; height: 10px; border-radius: 6px; background: var(--meter-track); overflow: hidden; }
+.c6bar i { display: block; height: 100%; border-radius: 6px; background: var(--accent); }
+.c6bar.sm { height: 7px; }
+.c6val { flex: 0 0 46px; text-align: right; font-weight: 700; font-size: 13px; }
+.c6none { color: var(--muted); font-size: 12.5px; }
+.c6body { padding: 2px 2px 12px; }
+.c6subs { display: flex; flex-direction: column; gap: 5px; margin-bottom: 6px; }
+.c6sub { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+.c6sub > span:first-child { flex: 0 0 176px; color: var(--ink-2); }
+@media (max-width: 560px) { .c6name, .c6sub > span:first-child { flex-basis: 118px; } }
+
+/* ป้ายรุ่นของเว็บกลาง — เล็ก จาง อยู่ท้ายสุดของทุกหน้า (ใส่โดย gp-brand.js) */
+/* รายการห้องเรียนแบบแถว */
+.roomlist { display: flex; flex-direction: column; gap: 10px; }
+.roomrow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  background: var(--card); border: 1px solid var(--grid); border-radius: var(--r-md); padding: 12px 14px; }
+.roomrow .rr-main { flex: 1 1 260px; min-width: 0; }
+.roomrow .rr-name { font-weight: 700; font-size: 16px; }
+.roomrow .rr-code, .roomrow .rr-act { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; flex-wrap: wrap; }
+.roomrow .rr-box { flex-basis: 100%; width: 100%; }
+@media (max-width: 720px) { .roomrow .rr-code, .roomrow .rr-act { flex-basis: 100%; } }
+
+/* ปุ่มลบถาวร */
+.btn-danger { border-color: var(--critical); color: var(--critical); background: transparent; }
+.btn-danger:hover { background: var(--critical); color: #fff; border-color: var(--critical); }
+
+/* แถบตัวกรองหน้าครู — เลือกห้อง / เลือกเกม อยู่แถวเดียวกัน พับเองบนจอแคบ */
+.pickbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.pickbar > label { font-weight: 600; font-size: 14px; color: var(--ink-2); margin: 0; flex: 0 0 auto; }
+.pickbar select { width: auto; min-width: 170px; max-width: 320px; }
+@media (max-width: 560px) {
+  .pickbar > label { flex-basis: 100%; }
+  .pickbar select { flex: 1 1 100%; max-width: none; }
+}
+
+/* กล่องบอกสถานะท่อข้อมูล — เว้นระยะให้แยกจากแท็บด้านบนและหัวข้อด้านล่างชัด ๆ */
+.warn-note.pipe { margin: 4px 0 16px; }
+.warn-note.pipe code { font-size: 12.5px; }
+
+.gp-ver { text-align: center; color: var(--ink-2); font-size: 12.5px;
+  padding: 14px 0 22px; opacity: .75; letter-spacing: .2px; }
+@media print { .gp-ver { opacity: 1; } }
+
+/* ═══════════ หน้าครู: ฟอร์มห้องเรียน (46_CLASSROOM_MANAGE) ═══════════ */
+
+/* ฟอร์มห้อง/นักเรียน — พับเป็นคอลัมน์เดียวบนจอแคบเอง ไม่ต้องมี breakpoint แยก */
+.rf { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); }
+.rf .f { margin-top: 0; }
+.ok-box { display: none; background: var(--tint-teal); border: 1px solid var(--good);
+  color: var(--ink); border-radius: var(--r-sm); padding: 10px 12px; font-size: 13.5px; }
+.ok-box.on { display: block; }

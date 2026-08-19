@@ -1,11 +1,11 @@
 /* ชุดทดสอบ 5 — สองเรื่องที่ครูสั่งรอบนี้
    1) ปุ่ม "สร้างห้องเรียน" ต้องอยู่บนหัวเว็บทุกหน้าสาธารณะ และกดแล้วถึงฟอร์มในคลิกเดียว
    2) ตัวชี้วัด/มาตรฐาน/สมรรถนะ/แหล่งหลักฐาน ต้องใช้ชื่อเต็ม และวางให้อ่านง่าย */
-import { chromium, serve, stub, login, reporter, realErrors } from './harness.mjs';
+import { chromium, serve, stub, login, reporter, realErrors, launchOpts } from './harness.mjs';
 
 const PORT = 8935, BASE = 'http://localhost:' + PORT;
 const srv = await serve(PORT);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch(launchOpts());
 const ok = reporter();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

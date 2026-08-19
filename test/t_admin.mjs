@@ -4,13 +4,13 @@
    กติกา "เกมเป็นเจ้าของ 'วัดอะไร' · ผู้ดูแลเป็นเจ้าของ 'คำที่ครูอ่าน'" ประกาศไว้ตั้งแต่ไฟล์ 66
    ฐานกันไม่ให้เกมทับข้อความได้แล้ว และทั้งสองภาคทำท่อ `kept_manual` รอไว้แล้ว
    **แต่ไม่มีใครได้ใช้เลย เพราะไม่มีที่ให้ผู้ดูแลแก้** — ชุดนี้คุมชิ้นส่วนที่ขาดไปนั้น */
-import { chromium, serve, stub, login, reporter, realErrors } from './harness.mjs';
+import { chromium, serve, stub, login, reporter, realErrors, launchOpts, ROOT as HUBROOT } from './harness.mjs';
 import * as F from './fixtures.mjs';
 import fs from 'fs';
 
 const PORT = 8936, BASE = 'http://localhost:' + PORT;
 const srv = await serve(PORT);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch(launchOpts());
 const ok = reporter();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -196,7 +196,7 @@ console.log('\n═══ 8) ประโยคใน admin.html ต้องต�
 /* ประโยคเดียวกันถูกเขียนไว้สองที่ (JS ใช้แสดงตัวอย่าง · SQL ใช้ส่งจริง)
    ปล่อยให้ดริฟต์กันเมื่อไร ผู้ดูแลจะเห็นตัวอย่างที่ไม่ตรงกับของจริง — แย่กว่าไม่มีตัวอย่าง */
 {
-  const ROOT = process.env.HUB_ROOT || '/home/claude/hub';
+  const ROOT = HUBROOT;
   const js  = fs.readFileSync(ROOT + '/admin.html', 'utf8');
   const sql = fs.readFileSync(ROOT + '/sql/71_STANDARDS_ADMIN_EDIT.sql', 'utf8');
   const jsHead  = /'ช่อง ' \+ labels\.join\(' · '\) \+ ' ใช้ข้อความของผู้ดูแลเว็บกลาง'/.test(js);

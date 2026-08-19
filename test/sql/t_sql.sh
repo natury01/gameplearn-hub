@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# ── สัญญา exit code ของชุดทดสอบในโฟลเดอร์นี้ [V.1.6.7] (STD-006 ข้อ 1) ──────────
+#   0  = รันครบและผ่านทุกข้อ
+#   1  = มีข้อตก หรือรันไม่สำเร็จ (แดง)
+#   77 = ข้ามทั้งชุด ไม่ได้ตรวจอะไรเลย (ข้าม ≠ ผ่าน — ธรรมเนียม Automake/Meson)
+#   ห้ามคืน "จำนวนข้อที่ตก" เป็น exit code: เกิน 255 จะวนกลับเป็น 0 และอาจชนรหัส 77
 # รันไฟล์ SQL จริงบน Postgres 16 ที่จำลองสภาพ Supabase แล้วทดสอบพฤติกรรม
 #   ทดสอบทั้งฝั่งที่ "ต้องทำได้" และฝั่งที่ "ต้องถูกปฏิเสธ" — อย่างหลังสำคัญกว่า
 set -u
@@ -14,26 +19,104 @@ if [ -z "${SQLDIR:-}" ] || [ ! -f "$SQLDIR/59_ROOM_BROWSE.sql" ]; then
   echo "❌ หาไฟล์ SQL ไม่เจอ — ตั้ง SQLDIR ให้ชี้ไปโฟลเดอร์ที่มี 59_ROOM_BROWSE.sql"
   exit 1
 fi
-PGBIN=/usr/lib/postgresql/16/bin
-if ! command -v psql >/dev/null || [ ! -x "$PGBIN/pg_ctl" ]; then
-  echo "⏭  ข้ามชุดทดสอบ SQL — เครื่องนี้ไม่มี PostgreSQL 16 ติดตั้งไว้"
-  echo "   (ติดตั้งแล้วรันใหม่จะได้ตรวจไฟล์ 59/60/61 จริงก่อนส่งให้ครูรันบนฐานจริง)"
-  exit 0
+# ── V.1.6.6: เลือกทางเชื่อม Postgres (มติครู 19 ส.ค. — "ติดตั้ง" บนเครื่องครู) ──
+#   ทาง ก: มี GP_PGHOST → ต่อเซิร์ฟเวอร์ที่ติดตั้งไว้แล้ว (เครื่องครู · ดูวิธีในเอกสาร 80)
+#   ทาง ข: ไม่ตั้ง → ตั้งเซิร์ฟเวอร์ชั่วคราวเองเหมือนเดิม (เครื่องแชต/คอนเทนเนอร์)
+#   ทั้งสองทางใช้ฐานทดสอบชั่วคราวชื่อ gptest — ถูก drop/สร้างใหม่ทุกครั้งที่รัน
+if [ -n "${GP_PGHOST:-}" ]; then
+  case "$GP_PGHOST" in *supabase.co*|*supabase.in*)
+    echo "❌ ห้ามชี้ชุดทดสอบไปที่ Supabase จริง — ฐานทดสอบต้องเป็นเครื่อง local เท่านั้น"
+    echo "   (สคริปต์นี้ drop/สร้างฐาน gptest และสร้าง role ทดสอบ — ไม่ควรเกิดบนฐานที่มีข้อมูลนักเรียน)"
+    exit 1;;
+  esac
+  H="$GP_PGHOST"; P="${GP_PGPORT:-5432}"; U="${GP_PGUSER:-postgres}"
+  [ -n "${GP_PGPASSWORD:-}" ] && export PGPASSWORD="$GP_PGPASSWORD"
+  if ! command -v psql >/dev/null 2>&1; then
+    echo "❌ ตั้ง GP_PGHOST ไว้แต่หา psql ไม่เจอใน PATH"
+    echo "   Windows: เพิ่ม C:\\Program Files\\PostgreSQL\\16\\bin เข้า PATH (ดูเอกสาร 80 ข้อ 3)"
+    exit 1
+  fi
+  if ! psql -h "$H" -p "$P" -U "$U" -d postgres -c 'select 1' >/dev/null 2>&1; then
+    echo "❌ ต่อ Postgres ที่ $H:$P (ผู้ใช้ $U) ไม่สำเร็จ — ตรวจว่าบริการรันอยู่และรหัสผ่านถูก (เอกสาร 80)"
+    exit 1     # ตั้งใจต่อแล้วต่อไม่ได้ = แดง ไม่ใช่ข้ามเงียบ (STD-006)
+  fi
+  echo "▶ ใช้ Postgres ที่ติดตั้งไว้: $H:$P ผู้ใช้ $U (ฐานทดสอบชั่วคราว: gptest)"
+else
+  H=/tmp; P=5433; U=postgres
+  PGBIN=/usr/lib/postgresql/16/bin
+  # [V.1.6.7] เครื่องที่มี Postgres รันอยู่แล้วแต่ลืมตั้ง GP_PGHOST (เช่นรุ่นพกพาบน Windows)
+  #   ไม่ควรถูกข้ามเงียบ ๆ — ลองต่อ 127.0.0.1 ก่อน (5432 มาตรฐาน · 5433 รุ่นพกพา)
+  #   เดิมกิ่งนี้ผูกกับ /usr/lib/postgresql/16/bin ซึ่งไม่มีวันมีบน Windows ⇒ ลืม env = ข้ามทุกครั้ง
+  if command -v psql >/dev/null 2>&1; then
+    for _p in 5432 5433; do
+      if psql -h 127.0.0.1 -p "$_p" -U postgres -d postgres -c 'select 1' >/dev/null 2>&1; then
+        H=127.0.0.1; P="$_p"; U=postgres
+        echo "▶ ไม่ได้ตั้ง GP_PGHOST แต่พบ Postgres ที่ 127.0.0.1:$_p — ใช้ตัวนี้ (ฐานทดสอบชั่วคราว: gptest)"
+        break
+      fi
+    done
+  fi
+  if [ "$H" = /tmp ] && { ! command -v psql >/dev/null || [ ! -x "$PGBIN/pg_ctl" ]; }; then
+    echo "⏭  ข้ามชุดทดสอบ SQL — เครื่องนี้ไม่มี PostgreSQL แบบที่ตั้งเองได้ และไม่ได้ตั้ง GP_PGHOST"
+    echo "   ⚠️ ข้าม ≠ ผ่าน (STD-006) — ไฟล์ SQL ยังไม่ถูกตรวจบนเครื่องนี้"
+    echo "   ทางแก้: ติดตั้ง PostgreSQL 16 แล้วรันด้วย GP_PGHOST=127.0.0.1 GP_PGPORT=<พอร์ต> (เอกสาร 80)"
+    # [V.1.6.7] เดิม exit 0 → run-all.sh นับเป็น "ผ่าน" แล้วพิมพ์ "ผ่านครบทุกชุด" ซึ่งขัดกับ
+    # ป้ายที่เพิ่งพิมพ์ไปเองสองบรรทัดบน — run-all.sh แยกนับเป็น skipped ตาม STD-006 ข้อ 1
+    exit 77
+  fi
+  if ! psql -h /tmp -p 5433 -U postgres -c 'select 1' >/dev/null 2>&1; then
+    export PGDATA=/tmp/pgdata_gp
+    rm -rf $PGDATA; mkdir -p $PGDATA; chown -R postgres:postgres $PGDATA 2>/dev/null || true
+    su postgres -c "$PGBIN/initdb -D $PGDATA -U postgres --auth=trust -E UTF8 --locale=C" >/dev/null 2>&1
+    su postgres -c "$PGBIN/pg_ctl -D $PGDATA -l /tmp/pg_gp.log -o '-p 5433 -k /tmp' start" >/dev/null 2>&1
+    sleep 2
+  fi
 fi
-if ! psql -h /tmp -p 5433 -U postgres -c 'select 1' >/dev/null 2>&1; then
-  export PGDATA=/tmp/pgdata_gp
-  rm -rf $PGDATA; mkdir -p $PGDATA; chown -R postgres:postgres $PGDATA 2>/dev/null || true
-  su postgres -c "$PGBIN/initdb -D $PGDATA -U postgres --auth=trust -E UTF8 --locale=C" >/dev/null 2>&1
-  su postgres -c "$PGBIN/pg_ctl -D $PGDATA -l /tmp/pg_gp.log -o '-p 5433 -k /tmp' start" >/dev/null 2>&1
-  sleep 2
-fi
-PSQL="psql -h /tmp -p 5433 -U postgres -d gptest -v ON_ERROR_STOP=1 -q"
-Q="psql -h /tmp -p 5433 -U postgres -d gptest -t -A -q"
-bad=0
-ok() { if [ "$2" = "$3" ]; then echo "  ✅ $1"; else echo "  ❌ $1"; echo "       ได้: [$2]  ควรได้: [$3]"; bad=$((bad+1)); fi; }
-okc() { if echo "$2" | grep -q "$3"; then echo "  ✅ $1"; else echo "  ❌ $1"; echo "       ได้: [$2]  ควรมีคำว่า: [$3]"; bad=$((bad+1)); fi; }
+# ── [V.1.6.7 · 19 ส.ค. 2569] ส่ง SQL ทาง stdin แทน -c ────────────────────────────
+#  เหตุ: psql.exe บน Windows ที่ระบบไม่ใช่ UTF-8 codepage (เช่นไทย = 874/TIS-620)
+#        แปลง argument ของ -c เป็น ANSI codepage แล้วส่งไบต์ WIN874 ออกไป
+#        ทั้งที่ประกาศ client_encoding=UTF8 → ERROR invalid byte sequence
+#        ทุกข้อที่มีข้อความไทย (ชื่อห้อง/ชื่อเกม/reason) แดงหมด — วัดจริงบนเครื่องครู 149 ข้อ
+#        ตั้ง PGCLIENTENCODING ไม่ช่วย เพราะการแปลงเกิดก่อนหน้านั้น
+#  พิสูจน์แยกสามทาง: -c พัง · stdin ผ่าน · -f ผ่าน  ⇒ ใช้ stdin (ท่าที่ไฟล์นี้ใช้อยู่แล้วบางจุด)
+#  วิธี: ทำ gpq() ให้รับ -c เหมือน psql ทุกประการ แล้วป้อน SQL ทาง stdin แทน
+#        → จุดเรียกทั้ง 185 แห่ง ($Q -c "…") ไม่ต้องแก้แม้แต่บรรทัดเดียว
+#  บน Linux/mac พฤติกรรมเหมือนเดิมทุกประการ (stdin กับ -c ให้ผลเท่ากันในชุดนี้)
+gpq() {
+  local a=() sql="" got=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -c) sql="$sql$2"$'
+'; got=1; shift 2 ;;
+      *)  a+=("$1"); shift ;;
+    esac
+  done
+  if [ "$got" = 1 ]; then printf '%s' "$sql" | psql "${a[@]}"; else psql "${a[@]}"; fi
+}
+PSQL="psql -h $H -p $P -U $U -d gptest -v ON_ERROR_STOP=1 -q"
+Q="gpq -h $H -p $P -U $U -d gptest -t -A -q"
+# [V.1.6.7] เพิ่มตัวนับหัว n — STD-006 ข้อ 1 "นับหัวก่อนเชื่อผล"
+#   เดิมชุดนี้พิมพ์แค่ "ผ่านครบทุกข้อ" ไม่มี X/Y ⇒ ถ้าหมวดใดหายไปทั้งหมวด (เช่น
+#   ไฟล์ SQL ไฟล์หนึ่งหาย แล้วกิ่งนั้นไม่ได้รัน) จะไม่มีใครเห็น เพราะ "ไม่มีข้อตก" เหมือนกัน
+bad=0; _nchk=0   # _nchk = ตัวนับหัว · ห้ามใช้ชื่อ n เพราะไฟล์นี้ใช้ n เก็บผลคิวรีอยู่แล้ว
+ok() { _nchk=$((_nchk+1)); if [ "$2" = "$3" ]; then echo "  ✅ $1"; else echo "  ❌ $1"; echo "       ได้: [$2]  ควรได้: [$3]"; bad=$((bad+1)); fi; }
+okc() { _nchk=$((_nchk+1)); if echo "$2" | grep -q "$3"; then echo "  ✅ $1"; else echo "  ❌ $1"; echo "       ได้: [$2]  ควรมีคำว่า: [$3]"; bad=$((bad+1)); fi; }
 
-psql -h /tmp -p 5433 -U postgres -q -c "drop database if exists gptest" -c "create database gptest"
+# ── [V.1.6.7] นกขมิ้นในเหมือง: ตรวจว่าท่อส่ง SQL รับภาษาไทยได้จริงก่อนเริ่มตรวจอะไร ──
+#  ถ้า client encoding เพี้ยน (เช่น psql.exe บน Windows codepage 874) ทุกข้อที่มีข้อความไทย
+#  จะแดงพร้อมกันเป็นร้อย ๆ ข้อ — ซึ่งอ่านแล้วเข้าใจผิดว่า "ฐาน/ไฟล์ SQL พัง"
+#  ทั้งที่จริงคือเครื่องมือส่งตัวอักษรไม่ถึง ⇒ หยุดตรงนี้พร้อมบอกวิธีแก้ ดีกว่าปล่อยให้เข้าใจผิด
+_canary=$(printf "%s" "select 'ทดสอบไทย';" | psql -h "$H" -p "$P" -U "$U" -d postgres -t -A -q 2>&1)
+if [ "$_canary" != "ทดสอบไทย" ]; then
+  echo "❌ ท่อส่ง SQL ส่งภาษาไทยไม่ถึงเซิร์ฟเวอร์ — หยุดก่อนตรวจ (ไม่งั้นจะแดงเป็นร้อยข้อโดยไม่ใช่ความผิดของ SQL)"
+  echo "   ส่งไป: [ทดสอบไทย]   ได้กลับ: [$_canary]"
+  echo "   สาเหตุที่พบบ่อย: psql.exe บน Windows ที่ระบบไม่ใช่ UTF-8 codepage แปลง argument ของ -c เป็น ANSI (874)"
+  echo "   ทางแก้: ใช้ psql ที่ส่ง SQL ทาง stdin/-f (ชุดนี้ทำแล้วผ่าน gpq) หรือรันบนเชลล์ที่ codepage เป็น UTF-8"
+  exit 1
+fi
+echo "  ✅ นกขมิ้น: ท่อส่ง SQL รับภาษาไทยได้ถูกต้อง"
+
+psql -h "$H" -p "$P" -U "$U" -q -c "drop database if exists gptest" -c "create database gptest"
 
 echo "═══ 0) ติดตั้งฐานจำลอง + รันไฟล์ SQL จริง ═══"
 $PSQL -f 00_fixture.sql >/dev/null 2>/tmp/e0.txt   && echo "  ✅ ฐานจำลอง (pgcrypto อยู่ในสคีมา extensions เหมือนของจริง)" || { echo "  ❌ ฐานจำลองล้ม"; cat /tmp/e0.txt; exit 1; }
@@ -388,6 +471,44 @@ n=$($Q -c "select gp_num_bad('12.5')::text || gp_num_bad('')::text || gp_num_bad
 ok "gp_num_bad: ตัวเลขผ่าน · ว่าง/ไม่ส่งไม่นับผิด · ข้อความจับได้" "$n" "falsefalsefalsetrue"
 n=$($Q -c "select gp_int_bad('5')::text || gp_int_bad('5.5')::text || gp_int_bad('สูง')::text;")
 ok "gp_int_bad: จำนวนเต็มผ่าน · ทศนิยม/ข้อความจับได้" "$n" "falsetruetrue"
+
+# ── ⭐⭐ V.1.6.5 (Audit F4) — คีย์ upsert ไม่แยกภาคด้วยตัวเอง: พิสูจน์ว่าการแยกด้วย
+#    gp_resolve_game เพียงพอจริง สำหรับกรณี "เด็กคนเดียว ส่งจากสองภาค run เดียวกัน"
+#    คีย์คือ (student_id, game_id, run_id) — ภาคถูกแยกเพราะ resolver คืน game_id คนละตัว
+#    ตามป้าย -p2- ใน game_version · ทั้งบล็อกห่อ begin…rollback ไม่ทิ้งแถวให้เทสต์ถัดไป
+#    (โดยเฉพาะหมวด 12 ที่นับค่าเฉลี่ยหน้าสาธารณะ — แถว p2 หลุดไปจะทำตัวเลขเพี้ยนเงียบ ๆ)
+out=$($Q -c "begin;
+  insert into games (id, code, name) values
+    ('44444444-4444-4444-8444-44444444444b','kanchanaburi2050-p2','กาญจนบุรี 2050 ภาค 2')
+    on conflict do nothing;
+  $AS_ANON
+  select rpc_submit_report('kanchanaburi2050','V.8.63-p2-2569.127','$S1',
+    '{\"score\":42,\"max_score\":160}'::jsonb, '[]'::jsonb);
+  reset role;   -- อ่านตารางตรง ๆ ต้องถอดหมวก anon ก่อน (RLS ปัด anon ถูกต้องแล้ว — เทสต์หมวด 12 คุมอยู่)
+  select 'ROWS=' || count(*) from achievement_results where student_id='$S1' and run_id='live';
+  select 'GAMES=' || count(distinct game_id) from achievement_results where student_id='$S1' and run_id='live';
+  select 'P2SCORE=' || score from achievement_results a join games g on g.id=a.game_id
+    where a.student_id='$S1' and g.code='kanchanaburi2050-p2';
+  select 'P1UNTOUCHED=' || (score is distinct from 42) from achievement_results a join games g on g.id=a.game_id
+    where a.student_id='$S1' and g.code='kanchanaburi2050';
+  set role anon;
+  select rpc_submit_report('kanchanaburi2050','V.7.99.37-IX2050-2569.71','$S1',
+    '{\"score\":99,\"max_score\":160}'::jsonb, '[]'::jsonb);
+  reset role;
+  select 'P1AFTER=' || score from achievement_results a join games g on g.id=a.game_id
+    where a.student_id='$S1' and g.code='kanchanaburi2050';
+  select 'P2AFTER=' || score from achievement_results a join games g on g.id=a.game_id
+    where a.student_id='$S1' and g.code='kanchanaburi2050-p2';
+  rollback;")
+okc "⭐⭐ F4: เด็กคนเดียว สองภาค run เดียวกัน = สองแถว ไม่ทับกัน" "$out" "ROWS=2"
+okc "และเป็นคนละ game_id จริง (resolver แยกภาคจากป้าย -p2-)" "$out" "GAMES=2"
+okc "ใบของภาค 2 ลงแถวภาค 2 (score 42)" "$out" "P2SCORE=42"
+okc "ใบของภาค 1 ที่มีอยู่เดิมไม่ถูกภาค 2 ทับ" "$out" "P1UNTOUCHED=true"
+okc "ส่งภาค 1 ตามหลัง = อัปเดตเฉพาะแถวภาค 1" "$out" "P1AFTER=99"
+okc "แถวภาค 2 ยังเป็นค่าเดิม ไม่ถูกภาค 1 ทับกลับ" "$out" "P2AFTER=42"
+# ⚠️ จุดบอดที่พิสูจน์ไม่ได้ด้วยเทสต์ (จดตาม 77_FIELD_CONTRACT): ภาค 2 ที่ "ลืมป้าย -p2-"
+#    แยกไม่ออกจากทราฟฟิกภาค 1 โดยนิยาม — ด่านกันอยู่ฝั่งเกม (ยาม build ของภาค 2 บังคับป้าย)
+#    ฐานทำได้แค่ปฏิเสธรุ่นว่าง ซึ่งทำอยู่แล้ว · ห้ามแก้ schema เพื่อเรื่องนี้ก่อนมี Impact Analysis
 echo ""
 echo "═══ 9) 66 — ใครเป็นเจ้าของผังตัวชี้วัด (คำถามของภาค 2) ═══"
 out=$($PSQL -f $SQLDIR/66_STANDARDS_OWNERSHIP.sql 2>&1)
@@ -518,8 +639,8 @@ n=$($Q -c "select case when pg_get_functiondef(p.oid) like '%kept_manual_total%'
 ok "ฟังก์ชันยังเป็นฉบับของไฟล์ 66 (ยามหยุดก่อนแตะอะไร)" "$n" "ยังเป็น 66"
 
 # ฐานที่ยังไม่เคยรัน 66 ต้องรันไฟล์ 61 ได้ตามปกติ — ยามต้องไม่ขวางคนที่ทำถูกลำดับ
-psql -h /tmp -p 5433 -U postgres -q -c "drop database if exists gporder" -c "create database gporder" >/dev/null 2>&1
-PSQL2="psql -h /tmp -p 5433 -U postgres -d gporder -v ON_ERROR_STOP=1 -q"
+psql -h "$H" -p "$P" -U "$U" -q -c "drop database if exists gporder" -c "create database gporder" >/dev/null 2>&1
+PSQL2="psql -h $H -p $P -U $U -d gporder -v ON_ERROR_STOP=1 -q"
 $PSQL2 -f 00_fixture.sql >/dev/null 2>&1
 out=$($PSQL2 -f $SQLDIR/61_STANDARDS_SKIPPED.sql 2>&1)
 if [ $? -eq 0 ]; then echo "  ✅ ฐานที่ยังไม่รัน 66 — รันไฟล์ 61 ได้ตามปกติ (ยามไม่ขวางคนทำถูกลำดับ)"; else echo "  ❌ ยามขวางฐานที่ยังไม่เคยรัน 66"; echo "$out" | tail -3; bad=$((bad+1)); fi
@@ -527,7 +648,7 @@ out=$($PSQL2 -f $SQLDIR/61_STANDARDS_SKIPPED.sql 2>&1)
 if [ $? -eq 0 ]; then echo "  ✅ ไฟล์ 61 ยังรันซ้ำตัวเองได้ (ยามไม่จับตัวเอง)"; else echo "  ❌ ไฟล์ 61 รันซ้ำตัวเองไม่ได้แล้ว"; bad=$((bad+1)); fi
 out=$($PSQL2 -f $SQLDIR/66_STANDARDS_OWNERSHIP.sql 2>&1)
 if [ $? -eq 0 ]; then echo "  ✅ ลำดับที่ถูก (61 → 66) ยังทำได้ตามปกติ"; else echo "  ❌ ลำดับ 61 → 66 พัง"; echo "$out" | tail -3; bad=$((bad+1)); fi
-psql -h /tmp -p 5433 -U postgres -q -c "drop database if exists gporder" >/dev/null 2>&1
+psql -h "$H" -p "$P" -U "$U" -q -c "drop database if exists gporder" >/dev/null 2>&1
 
 echo ""
 echo "═══ 11) 71 — แยก admin_edited ออกจาก source + หน้า Admin แก้ข้อความได้ ═══"
@@ -735,5 +856,17 @@ n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary(null,'ป.5')->'ach'->>'avg_a
 ok "⭐ ค่าเฉลี่ยรวมทุกโรงเรียนยังคืนมาเป็นเส้นเทียบ แม้กรองอยู่" "$n" "64.3"
 
 echo ""
-if [ "$bad" -eq 0 ]; then echo "✅ ผ่านครบทุกข้อ"; else echo "❌ ไม่ผ่าน $bad ข้อ"; fi
-exit "$bad"
+# [V.1.6.7] บรรทัดสุดท้ายต้องเป็น X/Y เสมอ (STD-006 ข้อ 1)
+# ยามพื้น: ถ้าจำนวนข้อลดฮวบ แปลว่ามีหมวดหนึ่ง "ไม่ได้รัน" (เช่นไฟล์ SQL หาย แล้วกิ่งนั้นถูกข้าม)
+# ซึ่งจะไม่มีข้อตกให้เห็นเลย — เป็นรูปแบบ "ตายเงียบ" ที่ STD-006 ข้อ 1 ตั้งมาเพื่อกัน
+# ฐาน ณ V.1.6.7 = 184 ข้อ (ผ่าน ok/okc) · อีกราว 26 ข้อเป็น echo ตรงในหมวด 0 ไม่ถูกนับ
+FLOOR=180
+if [ "$_nchk" -lt "$FLOOR" ]; then
+  echo "❌ นับหัวได้แค่ $_nchk ข้อ (ฐานที่ควรได้ ≥ $FLOOR) — สงสัยมีหมวดที่ไม่ได้รัน"
+  echo "   อ่านผลข้างบนว่าหมวดไหนหายไป · ถ้าตั้งใจตัดข้อออกจริง ให้ลด FLOOR พร้อมบันทึกเหตุผล"
+  bad=$((bad+1))
+fi
+if [ "$bad" -eq 0 ]; then echo "✅ ผ่านครบ $_nchk ข้อ"; else echo "❌ ไม่ผ่าน $bad ข้อ (จาก $_nchk)"; fi
+echo "สรุปชุด SQL: ผ่าน $((_nchk-bad))/$_nchk ข้อ (นับข้อที่ผ่าน ok/okc · หมวด 0 อีกราว 26 ข้อรายงานแยกด้านบน)"
+# exit code ห้ามเป็นตัวนับดิบ (เกิน 255 วนกลับเป็น 0 · และชนรหัส 77 ที่แปลว่า "ข้าม")
+if [ "$bad" -gt 0 ]; then exit 1; else exit 0; fi

@@ -40,7 +40,6 @@ js/config.js        ⭐ ค่ากลาง — แก้ไฟล์นี้
 js/gp-core.js       เชื่อม Supabase · เข้าสู่ระบบ · ตัวช่วยทั่วไป
 js/gp-brand.js      โลโก้ · ธีม · สโลแกนสลับวน · ปุ่มเข้า/ออกระบบ
 js/gp-catalog.js    โหลดแคตตาล็อก + ตัวกรอง
-js/gp-join.js       ⭐ ส่งโค้ดห้องเรียนต่อให้เกม — เกมทุกเกมโหลดไฟล์นี้
 js/gp-standards-panel.js   แผงมาตรฐานที่เกมวัด (เกมเอาไปฝังได้)
 wrangler.jsonc      ตั้งค่า Cloudflare
 favicon.svg
@@ -50,13 +49,15 @@ favicon.svg
 
 ## กฎ 3 ข้อที่ห้ามพลาด
 
-**1. `js/gp-join.js` เป็นไฟล์สาธารณะ — เกมทุกเกมโหลดไฟล์นี้**
-แก้แล้วกระทบทุกเกมพร้อมกัน ห้ามเปลี่ยนชื่อไฟล์ ห้ามเปลี่ยนพฤติกรรมโดยไม่แจ้งแชตเกม
+**1. `js/gp-join.js` ถูกถอดออกแล้ว (V.1.6.5 · มติครู ADR-001)**
+ไม่มีเกมใดเคยโหลดไฟล์นี้ — ทุกเกมอ่าน `?join=` จาก URL เองตามสัญญา STD-003
+ทะเบียนคีย์จองย้ายไปอยู่หัวไฟล์ `js/config.js` · **ชื่อคีย์ `gp_join_handoff` ยังจองถาวร ห้ามเกมใดนำไปใช้**
+(เครื่องในโรงเรียนอาจมีค่าเก่าค้างอยู่ — คีย์ที่เคยจองแล้วไม่ปล่อยคืน)
 
 **2. คีย์ localStorage ต่อไปนี้จองไว้ให้เว็บกลาง — เกมห้ามใช้ซ้ำ**
 
 ```
-gp_hub_sess · gp_join_handoff · gp_brand_cache · gp_theme · gp_announce_off
+gp_hub_sess · gp_join_handoff (จองถาวรแม้เลิกใช้) · gp_brand_cache · gp_theme · gp_announce_off · gp_room_claims
 ```
 
 ทุกเกมอยู่โดเมนเดียวกัน `localStorage` แยกตามโดเมนไม่ได้แยกตาม path
@@ -94,8 +95,12 @@ gp_hub_sess · gp_join_handoff · gp_brand_cache · gp_theme · gp_announce_off
 ชุดทดสอบใช้ Playwright จำลอง Supabase ด้วย `page.route()` — ไม่ต้องต่อฐานข้อมูลจริง
 ครอบคลุมหน้าแรก · ตัวกรอง · หน้า Admin · การส่งโค้ดห้องเรียน · ธีม · หัวเว็บ · สโลแกน · Q&A
 
+```bash
+# ทั้งชุด (เว็บ + SQL) ในคำสั่งเดียว — ต้องมี Postgres ในเครื่อง (ดูเอกสาร 80)
+cd test
+GP_PGHOST=127.0.0.1 GP_PGPORT=5432 GP_PGUSER=postgres bash run-all.sh
 ```
-node hub-test.js · admin-test.js · pages-test.js · join-test.js
-     mode-test.js · auth-test.js · ui-2026-08-10.js
-     feat-2026-08-10b.js · feat-admin-fields.js
-```
+
+บรรทัดสุดท้ายบอกเสมอว่า `สรุปแบตเตอรี่: X/Y ชุดรันสำเร็จ · ข้าม Z · แดง N` (STD-006 ข้อ 1)
+· **ข้าม ≠ ผ่าน** — ถ้ามีชุดถูกข้าม จะไม่ขึ้นคำว่า "ผ่านครบ" และ exit code เป็น 77
+· รายชื่อชุดและจำนวนข้อดูที่ `test/README.md` · สถานะชุดที่แดง/ล้าสมัยดูที่ `test/TESTS_REGISTRY.md`

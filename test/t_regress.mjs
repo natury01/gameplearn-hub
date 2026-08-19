@@ -1,14 +1,19 @@
 /* ชุดทดสอบ 3 — กันงานรอบนี้ทำของเดิมพัง
    ตรวจทุกหน้าที่ 320px (จอเล็กสุดที่ยังต้องรองรับ) และ 1280px:
    ไม่มีสคริปต์พัง · ไม่ล้นแนวนอน · ป้ายรุ่นตรง · ปุ่ม/ลิงก์กดได้จริง */
-import { chromium, serve, stub, login, reporter, realErrors } from './harness.mjs';
+import { chromium, serve, stub, login, reporter, realErrors, launchOpts, ROOT as HUBROOT } from './harness.mjs';
 import * as F from './fixtures.mjs';
 import fs from 'fs';
 
 const PORT = 8933, BASE = 'http://localhost:' + PORT;
-const VER = 'V.1.6.4';
+/* [V.1.6.7] STD-002 ข้อ 2 'เลขรุ่นอยู่ค่าคงที่จุดเดียว' — เดิมพิมพ์ซ้ำที่นี่
+   ทำให้ต้องแก้สองที่ทุกครั้งที่ออกรุ่น ลืมที่ใดที่หนึ่ง = ชุดนี้แดงทันทีโดยไม่ใช่ความผิดของเว็บ
+   อ่านจาก js/config.js ตรง ๆ แทน แล้วยังตรวจได้เหมือนเดิมว่า 'ทุกหน้าแสดงเลขนี้ครบ' */
+const VER = (fs.readFileSync(HUBROOT + '/js/config.js', 'utf8')
+  .match(/HUB_VERSION:\s*'([^']+)'/) || [])[1];
+if (!VER) { console.log('❌ อ่าน HUB_VERSION จาก js/config.js ไม่ได้ — หยุด'); process.exit(1); }
 const srv = await serve(PORT);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch(launchOpts());
 const ok = reporter();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -94,7 +99,7 @@ console.log('\n═══ 3) ของเดิมในหน้าครูท�
 
 console.log('\n═══ 4) ตรวจจากซอร์ส — เครื่องหมายของงานรอบนี้ต้องอยู่ในไฟล์จริง ═══');
 {
-  const ROOT = process.env.HUB_ROOT || '/home/claude/hub';
+  const ROOT = HUBROOT;
   const src = {
     index: fs.readFileSync(ROOT + '/index.html', 'utf8'),
     teacher: fs.readFileSync(ROOT + '/teacher.html', 'utf8'),
@@ -126,8 +131,28 @@ console.log('\n═══ 4) ตรวจจากซอร์ส — เคร�
   ok('4.3 สร้างห้องก่อนล็อกอิน — rpc_create_room_open + rpc_claim_room + เก็บกุญแจในเครื่อง',
     /rpc_create_room_open/.test(src.teacher) && /rpc_claim_room/.test(src.teacher)
     && /gp_room_claims/.test(src.teacher));
-  ok('คีย์ gp_room_claims ถูกจดไว้ในรายการคีย์จองของแพลตฟอร์ม (กันเกมใช้ชื่อซ้ำ)',
-    /gp_room_claims/.test(fs.readFileSync(ROOT + '/js/gp-join.js', 'utf8')));
+  /* V.1.6.5 — ทะเบียนคีย์จองย้ายจาก gp-join.js (ถูกถอดตาม ADR-001) มาอยู่ใน config.js */
+  ok('คีย์ gp_room_claims ถูกจดไว้ในทะเบียนคีย์จอง (ย้ายมาอยู่ config.js)',
+    /gp_room_claims/.test(src.cfg));
+  ok('ADR-001: ไฟล์ gp-join.js ถูกถอดออกจากชุดจริงแล้ว',
+    !fs.existsSync(ROOT + '/js/gp-join.js'));
+  ok('คีย์ gp_join_handoff ยังจองถาวรในทะเบียน (ห้ามปล่อยคืนแม้เลิกใช้)',
+    /gp_join_handoff/.test(src.cfg) && /จองถาวร/.test(src.cfg));
+  ok('ไม่มีหน้าไหนเขียนคีย์ gp_join_handoff อีก (เลิกทิ้งโค้ดห้องค้างบนเครื่องส่วนกลาง)',
+    !/setItem\('gp_join_handoff'/.test(src.index));
+  ok('Audit F11: _headers มี Cache-Control no-cache (กัน edge เสิร์ฟรุ่นเก่า)',
+    /Cache-Control: no-cache, must-revalidate/.test(fs.readFileSync(ROOT + '/_headers', 'utf8')));
+  ok('Audit: มีไฟล์ robots.txt จริง (กัน SPA fallback ตอบแทนด้วย index.html)',
+    fs.existsSync(ROOT + '/robots.txt')
+    && /User-agent: \*/.test(fs.readFileSync(ROOT + '/robots.txt', 'utf8')));
+  ok('Audit F3: คอลัมน์บวกคะแนนดิบข้ามเกมถูกถอด — เหลือสถานะผลจากเกม',
+    !/คะแนนรวม<\/th>/.test(src.teacher) && /ผลจากเกม<\/th>/.test(src.teacher)
+    && /เครื่องมือวัดคนละชุด/.test(src.teacher));
+  ok('STD-002 ⑤: หน้า Admin มีช่องแก้ current_version (พิธีออกรุ่นขั้น 4)',
+    /data-field="current_version"/.test(src.admin)
+    && /current_version&order/.test(src.admin));
+  ok('README_DEPLOY มีพิธีออกรุ่น (purge → ตรวจเลขรุ่น → current_version)',
+    /Purge Cache/.test(fs.readFileSync(ROOT + '/README_DEPLOY.md', 'utf8')));
   ok('มีไฟล์ SQL ที่ตอบคำขอของภาค 1 (skipped ของผังมาตรฐาน) มาในชุดด้วย',
     fs.existsSync(ROOT + '/sql/61_STANDARDS_SKIPPED.sql'));
   ok('ลำดับ SQL ใน README_DEPLOY มีไฟล์ใหม่ครบ',
@@ -177,7 +202,7 @@ console.log('\n═══ 4) ตรวจจากซอร์ส — เคร�
    ═══════════════════════════════════════════════════════════════════════════ */
 console.log('\n═══ 5) ไฟล์ SQL — ห้ามมี $$ อยู่ในสตริง (ปิด dollar-quote ของบล็อกที่ครอบอยู่) ═══');
 {
-  const ROOT = process.env.HUB_ROOT || '/home/claude/hub';
+  const ROOT = HUBROOT;
   /* เดินอ่านทีละตัวอักษร ข้ามคอมเมนต์และบล็อก dollar-quote แล้วดูเฉพาะสตริง '...' */
   const scan = (sql) => {
     const hits = [];

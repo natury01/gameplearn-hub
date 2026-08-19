@@ -1,9 +1,9 @@
 /* ชุดทดสอบ 1 — สไลด์ภาพรายด่านบนการ์ดเกม (ข้อ 3.1) + บล็อกสำหรับคุณครูถูกเอาออก (ข้อ 3.6) */
-import { chromium, serve, stub, reporter, realErrors } from './harness.mjs';
+import { chromium, serve, stub, reporter, realErrors, launchOpts } from './harness.mjs';
 
 const PORT = 8931, BASE = 'http://localhost:' + PORT;
 const srv = await serve(PORT);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch(launchOpts());
 const ok = reporter();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

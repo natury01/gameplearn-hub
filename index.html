@@ -630,10 +630,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       let games = await roomGames(key);
       if (!games.length) games = ALL.filter((g) => g.playable);   /* ยังไม่ได้มอบหมาย = เล่นเกมไหนก็ได้ */
       showRoom(room, key, games);
-      /* ส่งต่อโค้ดให้เกม — เกมทุกเกมอยู่โดเมนเดียวกันจึงอ่าน localStorage ก้อนนี้ได้
-         ใช้เป็นทางสำรองของ ?join= เผื่อพารามิเตอร์หายระหว่างทาง (ดู js/gp-join.js)
-         คีย์นี้จองไว้ให้แพลตฟอร์ม ห้ามเกมใดใช้ชื่อซ้ำ */
-      try { localStorage.setItem('gp_join_handoff', JSON.stringify({ code: key, at: Date.now() })); } catch (e) {}
+      /* V.1.6.5 (ADR-001) — เลิกเขียนคีย์ gp_join_handoff แล้ว
+         คีย์นี้เคยเป็น "ทางสำรอง" ให้ js/gp-join.js ฝั่งเกมอ่าน แต่ไม่มีเกมใดโหลดไฟล์นั้นเลย
+         ทุกเกมอ่าน ?join= จาก URL เอง (สัญญา STD-003) ซึ่งปุ่ม ▶ ข้างล่างแนบให้อยู่แล้ว
+         การเขียนคีย์ที่ไม่มีใครอ่าน = ทิ้งโค้ดห้องค้างไว้บนเครื่องส่วนกลางของโรงเรียนเปล่า ๆ
+         ⚠️ ชื่อคีย์ยังจองถาวรในทะเบียน (js/config.js) — ห้ามใครนำไปใช้ใหม่ */
     } catch (e) {
       joinErr('เชื่อมต่อไม่สำเร็จ: ' + (e.message || 'ลองใหม่อีกครั้ง'));
     } finally {

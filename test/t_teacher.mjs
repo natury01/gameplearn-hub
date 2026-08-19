@@ -1,11 +1,11 @@
 /* ชุดทดสอบ 2 — หน้าครู: ห้องผู้เล่นทั่วไป · ปุ่มลบ · ท่อข้อมูล · สวิตช์เกม · ตัวกรองรายเกม
    (ข้อ 3.2 · 3.3 · 3.4 · 3.5 · 3.7) */
-import { chromium, serve, stub, login, reporter, realErrors } from './harness.mjs';
+import { chromium, serve, stub, login, reporter, realErrors, launchOpts } from './harness.mjs';
 import * as F from './fixtures.mjs';
 
 const PORT = 8932, BASE = 'http://localhost:' + PORT;
 const srv = await serve(PORT);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch(launchOpts());
 const ok = reporter();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

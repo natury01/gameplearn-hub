@@ -1,6 +1,21 @@
+# ⭐ V.1.6.5 (Audit F11) — นโยบาย cache: "ของที่บอกว่าเว็บคือรุ่นไหน ห้าม cache ค้าง"
+#   เหตุการณ์จริง 18 ส.ค.: edge cache เสิร์ฟ HTML รุ่นเก่าทั้งที่อัปรุ่นใหม่แล้ว 2 รอบ
+#   ครูไล่จนเจอว่าเว็บส่ง V.7.99.32 ขณะดิสก์คือ .37 — ต่อไปนี้กันที่ต้นทาง:
+#
+#   ทำไม html/js/css ต้อง no-cache ทั้งสามอย่าง ไม่ใช่แค่ html:
+#   เว็บนี้ไม่มีขั้นตอน build จึงไม่มี hash ในชื่อไฟล์ — ถ้า html ใหม่แต่ js ถูก cache ยาว
+#   จะได้ "หน้าใหม่ + โค้ดเก่า" ซึ่งพังเงียบกว่ารุ่นเก่าทั้งชุดเสียอีก (เลขรุ่นอยู่ใน config.js)
+#   no-cache ≠ ห้ามเก็บ — เบราว์เซอร์/edge ยังเก็บได้ แต่ต้องถามเซิร์ฟเวอร์ก่อนใช้ทุกครั้ง
+#   (ได้ 304 ถ้าไม่เปลี่ยน — ไฟล์เราเล็ก ราคาถูกกว่าเว็บค้างรุ่นเก่ามาก)
+#   รูปภาพ cache ยาวได้ เพราะเปลี่ยนไฟล์ = เปลี่ยนชื่อ/URL เสมอ (อัปโหลดผ่าน storage)
+
 /*
   Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://janoonnhzpwjnxqjvswt.supabase.co; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests
   X-Content-Type-Options: nosniff
   X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Cache-Control: no-cache, must-revalidate
+
+/favicon.svg
+  Cache-Control: public, max-age=604800

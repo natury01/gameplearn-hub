@@ -3,12 +3,12 @@
    สองอย่างที่ชุดนี้ต้องพิสูจน์ให้ได้ และสำคัญกว่าเรื่องสวยงาม:
    1. **เปิดดูได้จริงโดยไม่ล็อกอิน** — ไม่มีที่ไหนในหน้านี้แนบโทเคนครูไปกับคำขอ
    2. **ไม่มีอะไรที่ระบุตัวเด็กโผล่บนจอ** — หน้านี้เปิดสาธารณะ ถ้าหลุดคือหลุดกับคนทั้งอินเทอร์เน็ต */
-import { chromium, serve, stub, login, reporter, realErrors } from './harness.mjs';
+import { chromium, serve, stub, login, reporter, realErrors, launchOpts } from './harness.mjs';
 import * as F from './fixtures.mjs';
 
 const PORT = 8937, BASE = 'http://localhost:' + PORT;
 const srv = await serve(PORT);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch(launchOpts());
 const ok = reporter();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -128,8 +128,12 @@ console.log('\n═══ 6) ตัวกรอง — เลือกแล้�
   const st = await p.evaluate(() => ({
     txt: document.getElementById('content').textContent,
     scope: (document.getElementById('scope-note') || {}).textContent || '' }));
+  /* [V.1.6.8] เดิมเช็คข้อความตายตัวคำเดียว — พอหน้าจอแยก "ไม่มีใบผลสัมฤทธิ์" ออกจาก
+     "ไม่มีอะไรเลย" (เพื่อไม่ทิ้งกราฟสมรรถนะที่ฐานส่งมาแล้ว) ข้อนี้จะแดงทั้งที่พฤติกรรมดีขึ้น
+     เขียนใหม่ให้ตรวจ "เจตนา" แทนคำ และเข้มขึ้นด้วยการยืนยันว่ากราฟเปล่าไม่ถูกวาดจริง */
   ok('⭐ กรองแล้วไม่มีผล = บอกเป็นข้อความ ไม่ใช่กราฟเปล่า ๆ',
-    st.txt.includes('ยังไม่มีผลในกลุ่มที่เลือก'), st.txt.slice(0, 200));
+    /ยังไม่มี(ผล|ใบผลสัมฤทธิ์)ในกลุ่มที่เลือก/.test(st.txt)
+      && !st.txt.includes('กระจายตามช่วงคะแนน'), st.txt.slice(0, 200));
   ok('บอกวิธีแก้ให้ด้วย ไม่ใช่แจ้งว่าว่างเฉย ๆ', st.txt.includes('ลองเลือก'), '');
   ok('บอกว่ากำลังดูขอบเขตไหนอยู่', st.scope.includes('ป.4'), st.scope);
   const body = JSON.parse(calls.filter((c) => String(c[1]).includes('rpc_pub_summary')).pop()[2] || '{}');

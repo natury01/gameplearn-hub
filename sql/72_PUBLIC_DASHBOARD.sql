@@ -168,14 +168,30 @@ as $fn$
            count(*)                                  as n,
            round(avg((u.value)::numeric), 1)          as avg_value
       from ach a
-      cross join lateral jsonb_each_text(coalesce(a.unit_scores, '{}'::jsonb)) u
+      /* [V.1.6.8] ใบผลของนักเรียน 'คนเดียว' ที่ unit_scores ไม่ใช่ object (jsonb 'null'
+         หรือ array/number) ทำให้ jsonb_each_text โยน error แล้วทั้งฟังก์ชันล้ม
+         ⇒ ครูทุกคนเปิดหน้าสาธารณะไม่ได้เลย เพราะข้อมูลเสียของคนเดียว
+         coalesce เดิมจับได้แค่ SQL NULL · ต้องตรวจรูปทรงด้วย jsonb_typeof */
+      cross join lateral jsonb_each_text(
+        case when jsonb_typeof(a.unit_scores) = 'object' then a.unit_scores
+             else '{}'::jsonb end) u
      where u.value ~ '^-?[0-9]+(\.[0-9]+)?$'          -- เก็บเฉพาะช่องที่เป็นตัวเลขจริง
      group by u.key
   )
   select jsonb_build_object(
     'scope', jsonb_build_object('school', p_school, 'grade', p_grade, 'year', p_year, 'game', p_game),
-    'n_schools',  (select count(distinct school_id)   from room),
-    'n_rooms',    (select count(*)                    from room),
+    /* [V.1.6.8] เดิมนับจาก room ตรง ๆ = นับห้องที่ยังไม่มีผลด้วย และไม่ฟังตัวกรองเกม
+       ทำให้หัวเรื่องขึ้น '6 ห้องเรียน · 3 โรงเรียน' ขณะที่กราฟข้างล่างมี 2 แท่ง
+       ⇒ นับเฉพาะห้องที่มีผลจริงในขอบเขตที่กรองอยู่ (ทั้งใบผลสัมฤทธิ์และใบสมรรถนะ)
+       ท่าเดียวกับ rooms_with_data ใน rpc_pub_filters ที่ทำถูกอยู่แล้ว */
+    'n_schools',  (select count(distinct r.school_id) from room r
+                    where r.classroom_id in (select classroom_id from ach
+                                             union select classroom_id from dim)),
+    'n_rooms',    (select count(*) from (select classroom_id from ach
+                                         union select classroom_id from dim) q),
+    /* [V.1.6.8] คงตัวเลข 'ห้องทั้งระบบ' ไว้ด้วย เผื่อหน้าจออยากบอกทั้งสองมุม */
+    'n_rooms_all',   (select count(*)                  from room),
+    'n_schools_all', (select count(distinct school_id) from room),
     'n_games',    (select count(distinct game_code)   from ach),
     'n_students', (select count(distinct student_id)  from ach),
     'ach', jsonb_build_object(
@@ -246,7 +262,8 @@ as $fn$
      where (p_game is null or a.game_code = p_game)
   ),
   dim as (
-    select d.student_id, d.score, d.game_code, r.*
+    /* [V.1.6.8] เติม comp_code — ใช้แตกค่าเฉลี่ยรายด้าน (comp_by_dim) */
+    select d.student_id, d.score, d.game_code, d.comp_code, r.*
       from public.v_student_comp_dims d
       join room r on r.classroom_id = d.classroom_id
      where d.evidence <> 'self_report'
@@ -274,21 +291,57 @@ as $fn$
              when 'classroom' then classroom_id::text
              when 'game'      then game_code
              else coalesce(school_id::text, '(ไม่ระบุโรงเรียน)') end as k,
-           student_id, score
+           /* [V.1.6.8] เติม comp_code เพื่อแตกค่าเฉลี่ยรายด้าน (comp_by_dim) */
+           student_id, score, comp_code
       from dim
   ),
+  /* [V.1.6.8] เดิม agg ตั้งต้นจาก keyed (ใบผลสัมฤทธิ์) อย่างเดียว
+     ⇒ ห้องที่มีแต่ใบสมรรถนะไม่มีแถวในตารางเลย แต่คะแนนกลับถูกนับเข้าค่าเฉลี่ยโรงเรียน
+     (เห็นเป็น n_students=2 แต่ comp_students=3 ในแถวเดียวกัน — ตัวเลขขัดกันเอง)
+     ⇒ ตั้งต้นจาก 'ทุก key ที่มีข้อมูลอย่างใดอย่างหนึ่ง' แล้วค่อยเติมค่าที่มี */
+  allkeys as (
+    select k, min(label) as label, min(sub) as sub from keyed group by k
+    union
+    select k, null::text, null::text from dkeyed where k not in (select k from keyed)
+  ),
   agg as (
-    select k, min(label) as label, min(sub) as sub,
-           count(distinct student_id)          as n_students,
-           count(*)                            as n_results,
-           round(avg(percent)::numeric, 1)     as avg_percent
-      from keyed group by k
+    select ak.k,
+           coalesce(min(ak.label), min(kd.dlabel), ak.k)      as label,
+           coalesce(min(ak.sub),   min(kd.dsub),   '')        as sub,
+           count(distinct kk.student_id)                      as n_students,
+           count(kk.student_id)                               as n_results,
+           round(avg(kk.percent)::numeric, 1)                 as avg_percent
+      from allkeys ak
+      left join keyed kk on kk.k = ak.k
+      left join lateral (
+        /* ป้ายของห้องที่มีแต่ใบสมรรถนะ — ดึงจาก room ตรง ๆ ตามชนิดการจัดกลุ่ม */
+        select case lower(coalesce(p_group, 'school'))
+                 when 'grade'     then coalesce(r.grade, '(ไม่ระบุชั้น)')
+                 when 'classroom' then r.room_name
+                 when 'game'      then ak.k
+                 else coalesce(r.school_name, '(ไม่ระบุโรงเรียน)') end as dlabel,
+               case lower(coalesce(p_group, 'school'))
+                 when 'classroom' then coalesce(r.school_name, '') else '' end as dsub
+          from room r
+         where ak.k in (r.classroom_id::text, r.school_id::text, r.grade)
+         limit 1) kd on true
+     group by ak.k
   )
   select coalesce(jsonb_agg(jsonb_build_object(
            'key', a.k, 'label', a.label, 'sub', nullif(a.sub, ''),
            'n_students', a.n_students, 'n_results', a.n_results,
            'avg_percent', a.avg_percent,
+           /* [V.1.6.8] ⚠️ comp_avg = ค่าเฉลี่ยข้ามด้าน ซึ่งแต่ละด้านคิดคนละสูตร:
+              4 ด้าน (คิดขั้นสูง/สื่อสาร/พลเมือง/ธรรมชาติฯ) = 30% รวบยอด + 70% ย่อย
+              แต่ จัดการตนเอง กับ รวมพลังทำงานเป็นทีม ไม่มีขารวบยอด จึงคิดจากย่อย 100%
+              ⇒ ตัวเลขเดียวนี้เอาคนละมาตรวัดมาบวกกัน ห้ามใช้ตัดสินคุณภาพเด็ก
+              คงคีย์เดิมไว้เพื่อไม่ให้ของที่อ่านอยู่พัง แต่เติมข้อมูลกำกับให้หน้าจอตัดสินใจได้ */
            'comp_avg', (select round(avg(d.score)::numeric, 1) from dkeyed d where d.k = a.k),
+           'comp_dims_n', (select count(distinct d.comp_code) from dkeyed d where d.k = a.k),
+           'comp_avg_note', 'เฉลี่ยข้ามด้านที่คิดคนละสูตร — ใช้ดูภาพรวมเท่านั้น ไม่ใช้ตัดสิน',
+           'comp_by_dim', (select coalesce(jsonb_object_agg(x.comp_code, x.s), '{}'::jsonb)
+                             from (select d.comp_code, round(avg(d.score)::numeric, 1) as s
+                                     from dkeyed d where d.k = a.k group by d.comp_code) x),
            'comp_students', (select count(distinct d.student_id) from dkeyed d where d.k = a.k))
          /* เรียงตามชื่อ ไม่ใช่ตามคะแนน — ครูตัดสินว่าไม่จัดอันดับโรงเรียน */
          order by a.label), '[]'::jsonb)

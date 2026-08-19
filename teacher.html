@@ -340,6 +340,109 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      RLS ของ 46 เปิดให้ผู้ดูแลอ่านได้ทุกห้อง (จำเป็นสำหรับงานดูแลระบบ) ถ้าไม่กรอง teacher_id
      ตรงนี้ ห้องของครูคนอื่นจะไหลเข้ามาอยู่ใต้หัวข้อ "ห้องเรียนของฉัน" — เคยเกิดจริงมาแล้ว
      และไม่ใช่แค่ชื่อหัวข้อผิด: ยอดนักเรียน ค่าเฉลี่ย และผลสมรรถนะจะกลายเป็นของทั้งระบบ */
+  /* ══ [V.1.6.9] อัปเดตผลจากเกม — ครูไม่ต้องเข้าเกมอีกต่อไป ═══════════════════
+     ปัญหาที่ครูรายงาน 19 ส.ค.: 'ครูปล่อยให้นักเรียนเล่นเกม แล้วคาบต่อไปครูเข้าดูผ่าน
+     เว็บกลางเลย ครูจะไม่ได้เข้าตัวเกม' — แต่ท่อส่งใบรายงานผลของเกมวิ่งก็ต่อเมื่อมีคน
+     'กดแท็บ 🧪 ของห้องนั้นในหน้าครูของเกม' ⇒ ครูที่ดูผ่านเว็บกลางอย่างเดียวไม่มีวันได้ข้อมูลใหม่
+
+     ทางที่เลือก: เว็บกลาง 'สั่งเอนจินของเกมทำงาน' ไม่ใช่ 'คิดคะแนนเอง'
+       · เคารพกฎล็อกข้อ 3 (เกมเป็นเจ้าของการคิดคะแนน · เว็บกลางเป็นเจ้าของการแสดงผล)
+       · ไม่ต้องพอร์ตสูตร ~1,464 บรรทัด/ภาค มาไว้เว็บกลาง (ซึ่งจะได้คนละเลขแน่นอน)
+       · ไม่เพิ่ม RPC เขียนใหม่ ไม่เพิ่มพื้นที่โจมตี — เกมใช้ท่อเดิมของมันทุกประการ
+       · ไม่ต้องให้นักเรียนมีสิทธิ์เขียนใบรายงานผล (rpc_submit_report ไม่มียามพิสูจน์ผู้ส่ง)
+
+     วิธี: ฝากหน้าครูของเกมไว้ใน iframe ซ่อน (same-origin จริง เซสชันครูใช้ร่วมกันอยู่แล้ว)
+     แล้วส่ง postMessage บอกว่า 'อัปเดตห้องนี้' · เกมตอบกลับว่าสำเร็จหรือไม่
+     ต้องใช้เกมรุ่นที่มีบล็อก R22-P2 ขึ้นไป — รุ่นเก่าจะไม่ตอบ แล้วเราขึ้นข้อความบอกครูตรง ๆ */
+  const GameRefresh = {
+    /* รอเกม 'ตอบรับ' ไม่เกิน 9 วิ — ไม่ตอบรับเลย = เกมรุ่นเก่าที่ยังไม่มีตัวรับ
+       แต่พอตอบรับแล้ว รอ 'งานเสร็จ' ได้ถึง 50 วิ เพราะฝั่งเกมรอสถิติเองได้ ~18 วิ
+       แล้วยังต้องไล่ยิงใบรายงานผลทีละคนอีก (เว้นจังหวะ 120ms/คน) */
+    ACK_TIMEOUT: 9000,
+    DONE_TIMEOUT: 60000,
+    _frame: null,
+    _busy: false,
+    /* หน้าครูของเกม อยู่ใต้ path ของเกมบนโดเมนเดียวกัน */
+    urlOf(game) {
+      const u = (game && (game.dashboard_url || game.launch_url)) || '';
+      if (!u) return null;
+      try {
+        const abs = new URL(u, location.href);
+        if (abs.origin !== location.origin) return null;   /* ยาม: ข้ามโดเมนไม่ทำ */
+        if (!/dashboard\.html$/.test(abs.pathname)) {
+          abs.pathname = abs.pathname.replace(/[^/]*$/, '') + 'dashboard.html';
+        }
+        /* launch_url ของเกมมัก+'?join=CODE' ติดมาด้วย — ล้างทิ้ง ไม่งั้นหน้าครูของเกม
+           จะถูกเปิดในโหมด "นักเรียนเข้าห้อง" แทนที่จะเป็นหน้าครู */
+        abs.search = ''; abs.hash = '';
+        return abs.href;
+      } catch (e) { return null; }
+    },
+    _ensureFrame(url) {
+      if (this._frame && this._frame.src === url) return Promise.resolve(this._frame);
+      if (this._frame) { try { this._frame.remove(); } catch (e) {} this._frame = null; }
+      return new Promise((res, rej) => {
+        const f = document.createElement('iframe');
+        f.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px';
+        f.setAttribute('aria-hidden', 'true');
+        f.setAttribute('title', 'ตัวช่วยอัปเดตผลจากเกม (ไม่แสดงผล)');
+        f.onload = () => res(f);
+        f.onerror = () => rej(new Error('เปิดหน้าครูของเกมไม่ได้'));
+        f.src = url;
+        document.body.appendChild(f);
+        this._frame = f;
+        setTimeout(() => rej(new Error('เปิดหน้าครูของเกมไม่ทันเวลา')), this.TIMEOUT);
+      });
+    },
+    /* สั่งอัปเดตหนึ่งห้อง — คืน {ok, why} เสมอ ไม่โยน error ออกไปให้หน้าจอพัง
+       จังหวะ: ยิงคำสั่งซ้ำทุก 1.5 วิ จนกว่าเกมจะ 'ตอบรับ' (gp2-refresh-ack)
+       แทนการเดาเวลาบูตด้วยตัวเลขตายตัว — เครื่องครูช้าเร็วไม่เท่ากัน
+       ฝั่งเกมมีธงกันรับซ้ำอยู่แล้ว การยิงซ้ำจึงไม่ทำให้ทำงานสองรอบ */
+    async room(game, roomId) {
+      const url = this.urlOf(game);
+      if (!url) return { ok: false, why: 'no-url' };
+      let f;
+      try { f = await this._ensureFrame(url); } catch (e) { return { ok: false, why: 'frame' }; }
+      return await new Promise((res) => {
+        let settled = false, acked = false, poke = null, ackTimer = null, doneTimer = null;
+        const finish = (r) => {
+          if (settled) return;
+          settled = true;
+          clearInterval(poke); clearTimeout(ackTimer); clearTimeout(doneTimer);
+          window.removeEventListener('message', onMsg);
+          res(r);
+        };
+        const onMsg = (ev) => {
+          if (ev.origin !== location.origin) return;
+          const d = ev.data;
+          if (!d || (d.gp2 !== 'gp2-refresh-done' && d.gp2 !== 'gp2-refresh-ack')) return;
+          if (roomId && d.room && d.room !== roomId) return;
+          if (d.gp2 === 'gp2-refresh-ack') {
+            /* เกมรับงานแล้ว — เลิกยิงซ้ำ แล้วเปลี่ยนไปรอ 'งานเสร็จ' ด้วยเพดานที่ยาวขึ้น */
+            acked = true;
+            clearInterval(poke); clearTimeout(ackTimer);
+            doneTimer = setTimeout(() => finish({ ok: false, why: 'timeout', students: 0 }), this.DONE_TIMEOUT);
+            return;
+          }
+          finish({ ok: !!d.ok, why: d.why || null, students: d.students || 0, ver: d.ver || null });
+        };
+        window.addEventListener('message', onMsg);
+        const fire = () => {
+          try {
+            f.contentWindow.postMessage({ gp2: 'gp2-refresh', room: roomId || null }, location.origin);
+          } catch (e) { finish({ ok: false, why: 'postMessage' }); }
+        };
+        fire();
+        poke = setInterval(fire, 1500);
+        /* ไม่ตอบรับเลยภายในเพดานแรก = เกมรุ่นเก่าที่ยังไม่มีตัวรับ (รุ่นเก่าจะเงียบสนิท) */
+        ackTimer = setTimeout(() => { if (!acked) finish({ ok: false, why: 'no-listener' }); }, this.ACK_TIMEOUT);
+      });
+    },
+    cleanup() { if (this._frame) { try { this._frame.remove(); } catch (e) {} this._frame = null; } },
+  };
+  /* [V.1.6.9] เปิดให้เรียกจาก console ได้ — ใช้ตรวจปัญหาหน้างานและใช้ในชุดทดสอบ
+     (อ่านอย่างเดียวไม่ได้เพิ่มสิทธิ์ใด ๆ · ทุกยามอยู่ในตัวโมดูลเอง) */
+  try { window.GameRefresh = GameRefresh; } catch (e) {}
   async function loadAll() {
     const uid = G.session().user_id;
 
@@ -892,17 +995,27 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             + '</div>' : '')
         + '</div>';
     }).join('');
-    /* มีแค่การคิดขั้นสูงด้านเดียว = เกมยังส่งผ่านช่องทางเดิม (rpc_submit_competency)
-       ซึ่งรับได้เฉพาะด้านนี้ — บอกสาเหตุและทางแก้ตรง ๆ ดีกว่าปล่อยให้ครูงงว่าทำไมขาด */
+    /* [V.1.6.8] ข้อความเดิมบอกสาเหตุที่ไม่จริงแล้ว — ระบบรับครบ 6 ด้านตั้งแต่ไฟล์ 43/72
+       สาเหตุจริงที่ครูเห็นด้านเดียว เรียงตามความน่าจะเป็น:
+         1) ยังไม่มีใครเปิดแท็บ 🧪 ในหน้าครู 'ในตัวเกม' — ท่อส่งใบสมรรถนะทำงานตอนนั้น (บทเรียน F12)
+         2) ยังไม่ได้รันไฟล์ SQL 43/72 บนฐานจริง
+         3) เล่นแต่ภาค 1 ซึ่งส่งแค่ 5 ด้าน (ไม่มีการรวมพลังทำงานเป็นทีม)
+       บอกทางแก้ที่ครูทำได้เองจริง ๆ ดีกว่าชี้ไปที่ช่องทางที่เลิกใช้แล้ว */
     const withData = ds.filter((d) => d.n > 0);
     const onlyHot = withData.length === 1 && withData[0].code === 'HOT';
     const selfs = ds.filter((d) => d.self.n);
     html += '<div class="card"><div class="c6wrap">'
       + '<div class="c6radar">' + radarSvg(ds) + '</div>'
       + '<div class="c6list">' + bars + '</div></div>'
-      + (onlyHot ? '<div class="panel-note">ตอนนี้มีข้อมูลเฉพาะ <b>การคิดขั้นสูง</b> เพราะเกมยังส่งผลผ่าน'
-          + 'ช่องทางเดิมที่รับได้ด้านเดียว — เมื่อรัน <code>43_REPORT_CARDS.sql</code> และอัปเดตเกมเป็นรุ่นที่'
-          + 'ส่ง "ใบรายงานผล" แล้ว ด้านที่เหลือจะขึ้นเองทันทีโดยไม่ต้องแก้อะไรที่หน้านี้</div>' : '')
+      + (onlyHot ? '<div class="panel-note">ตอนนี้มีข้อมูลเฉพาะ <b>การคิดขั้นสูง</b> — '
+          + 'ระบบรองรับครบ 6 ด้านแล้ว ด้านที่เหลือยังไม่มีข้อมูลส่งเข้ามา ลองไล่ตามลำดับนี้:'
+          + '<ol style="margin:6px 0 0 18px;padding:0">'
+          + '<li>เปิดเกม → เข้าสู่ระบบครู → <b>เปิด "ห้องเรียนของครู" ในตัวเกม</b> → กดแท็บ <b>🧪 เทียบเกณฑ์</b> '
+          + 'หนึ่งครั้งต่อห้อง (ใบสมรรถนะ 6 ด้านถูกส่งตอนนี้ — หน้านี้เป็นแค่หน้าอ่าน ไม่ได้ส่งเอง)</li>'
+          + '<li>ถ้ายังไม่ขึ้น ให้ผู้ดูแลตรวจว่ารันไฟล์ <code>43_REPORT_CARDS.sql</code> และ '
+          + '<code>72_PUBLIC_DASHBOARD.sql</code> บนฐานแล้ว</li>'
+          + '<li>ถ้าห้องนี้เล่นแต่ภาค 1 จะได้ไม่ครบ 6 ด้านโดยธรรมชาติ (ภาค 1 ไม่ได้วัดด้านการรวมพลังทำงานเป็นทีม)</li>'
+          + '</ol></div>' : '')
       + (selfs.length ? '<div class="panel-note">📋 จากแบบประเมินตนเอง (แสดงแยก ไม่รวมกับคะแนน): '
           + selfs.map((d) => G.esc(d.name) + (d.self.avg != null ? ' เฉลี่ย ' + d.self.avg.toFixed(1) : '')
             + ' (' + d.self.n + ' รายการ)').join(' · ') + '</div>' : '')
@@ -1733,6 +1846,13 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let html = '<h2 style="margin:0 0 2px;font-size:20px">🏫 ' + G.esc(r.name)
       + ' <span class="muted" style="font-size:14px;font-weight:400">โค้ดเข้าห้อง <span class="joinkey" style="font-size:15px">' + G.esc(r.join_key) + '</span></span></h2>'
       + '<div class="muted small">นักเรียน ' + stu.length + ' คน · เกมที่เปิดใช้ ' + allGames.length + ' เกม</div>'
+      /* [V.1.6.9] แถบ 'อัปเดตผลจากเกม' — ครูสั่งจากที่นี่ได้ ไม่ต้องเข้าเกมเอง
+         ตัวโมดูลคือ GameRefresh ด้านบน · เกมต้องเป็นรุ่นที่มีบล็อก R22-P2 ขึ้นไป */
+      + '<div class="card" id="gr-bar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0">'
+      +   '<div style="flex:1;min-width:220px"><b>ผลจากเกม</b>'
+      +     '<div class="muted small" id="gr-msg">กดปุ่มเพื่อให้เกมคำนวณผลล่าสุดแล้วส่งขึ้นระบบ — ไม่ต้องเปิดเกมเอง</div></div>'
+      +   '<button class="btn btn-sm btn-primary" id="gr-go">🔄 อัปเดตผลจากเกม</button>'
+      + '</div>'
       + pickerBar(cid)
       + tabs();
 
@@ -1761,17 +1881,23 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       html += '<h2 class="section-title">ผลสัมฤทธิ์รายคน <span class="sub">แตะชื่อเพื่อดูรายละเอียด</span></h2>'
         + '<div class="card table-scroll"><table class="gol"><thead><tr><th scope="col">เลขที่</th><th scope="col">ชื่อ</th>'
         + games.map((g) => '<th scope="col">' + G.esc(g.name) + '</th>').join('')
-        + '<th scope="col" class="num">คะแนนรวม</th></tr></thead><tbody>';
+        /* ⭐ V.1.6.5 (Audit F3) — คอลัมน์ "คะแนนรวม" ที่บวกคะแนนดิบข้ามเกมถูกถอดออก
+           เหตุผล: คะแนนแต่ละเกมมาจากเครื่องมือวัดคนละชุด (เพดานคนละเลข เกณฑ์คนละแบบ)
+           การบวกเป็นเลขเดียวขัดกติกาของเว็บกลางเอง "ห้ามเปรียบเทียบคะแนนดิบต่างเกม"
+           และของเดิมหนักกว่านั้น: แถวที่ยังไม่มีใบรายงานถูกเติมด้วย best_score ของความคืบหน้า
+           = เลขสองมาตรวัดปนอยู่ในผลบวกเดียวโดยไม่มีป้ายบอก
+           แทนที่ด้วย "สถานะผลจากเกม" (ส่งครบกี่เกม) ซึ่งตอบคำถามเดิมของครู
+           ("คนไหนตามไม่ทัน") โดยไม่สร้างเลขที่ไม่มีความหมาย · ภาค 2 ใช้หลักเดียวกันบนจอของเขา */
+        + '<th scope="col" class="num">ผลจากเกม</th></tr></thead><tbody>';
       stu.forEach((s) => {
         const prows = progOf(s.id);
         const dim = isOn(s) ? '' : ' style="opacity:.6"';
-        let total = 0;
+        let acCount = 0, waiting = 0;
         const cells = games.map((g) => {
           const p = prows.find((x) => x.game_id === g.id);
           const ac = achOf(s.id, g.id);
-          /* มีใบรายงานผลจากเกม → ใช้เลขของเกม (ตรงกับ Dashboard เกมเสมอ) · ไม่มีก็ใช้ความคืบหน้าไปพลาง */
-          if (ac && ac.score != null) total += Number(ac.score) || 0;
-          else if (p && p.best_score != null) total += Number(p.best_score) || 0;
+          if (ac) acCount += 1;
+          else if (p) waiting += 1;      /* เล่นแล้วแต่ใบรายงานยังไม่มา */
           if (ac) {
             /* แถบต้องเป็น "สัดส่วนคะแนน" เรื่องเดียวกับตัวเลขข้างบน — เดิมวาดความคืบหน้า
                (คนละเรื่องกัน) เลยดูเหมือนเลขกับแถบไม่ตรงกัน · ความคืบหน้าแยกไปอีกบรรทัดพร้อมป้าย */
@@ -1796,9 +1922,16 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           + '<td><a href="#/student/' + s.id + '">' + G.esc((s.first_name || '') + ' ' + (s.last_name || '')) + '</a>'
           + (s.character_name ? ' <span class="muted small">🎮 ' + G.esc(s.character_name) + '</span>' : '')
           + offTag(s) + '</td>'
-          + cells + '<td class="num"><b>' + G.fmt(total) + '</b></td></tr>';
+          + cells
+          + '<td class="num"><b>' + acCount + '</b><span class="muted small">/' + games.length + ' เกม</span>'
+          +   (waiting ? '<div class="muted small">รอผลอีก ' + waiting + '</div>' : '')
+          + '</td></tr>';
       });
-      html += '</tbody></table></div>';
+      html += '</tbody></table>'
+        + '<div class="form-hint">คะแนนของแต่ละเกมมาจาก<b>เครื่องมือวัดคนละชุด</b> '
+        + 'จึงแสดงแยกรายเกมและไม่นำมาบวกหรือเทียบข้ามเกม · '
+        + 'ดูผลละเอียดรายด้านของแต่ละคนได้จากชื่อนักเรียน</div>'
+        + '</div>';
 
       html += rosterSection(cid, stu);
     }
@@ -1815,6 +1948,48 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + 'ยังไม่เปิดเกมสักเกม = นักเรียนเลือกเล่นได้ทุกเกมที่เผยแพร่อยู่</div></div>';
 
     $('content').innerHTML = html;
+    /* [V.1.6.9] ผูกปุ่มอัปเดตผลจากเกม — ไล่ทีละเกมที่เปิดใช้ในห้องนี้ */
+    (function () {
+      const btn = $('gr-go'), msg = $('gr-msg');
+      if (!btn || !msg) return;
+      /* ยามอยู่ที่ตัวโมดูล ไม่ใช่ที่ปุ่ม — เพราะครูกดแท็บ/เปลี่ยนตัวกรองระหว่างรอได้
+         แล้วหน้าจะถูกวาดใหม่ ได้ปุ่มตัวใหม่ที่ยังกดได้ ⇒ สองรอบแย่ง iframe ตัวเดียวกัน */
+      if (GameRefresh._busy) { btn.disabled = true; msg.textContent = 'กำลังอัปเดตผลอยู่ — รอสักครู่นะครับ'; }
+      btn.onclick = async () => {
+        if (GameRefresh._busy) return;
+        const list = allGames.filter((g) => GameRefresh.urlOf(g));
+        if (!list.length) { msg.textContent = 'ห้องนี้ยังไม่ได้เปิดเกมที่รองรับการอัปเดตจากเว็บกลาง'; return; }
+        GameRefresh._busy = true;
+        btn.disabled = true;
+        const done = [];
+        try {
+          for (const g of list) {
+            msg.textContent = 'กำลังให้ ' + g.name + ' คำนวณผลของห้องนี้… (อาจใช้เวลาสักครู่)';
+            done.push({ g: g.name, r: await GameRefresh.room(g, cid) });
+          }
+        } finally {
+          GameRefresh.cleanup();
+          GameRefresh._busy = false;
+          btn.disabled = false;
+        }
+        /* ขึ้นจอได้เฉพาะ reason ที่เราเขียนเอง — detail ห้ามขึ้นจอ (กฎกลาง) */
+        const sayWhy = (w) => w === 'no-listener'
+            ? 'รุ่นบนเว็บยังไม่รองรับคำสั่งนี้ (ภาค 2 ต้องตั้งแต่ V.8.67)'
+          : w === 'no-session' ? 'เกมยังไม่รู้จักบัญชีครู — เปิดเกมแล้วเข้าสู่ระบบครูหนึ่งครั้ง'
+          : w === 'no-students' ? 'ห้องนี้ยังไม่มีนักเรียนที่เล่นเกมนี้'
+          : w === 'room-not-mine' ? 'เกมไม่พบห้องนี้ในบัญชีครู'
+          : w === 'demo' ? 'เกมอยู่ในโหมดตัวอย่าง จึงไม่ส่งผลจริง'
+          : w === 'timeout' ? 'เกมทำงานนานเกินไป — ลองใหม่อีกครั้ง'
+          : 'อัปเดตไม่สำเร็จ';
+        /* รายงานให้ครบทุกเกม — เดิมถ้ามีเกมใดสำเร็จ เกมที่ล้มจะหายไปเงียบ ๆ */
+        const okList = done.filter((d) => d.r.ok);
+        const bad = done.filter((d) => !d.r.ok);
+        const parts = okList.map((d) => '✅ ' + d.g + ' (' + d.r.students + ' คน)')
+          .concat(bad.map((d) => '⚠️ ' + d.g + ': ' + sayWhy(d.r.why)));
+        msg.textContent = parts.join(' · ') + (okList.length ? ' — กำลังโหลดตัวเลขใหม่…' : '');
+        if (okList.length) setTimeout(async () => { await loadAll(); renderRoom(cid); }, 2000);
+      };
+    })();
     const g2 = $('as-go'); if (g2) g2.onclick = () => addStudents(cid);
     bindPickers(() => renderRoom(cid));
     bindRoster(cid);

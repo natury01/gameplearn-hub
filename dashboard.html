@@ -227,7 +227,13 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
       + '<div class="stat"><b>' + (s.n_games || 0) + '</b><span>เกมที่มีผล</span></div>'
       + '</div>';
 
-    if (!nAch) {
+    /* [V.1.6.8] เดิมเช็คแค่จำนวนใบผลสัมฤทธิ์ — ห้องที่ครูเพิ่งเริ่มใช้จะมีแต่ใบสมรรถนะ
+       ทำให้ขึ้น 'ยังไม่มีผลในกลุ่มที่เลือก' แล้ว return ทิ้งกราฟสมรรถนะที่ฐานส่งมาแล้ว
+       ⇒ จะบอกว่าไม่มีผล ต่อเมื่อไม่มีทั้งใบผลสัมฤทธิ์และไม่มีสมรรถนะด้านใดที่มีค่า */
+    const hasComp = (comps || []).some(function (c) {
+      return c && c.avg_score !== null && c.avg_score !== undefined;
+    });
+    if (!nAch && !hasComp) {
       html += '<div class="card"><b>ยังไม่มีผลในกลุ่มที่เลือก</b>'
         + '<div class="muted small" style="margin-top:6px">ลองเลือก “ทุกโรงเรียน” หรือ “ทุกชั้น” '
         + 'หรือรอให้ครูเปิดหน้าห้องเรียนของเกมสักครั้ง เพื่อให้เกมส่งผลขึ้นมา</div></div>';
@@ -238,6 +244,16 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
     const btn = '<button class="btn btn-sm" id="tg-table">' + (S.table ? '📊 ดูเป็นกราฟ' : '📋 ดูเป็นตาราง') + '</button>';
 
     /* ---- 1. การกระจายผลสัมฤทธิ์ ---- */
+    /* [V.1.6.8] ถ้ากลุ่มนี้ยังไม่มีใบผลสัมฤทธิ์เลย ให้บอกเป็นข้อความพร้อมวิธีแก้
+       ห้ามวาดกราฟเปล่า (แท่งศูนย์ทุกช่วง) — อ่านแล้วเข้าใจผิดว่า "เด็กทำได้ 0"
+       ส่วนสมรรถนะด้านล่างยังวาดตามปกติ เพราะมีข้อมูลจริงส่งมาแล้ว */
+    if (!nAch) {
+      html += '<section class="card"><h2 class="section-title" style="margin-top:0">ผลสัมฤทธิ์</h2>'
+        + '<div><b>ยังไม่มีใบผลสัมฤทธิ์ในกลุ่มที่เลือก</b></div>'
+        + '<div class="muted small" style="margin-top:6px">ผลสมรรถนะด้านล่างมีข้อมูลแล้ว — '
+        + 'ส่วนใบผลสัมฤทธิ์จะขึ้นเมื่อครูเปิด “ห้องเรียนของครู” ในตัวเกมสักครั้ง '
+        + 'หรือลองเลือก “ทุกโรงเรียน” / “ทุกชั้น” เพื่อดูขอบเขตที่กว้างขึ้น</div></section>';
+    } else {
     const dist = (ach.dist || []).map((d) => ({ label: d.label, v: Number(d.n || 0) }));
     const distMax = Math.max(1, ...dist.map((d) => d.v));
     html += '<section class="card"><h2 class="section-title" style="margin-top:0">ผลสัมฤทธิ์ — กระจายตามช่วงคะแนน</h2>'
@@ -247,6 +263,7 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
           ? table(dist, [['ช่วงคะแนน', (r) => r.label], ['จำนวน (ใบ)', (r) => r.v]])
           : bars(dist, { max: distMax, unit: ' ใบ', labelWidth: 250, alt: 'การกระจายผลสัมฤทธิ์ตามช่วงคะแนน' }))
       + '</div><div style="margin-top:10px">' + btn + '</div></section>';
+    }   /* [V.1.6.8] ปิด else ของ if (!nAch) */
 
     /* ---- 2. คะแนนเก็บ / คะแนนสอบ (จาก unit_scores ที่เกมส่งมา) ---- */
     if (units.length) {

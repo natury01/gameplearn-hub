@@ -5,9 +5,37 @@ import { chromium } from 'playwright';
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import * as F from './fixtures.mjs';
 
-const ROOT = process.env.HUB_ROOT || '/home/claude/hub';
+/* V.1.6.6 (บันทึก Code 19 ส.ค. ข้อ 2) — เลิกผูก path เครื่องแชต
+   หาโฟลเดอร์เว็บเองตามลำดับ: ① env HUB_ROOT (ชี้เองได้เสมอ)
+   ② โฟลเดอร์แม่ของ test/ (โครงในซิป: GAMEPLEARN_HUB/test → GAMEPLEARN_HUB/)
+   ③ ../hub ข้างโฟลเดอร์เทสต์ (โครงบนเครื่องพัฒนา: hub-test/ อยู่ข้าง hub/)
+   เช็กด้วยไฟล์จริง (index.html + js/config.js) ไม่ใช่เดาจากชื่อ — หาไม่เจอ = หยุดดัง ๆ
+   บอกทุกที่ที่ลองแล้ว ไม่เงียบแล้วไปเทสต์โฟลเดอร์ผิด (อันตรายกว่าเทสต์ไม่รัน) */
+const _here = path.dirname(fileURLToPath(import.meta.url));
+function _findRoot() {
+  const tried = [];
+  for (const c of [process.env.HUB_ROOT, path.resolve(_here, '..'), path.resolve(_here, '..', 'hub')]) {
+    if (!c) continue;
+    tried.push(c);
+    if (fs.existsSync(path.join(c, 'index.html')) && fs.existsSync(path.join(c, 'js', 'config.js'))) return c;
+  }
+  console.error('❌ หาโฟลเดอร์เว็บกลางไม่เจอ (ต้องมี index.html + js/config.js) — ลองแล้ว:');
+  tried.forEach((t) => console.error('   · ' + t));
+  console.error('   ตั้ง HUB_ROOT ให้ชี้โฟลเดอร์ที่แตกจากซิป GAMEPLEARN_HUB แล้วรันใหม่');
+  process.exit(1);
+}
+export const ROOT = _findRoot();
+
+/* เบราว์เซอร์: ① env GP_CHROMIUM ชี้เอง ② path ในเครื่องแชต (ถ้ายังมี — เร็วสุด)
+   ③ ปล่อยให้ playwright หาเอง (เครื่องครู: npx playwright install chromium ครั้งเดียว) */
+export function launchOpts() {
+  if (process.env.GP_CHROMIUM) return { executablePath: process.env.GP_CHROMIUM };
+  const local = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  return fs.existsSync(local) ? { executablePath: local } : {};
+}
 const SB = 'https://janoonnhzpwjnxqjvswt.supabase.co';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png',
@@ -200,7 +228,12 @@ export function reporter() {
     console.log((cond ? '  ✅ ' : '  ❌ ') + label
       + (!cond && extra !== undefined ? '\n       → ' + JSON.stringify(extra).slice(0, 400) : ''));
   };
-  ok.done = () => { console.log(`\n${bad ? '❌' : '✅'} ผ่าน ${n - bad}/${n} ข้อ`); return bad; };
+  /* [V.1.6.7] STD-006 ข้อ 1 — ชุดที่รัน 0 ข้อ (ตายกลางทางก่อนถึงข้อแรก หรือเงื่อนไข
+     ครอบทั้งชุดไม่เข้า) ต้องเป็นแดง ไม่ใช่ "ผ่าน 0/0 ข้อ" ซึ่งอ่านแล้วเข้าใจว่าผ่าน */
+  ok.done = () => {
+    if (n === 0) { console.log('\n❌ ชุดนี้ไม่ได้ตรวจข้อใดเลย (0 ข้อ) — นับเป็นแดงตาม STD-006 ข้อ 1'); return 1; }
+    console.log(`\n${bad ? '❌' : '✅'} ผ่าน ${n - bad}/${n} ข้อ`); return bad;
+  };
   return ok;
 }
 

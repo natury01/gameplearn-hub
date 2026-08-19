@@ -712,7 +712,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     await loadFrameworkItems();
     games = await G.get('/rest/v1/games?select=id,code,name,name_en,description,subject_note,status,'
       + 'is_featured,sort_order,launch_url,cover_url,topic,genre,minimum_grade,maximum_grade,'
-      + 'play_minutes,tags&order=sort_order,name')
+      + 'play_minutes,tags,current_version&order=sort_order,name')
       .catch(async function () {
         /* ยังไม่ได้รัน 14/37 → คอลัมน์ยังไม่ครบ ใช้เท่าที่มี */
         const rows = await G.get('/rest/v1/games?select=id,code,name,description,status,launch_url&order=name');
@@ -1071,6 +1071,17 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             +       '<label class="f" style="margin-top:0;font-weight:600;color:var(--ink)">ชื่อเรื่อง / หัวข้อการเรียนรู้</label>'
             +       '<div class="form-hint" style="margin:0 0 8px">แสดงบนการ์ดในแคตตาล็อก เช่น "ประวัติศาสตร์และภูมิศาสตร์กาญจนบุรี"</div>'
             +       '<input type="text" data-game="' + g.id + '" data-field="topic" aria-label="ชื่อเรื่อง / หัวข้อการเรียนรู้ — ' + G.esc(g.name) + '" value="' + G.esc(g.topic || '') + '">'
+
+            /* ⭐ V.1.6.5 (Audit + STD-002 ข้อ 5⑤) — ช่องรุ่นที่ขึ้นเว็บอยู่จริง
+               เดิมค่านี้แก้ได้ด้วย SQL เท่านั้น จึงไม่มีใครแก้ และค้างที่รุ่นเก่ามาก ("7.45")
+               ทั้งที่เป็นค่าที่ทะเบียนกลางใช้บอกว่า "ตอนนี้เว็บเสิร์ฟรุ่นไหน" */
+            +       '<label class="f" style="font-weight:600;color:var(--ink)">รุ่นที่ขึ้นเว็บอยู่จริง (current_version)</label>'
+            +       '<div class="form-hint" style="margin:0 0 8px">'
+            +         'พิมพ์เลขรุ่น<b>เต็มตามป้ายท้ายจอของเกม</b>หลังอัปรุ่นและ purge cache แล้ว '
+            +         '(พิธีออกรุ่นขั้น 4 — ดู README_DEPLOY) · ภาค 2 ต้องมีป้าย <code>-p2-</code> ครบ'
+            +       '</div>'
+            +       '<input type="text" data-game="' + g.id + '" data-field="current_version" aria-label="รุ่นที่ขึ้นเว็บอยู่จริง — ' + G.esc(g.name) + '"'
+            +         ' value="' + G.esc(g.current_version || '') + '" placeholder="เช่น V.7.99.37-IX2050-2569.71">'
             +       (g.cover_url
                       ? '<div style="margin-top:12px"><img src="' + G.esc(g.cover_url) + '" alt=""'
                         + ' style="width:100%;max-width:260px;border-radius:12px;border:1px solid var(--border)"></div>'
@@ -1108,7 +1119,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       el.value = val.join(', ');
     }
     else if (field === 'cover_url' || field === 'topic' || field === 'description'
-             || field === 'name_en' || field === 'subject_note' || field === 'genre') {
+             || field === 'name_en' || field === 'subject_note' || field === 'genre'
+             || field === 'current_version') {
       val = el.value.trim() || null;
     }
     else if (field === 'name') {

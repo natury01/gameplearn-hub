@@ -1,6 +1,13 @@
 /* เกมเพลิน (GamePlearn) — ค่ากลางของแพลตฟอร์ม (แก้ไฟล์นี้ไฟล์เดียวเมื่อย้ายโปรเจกต์/โดเมน)
  * กฎเหล็ก: anon key เท่านั้น (เปิดเผยได้ — สิทธิ์จริงคุมด้วย RLS/RPC ฝั่ง Supabase)
- * อ้างอิง: 00_PLATFORM_AGREEMENT.md v1.1 */
+ * อ้างอิง: 00_PLATFORM_AGREEMENT.md v1.1
+ *
+ * ⚠️ ทะเบียนคีย์ localStorage ที่จองไว้ให้แพลตฟอร์ม/เว็บกลาง — เกมใดห้ามใช้ชื่อซ้ำ:
+ *    gp_hub_sess · gp_brand_cache · gp_theme · gp_announce_off · gp_room_claims
+ *    gp_join_handoff  ← เลิกใช้แล้ว (ADR-001 ถอด gp-join.js ใน V.1.6.5) **แต่ชื่อยังจองถาวร**
+ *                        เครื่องในโรงเรียนอาจมีค่าเก่าค้าง — คีย์ที่เคยจองแล้วไม่ปล่อยคืน
+ *    (ทะเบียนนี้เคยอยู่หัวไฟล์ gp-join.js — ย้ายมาที่นี่ตอนถอดไฟล์นั้น
+ *     เพราะไฟล์ค่ากลางคือไฟล์เดียวที่ทุกหน้าโหลดและทุกเกมถูกชี้ให้มาอ่าน) */
 window.GP_CONFIG = {
   SB_URL: 'https://janoonnhzpwjnxqjvswt.supabase.co',
   SB_ANON: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imphbm9vbm5oenB3am54cWp2c3d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMzUxODIsImV4cCI6MjEwMDgxMTE4Mn0.bimXWE_w_RRwOY9KbmLGqkpBlaI57WV34CXdLtbe4Vs',
@@ -13,8 +20,8 @@ window.GP_CONFIG = {
      ทำไมต้องมี: เวลาครูแจ้งปัญหา จะได้รู้ทันทีว่ากำลังเปิดรุ่นไหนอยู่
      ไม่ต้องเดาว่าอัปโหลดชุดใหม่แล้วหรือยัง — ปัญหาที่เสียเวลาไล่มาหลายรอบแล้ว
      เลข 2569.0811 = ปี พ.ศ. + วันที่ build (รูปแบบเดียวกับป้ายรุ่นของเกมทั้งสองภาค) */
-  HUB_VERSION: 'V.1.6.4',
-  HUB_BUILD: '2569.0812',
+  HUB_VERSION: 'V.1.6.9',
+  HUB_BUILD: '2569.0819c',
 
   /* อีเมลผู้ดูแล — ใช้เป็นช่องทางสำรองของหน้า contact.html
      (ตอนที่ยังไม่ได้รัน 15_SITE_PAGES.sql หรือระบบรับข้อความมีปัญหา) */

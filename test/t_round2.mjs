@@ -1,11 +1,11 @@
 /* ชุดทดสอบ 4 — งานข้อ 4 ของ handover
    4.1 ดูห้องสาธารณะของครูคนอื่น · 4.2 การ์ดห้องแบบหน้าเกม · 4.3 สร้างห้องก่อนล็อกอินแล้วผูกทีหลัง */
-import { chromium, serve, stub, login, reporter, realErrors } from './harness.mjs';
+import { chromium, serve, stub, login, reporter, realErrors, launchOpts } from './harness.mjs';
 import * as F from './fixtures.mjs';
 
 const PORT = 8934, BASE = 'http://localhost:' + PORT;
 const srv = await serve(PORT);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch(launchOpts());
 const ok = reporter();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

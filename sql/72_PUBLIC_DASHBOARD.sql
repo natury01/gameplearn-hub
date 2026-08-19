@@ -23,10 +23,24 @@
 --    "ครูเห็นเฉพาะห้องตัวเอง" ต้องไม่ถูกแตะ · ต้องเห็นข้ามกันให้ทำเป็น RPC เฉพาะทาง
 --    ไฟล์นี้จึงเป็น `security definer` แบบเดียวกับไฟล์ `59` (ห้องสาธารณะของครูคนอื่น)
 --
--- 📌 **ครูตัดสินใจไว้ว่า "แสดงทุกห้อง ไม่ต้องซ่อนห้องที่เด็กน้อย"**
---    ⇒ ไฟล์นี้ไม่มีเพดานจำนวนขั้นต่ำ · ถ้าวันหนึ่งเปลี่ยนใจ ให้เพิ่มเงื่อนไข
---    `having count(distinct …) >= N` ที่ query ของ rpc_pub_breakdown จุดเดียว
---    (จดไว้ตรงนี้เพื่อให้คนที่มาทีหลังรู้ว่าไม่ได้ลืม แต่เป็นการตัดสินใจ)
+-- 📌 **เพดานจำนวนนักเรียนขั้นต่ำ = 5 คน** (ครูเคาะใหม่ 19 ส.ค. 2569)
+--    ⚠️ กลับมติเดิม: ก่อนหน้านี้ไฟล์นี้เคยบันทึกว่า "แสดงทุกห้อง ไม่ต้องซ่อนห้องที่เด็กน้อย"
+--       ครูกลับคำเมื่อ 19 ส.ค. 2569 พร้อมกับการเปิดให้ "ดูคะแนนรายห้องได้โดยไม่ต้องล็อกอิน"
+--       เหตุผล: พอเจาะลงถึงระดับห้อง ห้องที่มีเด็ก 1-3 คน **ค่าเฉลี่ยห้อง = คะแนนรายคน**
+--       ⇒ ระบุตัวเด็กได้ทันทีทั้งที่ไม่มีชื่อสักตัวอยู่ในผลลัพธ์
+--
+--    วิธีที่ใช้: **คงแถวไว้ แต่ปิดค่าเฉลี่ย** ไม่ใช่ซ่อนทั้งแถว
+--      · ครูยังเห็นว่าห้องมีอยู่และมีเด็กกี่คน — ห้องไม่หายเงียบ ๆ ให้ไล่หาสาเหตุ
+--      · จำนวนคนไม่ใช่คะแนน จึงไม่ทำให้ระบุตัวเด็กได้
+--      · ถ้าซ่อนทั้งแถว ผลลัพธ์จะกลายเป็นอาเรย์ว่าง แล้วข้อสอบความเป็นส่วนตัวที่ตรวจ
+--        ด้วยการ grep หาชื่อเด็ก จะ "ผ่านแบบว่างเปล่า" ทั้งที่ไม่ได้ทดสอบอะไรเลย
+--
+--    นับหัวอย่างไร: **นับรวมทั้งใบผลสัมฤทธิ์และใบสมรรถนะ** (keyed ∪ dkeyed)
+--      ห้ามนับจาก keyed อย่างเดียว — ห้องที่มีแต่ใบสมรรถนะจะได้ 0 แล้วถูกปิดค่าเฉลี่ยทิ้ง
+--      ทั้งที่อาจมีเด็ก 40 คน (กับดักเดียวกับที่ V.1.6.8 เพิ่ง CTE `allkeys` มาแก้)
+--
+--    เพดานนี้ครอบเฉพาะ `rpc_pub_breakdown` (ค่าเฉลี่ยรายกลุ่ม) ตามถ้อยคำที่ครูเคาะ
+--    ไม่ครอบ `rpc_pub_summary` (ยอดรวมทั้งระบบ) ซึ่งรวมทุกคนอยู่แล้วจึงไม่ชี้ตัวใคร
 --
 -- 📌 **ไม่จัดอันดับโรงเรียน** ตามที่ครูตัดสิน — ฟังก์ชันคืนค่าของแต่ละกลุ่ม
 --    พร้อม "ค่าเฉลี่ยรวมทุกโรงเรียน" ไว้เทียบ · การเรียงลำดับเป็นเรื่องของหน้าเว็บ
@@ -310,7 +324,13 @@ as $fn$
            coalesce(min(ak.sub),   min(kd.dsub),   '')        as sub,
            count(distinct kk.student_id)                      as n_students,
            count(kk.student_id)                               as n_results,
-           round(avg(kk.percent)::numeric, 1)                 as avg_percent
+           round(avg(kk.percent)::numeric, 1)                 as avg_percent,
+           /* [19 ส.ค. 2569] จำนวนหัวจริงของกลุ่มนี้ = รวมทั้งเด็กที่มีใบผลสัมฤทธิ์
+              และเด็กที่มีแต่ใบสมรรถนะ · ใช้ตัดสินเพดาน 5 คนเท่านั้น ไม่ได้เอาไปแสดง */
+           (select count(*) from (
+              select kk2.student_id from keyed kk2 where kk2.k = ak.k
+              union
+              select dd2.student_id from dkeyed dd2 where dd2.k = ak.k) u)  as head_n
       from allkeys ak
       left join keyed kk on kk.k = ak.k
       left join lateral (
@@ -330,18 +350,27 @@ as $fn$
   select coalesce(jsonb_agg(jsonb_build_object(
            'key', a.k, 'label', a.label, 'sub', nullif(a.sub, ''),
            'n_students', a.n_students, 'n_results', a.n_results,
-           'avg_percent', a.avg_percent,
+           /* [19 ส.ค. 2569] เพดาน 5 คน — ต่ำกว่านี้คืน null ไม่ใช่ 0
+              (0 แปลว่า "วัดแล้วได้ศูนย์" ซึ่งไม่จริง · null แปลว่า "ยังไม่แสดง") */
+           'min_students', 5,
+           'suppressed', (a.head_n < 5),
+           'suppressed_note', case when a.head_n < 5
+                then 'ยังไม่แสดงค่าเฉลี่ย — กลุ่มนี้มีนักเรียนน้อยกว่า 5 คน (ค่าเฉลี่ยจะเท่ากับคะแนนรายคน)'
+                else null end,
+           'avg_percent', case when a.head_n < 5 then null else a.avg_percent end,
            /* [V.1.6.8] ⚠️ comp_avg = ค่าเฉลี่ยข้ามด้าน ซึ่งแต่ละด้านคิดคนละสูตร:
               4 ด้าน (คิดขั้นสูง/สื่อสาร/พลเมือง/ธรรมชาติฯ) = 30% รวบยอด + 70% ย่อย
               แต่ จัดการตนเอง กับ รวมพลังทำงานเป็นทีม ไม่มีขารวบยอด จึงคิดจากย่อย 100%
               ⇒ ตัวเลขเดียวนี้เอาคนละมาตรวัดมาบวกกัน ห้ามใช้ตัดสินคุณภาพเด็ก
               คงคีย์เดิมไว้เพื่อไม่ให้ของที่อ่านอยู่พัง แต่เติมข้อมูลกำกับให้หน้าจอตัดสินใจได้ */
-           'comp_avg', (select round(avg(d.score)::numeric, 1) from dkeyed d where d.k = a.k),
+           'comp_avg', case when a.head_n < 5 then null else
+                        (select round(avg(d.score)::numeric, 1) from dkeyed d where d.k = a.k) end,
            'comp_dims_n', (select count(distinct d.comp_code) from dkeyed d where d.k = a.k),
            'comp_avg_note', 'เฉลี่ยข้ามด้านที่คิดคนละสูตร — ใช้ดูภาพรวมเท่านั้น ไม่ใช้ตัดสิน',
-           'comp_by_dim', (select coalesce(jsonb_object_agg(x.comp_code, x.s), '{}'::jsonb)
-                             from (select d.comp_code, round(avg(d.score)::numeric, 1) as s
-                                     from dkeyed d where d.k = a.k group by d.comp_code) x),
+           'comp_by_dim', case when a.head_n < 5 then '{}'::jsonb else
+                           (select coalesce(jsonb_object_agg(x.comp_code, x.s), '{}'::jsonb)
+                              from (select d.comp_code, round(avg(d.score)::numeric, 1) as s
+                                      from dkeyed d where d.k = a.k group by d.comp_code) x) end,
            'comp_students', (select count(distinct d.student_id) from dkeyed d where d.k = a.k))
          /* เรียงตามชื่อ ไม่ใช่ตามคะแนน — ครูตัดสินว่าไม่จัดอันดับโรงเรียน */
          order by a.label), '[]'::jsonb)

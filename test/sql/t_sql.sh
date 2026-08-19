@@ -838,8 +838,68 @@ n=$($Q -c "begin; $AS_ANON select (rpc_pub_breakdown('classroom')->0->>'label');
 ok "แถวรายห้องบอกชื่อห้อง" "$n" "ป.5/1"
 n=$($Q -c "begin; $AS_ANON select (rpc_pub_breakdown('classroom')->0->>'n_students'); rollback;")
 ok "นับจำนวนนักเรียนในห้องถูก" "$n" "3"
-n=$($Q -c "begin; $AS_ANON select (rpc_pub_breakdown('classroom')->0->>'comp_avg'); rollback;")
-ok "แถวย่อยมีค่าเฉลี่ยสมรรถนะด้วย ((82+60+44+70)/4 = 64.0)" "$n" "64.0"
+# ── เพดานนักเรียนขั้นต่ำ 5 คน (ครูเคาะ 19 ส.ค. 2569) ──
+#  ห้อง ป.5/1 ในฟิกซ์เจอร์มีเด็ก 3 คน = ต่ำกว่าเกณฑ์ ⇒ ต้องถูกปิดค่าเฉลี่ย
+#  แต่ต้อง "คงแถวไว้" ไม่ใช่ซ่อนทั้งแถว — ไม่งั้นผลลัพธ์กลายเป็นอาเรย์ว่าง
+#  แล้วข้อสอบความเป็นส่วนตัวที่ตรวจด้วยการ grep หาชื่อเด็ก จะผ่านแบบว่างเปล่า
+n=$($Q -c "begin; $AS_ANON select (rpc_pub_breakdown('classroom')->0->>'suppressed'); rollback;")
+ok "ห้อง 3 คน (ต่ำกว่าเกณฑ์ 5) → ติดธงปิดค่าเฉลี่ย" "$n" "true"
+n=$($Q -c "begin; $AS_ANON select coalesce((rpc_pub_breakdown('classroom')->0->>'comp_avg'),'NULL'); rollback;")
+ok "ห้องต่ำกว่าเกณฑ์ → ค่าเฉลี่ยสมรรถนะเป็น null (ไม่ใช่ 0 — 0 แปลว่าวัดแล้วได้ศูนย์)" "$n" "NULL"
+n=$($Q -c "begin; $AS_ANON select coalesce((rpc_pub_breakdown('classroom')->0->>'avg_percent'),'NULL'); rollback;")
+ok "ห้องต่ำกว่าเกณฑ์ → ค่าเฉลี่ยผลสัมฤทธิ์เป็น null ด้วย" "$n" "NULL"
+n=$($Q -c "begin; $AS_ANON select (rpc_pub_breakdown('classroom')->0->>'comp_by_dim'); rollback;")
+ok "ห้องต่ำกว่าเกณฑ์ → ไม่หลุดค่าเฉลี่ยรายด้านออกมาทางประตูหลัง" "$n" "{}"
+n=$($Q -c "begin; $AS_ANON select (rpc_pub_breakdown('classroom')->0->>'label'); rollback;")
+ok "⭐ แต่แถวยังอยู่ ครูยังเห็นว่าห้องนี้มีตัวตน (ไม่หายเงียบ ๆ)" "$n" "ป.5/1"
+n=$($Q -c "begin; $AS_ANON select (rpc_pub_breakdown('classroom')->0->>'n_students'); rollback;")
+ok "และยังบอกจำนวนคนได้ (จำนวนคนไม่ใช่คะแนน จึงไม่ชี้ตัวใคร)" "$n" "3"
+n=$($Q -c "begin; $AS_ANON select (rpc_pub_breakdown('classroom')->0->>'min_students'); rollback;")
+ok "บอกเกณฑ์ที่ใช้มาด้วย เพื่อให้หน้าเว็บอธิบายครูได้ถูก" "$n" "5"
+
+#  ⭐ อีกทางหนึ่ง: ห้องที่คนถึงเกณฑ์ **ต้องคำนวณค่าเฉลี่ยได้ถูกต้องเหมือนเดิม**
+#  ถ้าไม่มีข้อนี้ เพดานจะกลายเป็น "ปิดทุกอย่างทิ้ง" แล้วยังเขียวอยู่ดี (ข้อสอบไม่มีเขี้ยว)
+#  สร้างห้อง 5 คนในธุรกรรมแล้ว rollback — ยอดรวมของฟิกซ์เจอร์เดิมไม่ขยับสักข้อ
+_BIG="begin;
+ insert into classrooms (id, teacher_id, school_id, name, grade, room_no, academic_year, join_key, listed, is_active)
+   values ('55555555-5555-4555-8555-00000000000a','22222222-2222-4222-8222-222222222222',
+           '33333333-3333-4333-8333-333333333331','ป.5/9','ป.5','9','2569','BIG555',true,true);
+ insert into students (classroom_id, first_name, last_name, is_active)
+   select '55555555-5555-4555-8555-00000000000a','เด็กใหญ่', n::text, true from generate_series(1,5) n;
+ insert into achievement_results (student_id, game_id, run_id, score, max_score, percent, unit_scores)
+   select s.id,'$GID','live', v.p, 100, v.p, '{}'::jsonb
+     from (select id, row_number() over (order by last_name) rn from students
+            where classroom_id='55555555-5555-4555-8555-00000000000a') s
+     join (values (1,50),(2,60),(3,70),(4,80),(5,90)) v(rn,p) on v.rn = s.rn;
+ insert into competency_dim_results (student_id, game_id, run_id, comp_code, score, level, evidence)
+   select s.id,'$GID','live','HOT', v.p, 4, 'scored'
+     from (select id, row_number() over (order by last_name) rn from students
+            where classroom_id='55555555-5555-4555-8555-00000000000a') s
+     join (values (1,60),(2,62),(3,64),(4,66),(5,68)) v(rn,p) on v.rn = s.rn;
+ $AS_ANON"
+n=$($Q -c "$_BIG select (x->>'suppressed') from jsonb_array_elements(rpc_pub_breakdown('classroom')) x where x->>'label'='ป.5/9'; rollback;")
+ok "⭐ ห้อง 5 คน (ถึงเกณฑ์พอดี) → ไม่ถูกปิด" "$n" "false"
+n=$($Q -c "$_BIG select (x->>'avg_percent') from jsonb_array_elements(rpc_pub_breakdown('classroom')) x where x->>'label'='ป.5/9'; rollback;")
+ok "⭐ และค่าเฉลี่ยผลสัมฤทธิ์ยังคำนวณถูก ((50+60+70+80+90)/5 = 70.0)" "$n" "70.0"
+n=$($Q -c "$_BIG select (x->>'comp_avg') from jsonb_array_elements(rpc_pub_breakdown('classroom')) x where x->>'label'='ป.5/9'; rollback;")
+ok "⭐ ค่าเฉลี่ยสมรรถนะก็ยังคำนวณถูก ((60+62+64+66+68)/5 = 64.0)" "$n" "64.0"
+
+#  กับดักที่ต้องกันไว้: ถ้าไปนับหัวจาก "ใบผลสัมฤทธิ์" อย่างเดียว ห้องที่มีแต่ใบสมรรถนะ
+#  จะได้ 0 แล้วถูกปิดทิ้งทั้งที่อาจมีเด็กทั้งห้อง (กับดักเดียวกับที่ V.1.6.8 เพิ่งแก้ด้วย allkeys)
+_COMPONLY="begin;
+ insert into classrooms (id, teacher_id, school_id, name, grade, room_no, academic_year, join_key, listed, is_active)
+   values ('55555555-5555-4555-8555-00000000000b','22222222-2222-4222-8222-222222222222',
+           '33333333-3333-4333-8333-333333333331','ป.5/8','ป.5','8','2569','CMP555',true,true);
+ insert into students (classroom_id, first_name, last_name, is_active)
+   select '55555555-5555-4555-8555-00000000000b','เด็กสมรรถนะ', n::text, true from generate_series(1,6) n;
+ insert into competency_dim_results (student_id, game_id, run_id, comp_code, score, level, evidence)
+   select s.id,'$GID','live','HOT', 70, 5, 'scored' from students s
+    where s.classroom_id='55555555-5555-4555-8555-00000000000b';
+ $AS_ANON"
+n=$($Q -c "$_COMPONLY select (x->>'suppressed') from jsonb_array_elements(rpc_pub_breakdown('classroom')) x where x->>'label'='ป.5/8'; rollback;")
+ok "⭐ ห้องที่มีแต่ใบสมรรถนะ 6 คน → ต้องไม่ถูกปิด (นับหัวจากสองแหล่ง ไม่ใช่แหล่งเดียว)" "$n" "false"
+n=$($Q -c "$_COMPONLY select (x->>'comp_avg') from jsonb_array_elements(rpc_pub_breakdown('classroom')) x where x->>'label'='ป.5/8'; rollback;")
+ok "⭐ และยังคืนค่าเฉลี่ยสมรรถนะของห้องนั้นได้" "$n" "70.0"
 
 # ── ตัวกรองต้องคืนเฉพาะตัวเลือกที่มีผลจริง ──
 n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_filters()->'schools'); rollback;")
@@ -860,7 +920,7 @@ echo ""
 # ยามพื้น: ถ้าจำนวนข้อลดฮวบ แปลว่ามีหมวดหนึ่ง "ไม่ได้รัน" (เช่นไฟล์ SQL หาย แล้วกิ่งนั้นถูกข้าม)
 # ซึ่งจะไม่มีข้อตกให้เห็นเลย — เป็นรูปแบบ "ตายเงียบ" ที่ STD-006 ข้อ 1 ตั้งมาเพื่อกัน
 # ฐาน ณ V.1.6.7 = 184 ข้อ (ผ่าน ok/okc) · อีกราว 26 ข้อเป็น echo ตรงในหมวด 0 ไม่ถูกนับ
-FLOOR=180
+FLOOR=192
 if [ "$_nchk" -lt "$FLOOR" ]; then
   echo "❌ นับหัวได้แค่ $_nchk ข้อ (ฐานที่ควรได้ ≥ $FLOOR) — สงสัยมีหมวดที่ไม่ได้รัน"
   echo "   อ่านผลข้างบนว่าหมวดไหนหายไป · ถ้าตั้งใจตัดข้อออกจริง ให้ลด FLOOR พร้อมบันทึกเหตุผล"

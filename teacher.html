@@ -443,6 +443,64 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   /* [V.1.6.9] เปิดให้เรียกจาก console ได้ — ใช้ตรวจปัญหาหน้างานและใช้ในชุดทดสอบ
      (อ่านอย่างเดียวไม่ได้เพิ่มสิทธิ์ใด ๆ · ทุกยามอยู่ในตัวโมดูลเอง) */
   try { window.GameRefresh = GameRefresh; } catch (e) {}
+  /* ══ [V.1.6.10] ซิงก์อัตโนมัติ — ครูไม่ต้องกดปุ่มอีกต่อไป ═══════════════════
+     ครูสั่ง 19 ส.ค.: "ควรบันทึกข้อมูลระหว่างเว็บกลางกับเกมอัตโนมัติ"
+
+     ของที่ครูแก้บนเว็บกลาง (ชื่อ/เลขที่/ข้อมูลห้อง) ไม่ต้องซิงก์อยู่แล้ว
+     เพราะเขียนลงฐานเดียวกับที่เกมอ่าน · สิ่งที่ต้องซิงก์คือ 'คะแนนที่คิดแล้ว'
+     เพราะเกมเป็นเจ้าของการคิดคะแนน (กฎล็อกข้อ 3)
+
+     รู้ได้ยังไงว่าผลเก่า: เด็กเล่นล่าสุดเมื่อไร (last_played_at)
+     เทียบกับ เกมคิดผลล่าสุดเมื่อไร (computed_at)
+     เล่นทีหลัง = ตัวเลขบนเว็บกลางล้าหลังแล้ว ⇒ สั่งคำนวณ
+
+     ทำไมต้องมีเงื่อนไข ไม่สั่งรัวทุกครั้งที่เปิดหน้า:
+       การสั่งหนึ่งครั้งเปิด iframe + ไล่ยิงใบรายงานผลทีละคน กินเวลาหลายวินาที
+       และเขียนฐานจริง · เปิดหน้าเฉย ๆ แล้วสั่งทุกครั้ง = กวนฐานโดยเปล่าประโยชน์ */
+  const AutoSync = {
+    GAP_MS: 90 * 1000,        /* เผื่อนาฬิกาเครื่อง/เซิร์ฟเวอร์คลาดกัน — ต่างกันไม่ถึงนี้ถือว่าไม่เก่า */
+    COOLDOWN_MS: 3 * 60 * 1000,  /* ห้องเดิมสั่งซ้ำได้เร็วสุดทุก 3 นาที กันวนลูปถ้าเกมส่งไม่สำเร็จ */
+    _last: {},
+
+    /* ห้องนี้ผลเก่ากว่าการเล่นล่าสุดไหม — คืน true เมื่อควรสั่งคำนวณ */
+    stale(cid) {
+      try {
+        const sids = new Set((S.students || []).filter((s) => s.classroom_id === cid).map((s) => s.id));
+        if (!sids.size) return false;
+        const t = (v) => { const d = Date.parse(v || ''); return isNaN(d) ? 0 : d; };
+        const played = Math.max(0, ...(S.progress || [])
+          .filter((p) => sids.has(p.student_id)).map((p) => t(p.last_played_at)));
+        if (!played) return false;                 /* ยังไม่มีใครเล่น = ไม่มีอะไรให้ซิงก์ */
+        const computed = Math.max(0, ...(S.achieve || [])
+          .filter((a) => sids.has(a.student_id)).map((a) => t(a.computed_at)));
+        return played > computed + this.GAP_MS;
+      } catch (e) { return false; }
+    },
+
+    /* สั่งเงียบ ๆ เบื้องหลัง — ไม่ขวางการใช้งาน ไม่เด้งอะไรใส่ครู
+       สำเร็จแล้วค่อยโหลดตัวเลขใหม่และวาดหน้าใหม่ให้เอง */
+    async maybe(cid, onDone) {
+      if (GameRefresh._busy) return false;
+      const last = this._last[cid] || 0;
+      if (Date.now() - last < this.COOLDOWN_MS) return false;
+      if (!this.stale(cid)) return false;
+      const list = enabledGames(cid).filter((g) => GameRefresh.urlOf(g));
+      if (!list.length) return false;
+      this._last[cid] = Date.now();
+      GameRefresh._busy = true;
+      let okAny = false;
+      try {
+        for (const g of list) {
+          const r = await GameRefresh.room(g, cid);
+          if (r && r.ok) okAny = true;
+        }
+      } catch (e) { /* เงียบ — นี่คืองานเบื้องหลัง ห้ามทำให้หน้าจอครูพัง */ }
+      finally { GameRefresh.cleanup(); GameRefresh._busy = false; }
+      if (okAny && typeof onDone === 'function') { try { await onDone(); } catch (e) {} }
+      return okAny;
+    },
+  };
+  try { window.AutoSync = AutoSync; } catch (e) {}
   async function loadAll() {
     const uid = G.session().user_id;
 
@@ -1850,7 +1908,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
          ตัวโมดูลคือ GameRefresh ด้านบน · เกมต้องเป็นรุ่นที่มีบล็อก R22-P2 ขึ้นไป */
       + '<div class="card" id="gr-bar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0">'
       +   '<div style="flex:1;min-width:220px"><b>ผลจากเกม</b>'
-      +     '<div class="muted small" id="gr-msg">กดปุ่มเพื่อให้เกมคำนวณผลล่าสุดแล้วส่งขึ้นระบบ — ไม่ต้องเปิดเกมเอง</div></div>'
+      +     '<div class="muted small" id="gr-msg">ระบบอัปเดตผลจากเกมให้อัตโนมัติเมื่อมีการเล่นใหม่ — ปุ่มนี้ไว้สั่งเองเมื่ออยากบังคับ</div></div>'
       +   '<button class="btn btn-sm btn-primary" id="gr-go">🔄 อัปเดตผลจากเกม</button>'
       + '</div>'
       + pickerBar(cid)
@@ -1989,6 +2047,21 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         msg.textContent = parts.join(' · ') + (okList.length ? ' — กำลังโหลดตัวเลขใหม่…' : '');
         if (okList.length) setTimeout(async () => { await loadAll(); renderRoom(cid); }, 2000);
       };
+    })();
+    /* [V.1.6.10] ซิงก์อัตโนมัติ — ตรวจทุกครั้งที่เข้าหน้าห้อง แต่ลงมือเฉพาะตอนผลเก่าจริง
+       ไม่ await เพราะห้ามให้ครูรอ — ทำงานเบื้องหลังแล้วค่อยวาดใหม่เมื่อเสร็จ */
+    (function () {
+      const msg = $('gr-msg'), btn = $('gr-go');
+      if (!AutoSync.stale(cid)) return;
+      if (msg) msg.textContent = 'มีการเล่นใหม่หลังคิดผลครั้งล่าสุด — กำลังอัปเดตให้อัตโนมัติ…';
+      if (btn) btn.disabled = true;
+      AutoSync.maybe(cid, async () => { await loadAll(); renderRoom(cid); })
+        .then((ok) => {
+          if (ok) return;                       /* สำเร็จ = วาดใหม่ไปแล้ว ไม่ต้องทำอะไรต่อ */
+          const m2 = $('gr-msg'), b2 = $('gr-go');
+          if (b2) b2.disabled = false;
+          if (m2) m2.textContent = 'อัปเดตอัตโนมัติยังไม่สำเร็จ — กดปุ่มเพื่อลองอีกครั้ง';
+        });
     })();
     const g2 = $('as-go'); if (g2) g2.onclick = () => addStudents(cid);
     bindPickers(() => renderRoom(cid));

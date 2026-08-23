@@ -261,22 +261,33 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
     const dist = (ach.dist || []).map((d) => ({ label: d.label, v: Number(d.n || 0) }));
     const distMax = Math.max(1, ...dist.map((d) => d.v));
     html += '<section class="card"><h2 class="section-title" style="margin-top:0">ผลสัมฤทธิ์ — กระจายตามช่วงคะแนน</h2>'
-      + '<div class="muted small" style="margin-bottom:8px">นับเป็นจำนวน “ใบผลของนักเรียน” รวม ' + nAch + ' ใบ</div>'
+      /* [V.1.6.19 · ครูทัก] เดิมเขียนว่า "ใบ" ซึ่งเป็นศัพท์ของคนทำระบบ ครูอ่านแล้วไม่รู้ว่าคืออะไร
+         และตัวเลขดู "ไม่ตรง" กับจำนวนนักเรียนในห้อง เพราะสองอย่างนี้ไม่ใช่สิ่งเดียวกัน:
+           · เด็ก 1 คนเล่น 2 เกม = 2 รายการ ⇒ เรียก "คน" ก็ผิด
+           · เด็กที่เล่นแล้วแต่เกมยังไม่ได้ส่งผลขึ้นมา = ไม่มีรายการเลย ⇒ หายไปจากกราฟ
+         ⇒ บอกตรง ๆ ว่านับอะไร และบอกด้วยว่าคนที่หายไปแปลว่าอะไร ไม่ปล่อยให้ครูเดา */
+      + '<div class="muted small" style="margin-bottom:8px">นับเป็น <b>ผลของนักเรียน 1 คนต่อ 1 เกม</b> '
+      +   'รวม ' + nAch + ' รายการ<br>'
+      +   'ถ้าน้อยกว่าจำนวนนักเรียนในห้อง แปลว่าเกม<b>ยังไม่ได้ส่งผลของคนที่เหลือขึ้นมา</b> '
+      /* ⚠️ ห้ามใช้คำว่า "เด็ก" ตรงนี้ — ยามความเป็นส่วนตัวในชุดทดสอบห้ามคำชุดนี้
+         บนหน้าสาธารณะ เพื่อกันชื่อนักเรียนหลุด ใช้ "นักเรียน" ได้ความหมายเดียวกัน
+         (เลี่ยงคำ ไม่ใช่ผ่อนยาม — ยามนี้มีเหตุผลของมัน) */
+      +   '— ไม่ใช่ว่านักเรียนไม่ได้เล่น</div>'
       + '<div class="chartbox viz">'
       + (S.table
-          ? table(dist, [['ช่วงคะแนน', (r) => r.label], ['จำนวน (ใบ)', (r) => r.v]])
-          : bars(dist, { max: distMax, unit: ' ใบ', labelWidth: 250, alt: 'การกระจายผลสัมฤทธิ์ตามช่วงคะแนน' }))
+          ? table(dist, [['ช่วงคะแนน', (r) => r.label], ['จำนวน (รายการ)', (r) => r.v]])
+          : bars(dist, { max: distMax, unit: ' รายการ', labelWidth: 250, alt: 'การกระจายผลสัมฤทธิ์ตามช่วงคะแนน' }))
       + '</div><div style="margin-top:10px">' + btn + '</div></section>';
     }   /* [V.1.6.8] ปิด else ของ if (!nAch) */
 
     /* ---- 2. คะแนนเก็บ / คะแนนสอบ (จาก unit_scores ที่เกมส่งมา) ---- */
     if (units.length) {
-      const u = units.map((x) => ({ label: x.name, v: Number(x.avg), note: 'จาก ' + x.n + ' ใบ' }));
+      const u = units.map((x) => ({ label: x.name, v: Number(x.avg), note: 'จาก ' + x.n + ' รายการ' }));
       html += '<section class="card"><h2 class="section-title" style="margin-top:0">คะแนนเก็บ / คะแนนสอบ</h2>'
         + '<div class="muted small" style="margin-bottom:8px">ชื่อช่องมาจากเกมโดยตรง — เว็บกลางไม่ตั้งชื่อเองและไม่คิดคะแนนซ้ำ</div>'
         + '<div class="chartbox viz">'
         + (S.table
-            ? table(units, [['ช่อง', (r) => r.name], ['ค่าเฉลี่ย', (r) => r.avg], ['จำนวนใบ', (r) => r.n]])
+            ? table(units, [['ช่อง', (r) => r.name], ['ค่าเฉลี่ย', (r) => r.avg], ['จำนวนรายการ', (r) => r.n]])
             : bars(u, { max: Math.max(...u.map((x) => x.v)), labelWidth: 220, alt: 'ค่าเฉลี่ยคะแนนแต่ละช่องที่เกมส่งมา' }))
         + '</div></section>';
     }

@@ -178,30 +178,35 @@ export const frameworkItems = [
 /* ---- ข้อมูลผังมาตรฐานแบบที่ฐานจริงคืนมา (ใช้ตรวจหน้ามาตรฐาน + หน้า Admin) ----
    game_id / item_id / admin_edited เติมให้ตอนทำไฟล์ 71 — หน้า Admin ต้องใช้ทั้งสามช่อง
    หน้ามาตรฐานไม่ได้อ่านช่องพวกนี้ จึงไม่กระทบชุดเดิม */
+/* [V.1.6.18] เติม source ให้ตรงกับฐานจริง (มีมาตั้งแต่ไฟล์ 53 แต่ตัวอย่างเดิมไม่มี)
+   'game-sync' = เกมประกาศเองว่าวัดข้อนี้ · 'manual' = ผู้ดูแลกรอกไว้ในทะเบียน
+   แถวสุดท้ายตั้งเป็น manual โดยตั้งใจ — เลียนเคสจริงที่ครูเจอ:
+   กลุ่มสาระที่เกมไม่เคยอ้างว่าวัด โผล่บนการ์ด และตัวเกมลบเองไม่ได้
+   (rpc_publish_standards ลบเฉพาะ source='game-sync' — ไฟล์ 71 บรรทัด 356) */
 export const stdMaps = [
-  { game_id: G1, item_id: 'i1', admin_edited: false, note: 'ด่าน 1 · 3 · 8', evidence: 'คำตอบข้อ 4-7 ในด่านสะพานข้ามแม่น้ำแคว และผังสรุปเหตุการณ์ที่นักเรียนเรียงเอง',
+  { game_id: G1, item_id: 'i1', source: 'game-sync', admin_edited: false, note: 'ด่าน 1 · 3 · 8', evidence: 'คำตอบข้อ 4-7 ในด่านสะพานข้ามแม่น้ำแคว และผังสรุปเหตุการณ์ที่นักเรียนเรียงเอง',
     criteria: 'ตอบถูกตั้งแต่ 3 ใน 4 ข้อขึ้นไป = ผ่าน · เรียงลำดับเหตุการณ์ถูกครบ = ดีเยี่ยม',
     framework_items: { id: 'i1', code: 'ส 5.1 ป.4/1', name_th: 'สืบค้นและอธิบายลักษณะทางกายภาพของจังหวัดตนเอง',
       depth: 2, sort_order: 1, parent_id: null,
       assessment_frameworks: { code: 'core-2551-rev2560', kind: 'achievement',
         name_th: 'หลักสูตรแกนกลางการศึกษาขั้นพื้นฐาน พุทธศักราช 2551 (ฉบับปรับปรุง พ.ศ. 2560)', status: 'active' } } },
-  { game_id: G1, item_id: 'i2', admin_edited: false, note: 'ด่าน 10 ช่องเขาขาด', evidence: 'บันทึกการตัดสินใจของนักเรียนในสถานการณ์จำลอง 3 จุด',
+  { game_id: G1, item_id: 'i2', source: 'game-sync', admin_edited: false, note: 'ด่าน 10 ช่องเขาขาด', evidence: 'บันทึกการตัดสินใจของนักเรียนในสถานการณ์จำลอง 3 จุด',
     criteria: 'เลือกโดยอ้างหลักฐานในเกมได้อย่างน้อย 2 ใน 3 จุด = ผ่าน',
     framework_items: { id: 'i2', code: 'ส 4.2 ป.4/2', name_th: 'อธิบายเหตุการณ์สำคัญในประวัติศาสตร์ท้องถิ่นและผลที่เกิดขึ้น',
       depth: 2, sort_order: 2, parent_id: null,
       assessment_frameworks: { code: 'core-2551-rev2560', kind: 'achievement',
         name_th: 'หลักสูตรแกนกลางการศึกษาขั้นพื้นฐาน พุทธศักราช 2551 (ฉบับปรับปรุง พ.ศ. 2560)', status: 'active' } } },
-  { game_id: G1, item_id: 'c1', admin_edited: false, note: 'ทุกด่านที่มีคำถามปลายเปิด', evidence: 'คำตอบอัตนัยและร่องรอยการแก้ปัญหาที่เกมบันทึกไว้',
+  { game_id: G1, item_id: 'c1', source: 'game-sync', admin_edited: false, note: 'ทุกด่านที่มีคำถามปลายเปิด', evidence: 'คำตอบอัตนัยและร่องรอยการแก้ปัญหาที่เกมบันทึกไว้',
     criteria: 'คิดจากคะแนนรวม 100 → ≥80 ระดับ 6 · 65-79 ระดับ 5 · 50-64 ระดับ 4',
     framework_items: { id: 'c1', code: 'HOT', name_th: 'การคิดขั้นสูง', depth: 1, sort_order: 2, parent_id: null,
       assessment_frameworks: { code: 'cbe-core', kind: 'competency', name_th: 'กรอบสมรรถนะหลัก 6 ประการ', status: 'active' } } },
-  { game_id: G1, item_id: 'c1a', admin_edited: false, note: null, evidence: null, criteria: null,
+  { game_id: G1, item_id: 'c1a', source: 'game-sync', admin_edited: false, note: null, evidence: null, criteria: null,
     framework_items: { id: 'c1a', code: 'HT-CTC', name_th: 'การคิดอย่างมีวิจารณญาณ', depth: 2, sort_order: 1, parent_id: 'c1',
       assessment_frameworks: { code: 'cbe-core', kind: 'competency', name_th: 'กรอบสมรรถนะหลัก 6 ประการ', status: 'active' } } },
-  { game_id: G1, item_id: 'c1b', admin_edited: false, note: null, evidence: null, criteria: null,
+  { game_id: G1, item_id: 'c1b', source: 'game-sync', admin_edited: false, note: null, evidence: null, criteria: null,
     framework_items: { id: 'c1b', code: 'HT-PRB', name_th: 'การคิดแก้ปัญหา', depth: 2, sort_order: 2, parent_id: 'c1',
       assessment_frameworks: { code: 'cbe-core', kind: 'competency', name_th: 'กรอบสมรรถนะหลัก 6 ประการ', status: 'active' } } },
-  { game_id: G1, item_id: 'c2', admin_edited: false, note: 'ด่าน 14 กาญจนบุรี 2050', evidence: 'ผลการเลือกนโยบายเมืองและเหตุผลที่นักเรียนให้ไว้',
+  { game_id: G1, item_id: 'c2', source: 'manual', admin_edited: false, note: 'ด่าน 14 กาญจนบุรี 2050', evidence: 'ผลการเลือกนโยบายเมืองและเหตุผลที่นักเรียนให้ไว้',
     criteria: 'รักษาสมดุลทั้ง 3 ด้านไม่ต่ำกว่าเกณฑ์ = ผ่าน',
     framework_items: { id: 'c2', code: 'SN', name_th: 'การอยู่ร่วมกับธรรมชาติและวิทยาการอย่างยั่งยืน',
       depth: 1, sort_order: 6, parent_id: null,
@@ -237,4 +242,24 @@ export const pubSummary = {
 export const pubBreakdown = [
   { key: 'a', label: 'โรงเรียนบ้านกาญจน์', sub: null, n_students: 8, n_results: 9, avg_percent: 66.1, comp_avg: 64.0, comp_students: 8 },
   { key: 'b', label: 'โรงเรียนวัดใหม่', sub: null, n_students: 4, n_results: 5, avg_percent: 60.9, comp_avg: 61.2, comp_students: 4 },
+];
+
+/* [V.1.6.18] สถิติการเข้าถึงเกม — รูปแบบเดียวกับที่วิวจริงคืนมาหลังรันไฟล์ 83
+   เกม ก อัปรุ่นที่ส่งสถิติแล้ว (มีช่อง open_*) · เกม ข ยังไม่อัป (ไม่มีคีย์เลย)
+   ⇒ ใช้ตรวจว่าหน้าจอขึ้น – ให้เกมที่ยังไม่อัป ไม่ใช่ขึ้น 0 ซึ่งคนละความหมาย */
+export const gameActivity = [
+  { game_code: 'g-alpha', game_name: 'กาญจนบุรี 2050', status: 'published',
+    click_all: 40, click_7d: 9, click_30d: 25, click_mobile: 22, click_pc: 18,
+    open_all: 31, open_7d: 7, open_30d: 20,
+    open_hub: 18, open_qr: 9, open_direct: 4, open_unknown: 0, open_visitors: 25,
+    play_all: 12, players_all: 5 },
+  { game_code: 'g-beta', game_name: 'กาญจนบุรี 2050 ภาค 2', status: 'published',
+    click_all: 6, click_7d: 2, click_30d: 4, click_mobile: 4, click_pc: 2,
+    play_all: 3, players_all: 2 },
+];
+
+export const visitDaily = [
+  { day: '2026-08-23', page: 'home', game_code: null, device: 'pc', source: 'hub', views: 12, visitors: 8 },
+  { day: '2026-08-23', page: 'dashboard', game_code: null, device: 'mobile', source: 'hub', views: 5, visitors: 4 },
+  { day: '2026-08-23', page: 'gameopen', game_code: 'g-alpha', device: 'mobile', source: 'qr', views: 9, visitors: 7 },
 ];

@@ -97,6 +97,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 <script src="js/config.js"></script>
 <script src="js/gp-core.js"></script>
 <script src="js/gp-brand.js"></script>
+<script src="js/gp-tour.js"></script>
 <script src="js/gp-standards-panel.js"></script>
 <script>
 (function () {
@@ -682,7 +683,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     return '<div class="tabs" role="tablist">'
       + '<button class="tab" role="tab" data-tab="ach"  aria-selected="' + (TAB === 'ach') + '">ผลสัมฤทธิ์</button>'
       + '<button class="tab" role="tab" data-tab="comp" aria-selected="' + (TAB === 'comp') + '">สมรรถนะหลัก</button>'
-      + '<button class="tab" role="tab" data-tab="hots" aria-selected="' + (TAB === 'hots') + '">การคิดขั้นสูง (รายเกม)</button>'
+      /* [V.1.6.19 · ครูสั่ง] ตัดแท็บ "การคิดขั้นสูง (รายเกม)" ออก
+         การคิดขั้นสูงเป็น 1 ใน 6 ด้านของกรอบสมรรถนะ มีแท็บของตัวเองแยกออกมา
+         เป็นซากจากยุคที่เกมวัดได้ด้านเดียว ตอนนี้เป็นการแสดงของซ้ำสองที่
+         และทำให้ครูเข้าใจผิดว่าเป็นคนละเรื่องกับสมรรถนะ
+         รายละเอียด A/B/C/D ของด้านนี้ยังดูได้ที่หน้ารายคน */
       + '</div>';
   }
 
@@ -764,27 +769,42 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     /* ค่าเฉลี่ยของห้องไม่รวมคนที่ปิดการใช้งาน — ไม่งั้นเลขบนเว็บกลางจะไม่ตรงกับหน้าครูของเกม */
     const prog = S.progress.filter((p) => !off.has(p.student_id) && stuIds.has(p.student_id) && rowGameOk(p));
     const avgProg = prog.length ? prog.reduce((a, p) => a + (Number(p.progress_percent) || 0), 0) / prog.length : null;
-    const totalAttempts = S.summary.filter((r) => inRoom(r) && rowGameOk(r))
-      .reduce((a, r) => a + (Number(r.total_attempts) || 0), 0);
     const offHere = myStu.filter((x) => x.is_active === false).length;
+
+    /* ── [V.1.6.18 · ครูสั่ง] ตัวเลขเชิงการเรียนรู้แทนตัวเลขเชิงระบบ ──
+       ใช้ข้อมูลที่โหลดมาแล้วทั้งคู่ ไม่ยิงฐานเพิ่มแม้แต่คำขอเดียว */
+
+    /* (ก) ประเมินไปถึงไหนแล้ว — นับ "คน" ไม่ใช่ "ใบ"
+       เด็กคนเดียวเล่นสองเกมมีสองใบ ถ้านับใบจะดูเหมือนประเมินไปแล้วเกินจำนวนเด็ก */
+    const assessedIds = new Set(achRows(cid).map((r) => r.student_id));
+    const assessedN = myStu.filter((x) => isOn(x) && assessedIds.has(x.id)).length;
+
+    /* (ข) สมรรถนะสรุประดับได้กี่ด้าน — นับเฉพาะด้านที่มี "ระดับ" จริง
+       แถวที่เกมส่งมาแต่ยังสรุปไม่ได้ (level = null) ไม่นับ — ตรงกับสถานะสามชั้นใน V.1.6.17
+       ไม่นับใบประเมินตนเอง เพราะเป็นหลักฐานประกอบ ไม่ใช่ฐานตัดสินระดับ (หลัก CBE) */
+    const dimRows = (S.compDims || []).filter((r) => inRoom(r) && !off.has(r.student_id)
+      && rowGameOk(r) && r.evidence !== 'self_report' && r.level != null);
+    const dimDone = new Set(dimRows.map((r) => r.comp_code)).size;
 
     let html = pickerBar(null) + '<div class="tiles">'
       + tile('ห้องเรียน', G.fmtInt(cid ? 1 : S.rooms.length))
       + tile('นักเรียน', G.fmtInt(stuOn), offHere ? '· ปิด ' + offHere : '')
       + tile('เกมที่ใช้งาน', G.fmtInt(activeGames))
       + tile('ความคืบหน้าเฉลี่ย', avgProg == null ? '–' : Math.round(avgProg), avgProg == null ? '' : '%')
-      + tile('รอบที่ส่งผล', G.fmtInt(totalAttempts))
-      /* "บันทึกการเล่นสะสม" นับจากตาราง events ซึ่งนับรวมทั้งบัญชี แยกรายห้อง/รายเกมไม่ได้
-         จึงแสดง – เมื่อกรอง แทนที่จะโชว์เลขรวมทั้งหมดข้างตัวเลขที่กรองแล้ว ซึ่งอ่านผิดแน่นอน */
-      + tile('บันทึกการเล่นสะสม',
-          (cid || GAME) ? '–' : (S.eventsCount == null ? '–' : G.fmtInt(S.eventsCount)))
+      /* [V.1.6.18] เดิมสองช่องนี้คือ "รอบที่ส่งผล" กับ "บันทึกการเล่นสะสม"
+         ทั้งคู่เป็นตัวเลขเชิงระบบ ไม่ได้บอกอะไรเรื่องการเรียนรู้ (ครูทักมาเอง)
+         · รอบที่ส่งผล — เด็กเล่นซ้ำ 5 รอบเลขขึ้น 5 ทั้งที่เรียนรู้เท่าเดิม
+         · บันทึกการเล่นสะสม — นับทั้งบัญชี แยกรายห้องไม่ได้ พอกรองห้องก็ขึ้น – อยู่ดี
+         ตัวเลขเดิมยังดูได้ที่หน้ารายคน (ช่อง "รอบที่ส่งผล" ในตารางความก้าวหน้า) */
+      + tile('ประเมินแล้ว', stuOn ? (G.fmtInt(assessedN) + '/' + G.fmtInt(stuOn)) : '–',
+             stuOn ? 'คน' : '')
+      + tile('สมรรถนะที่สรุปได้', dimRows.length ? (dimDone + '/' + COMP6.length) : '–',
+             dimRows.length ? 'ด้าน' : '')
       + '</div>';
 
     html += tabs();
 
-    if (TAB === 'hots') {
-      html += '<h2 class="sr-only">การคิดขั้นสูง รายเกม</h2>' + hotsSection(cid);
-    } else if (TAB === 'comp') {
+    if (TAB === 'comp') {
       html += comp6Section(cid) + comp6Table(cid) + compSection(cid);
     } else {
       html += pipeNote(achRows(cid).length > 0) + achSummaryCards(cid);
@@ -944,7 +964,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       });
       const selfScored = selfR.filter((r) => r.score != null);
       const byTeacher = scored.filter((r) => r.decided_by === 'teacher');
-      return { code, name, short, avg, n: scored.length,
+      /* [V.1.6.17] แยก "มีแถวแต่ยังสรุประดับไม่ได้" ออกจาก "ไม่มีแถวเลย"
+         เกมภาค 1 เริ่มส่งด้านที่หลักฐานยังไม่พอขึ้นมาด้วย (พร้อมป้ายบอกเหตุผล)
+         ถ้าไม่แยกนับ หน้านี้จะขึ้น "ประเมินเป็นระดับ" ให้แถวที่ยังไม่มีระดับ = โกหกครู */
+      const lvN = scored.filter((r) => r.level != null).length;
+      return { code, name, short, avg, n: scored.length, lvN,
         stat, prov, cmpN, notes: Object.keys(notes),
         teacher: byTeacher.length,
         sysAvg: (function () {
@@ -1046,7 +1070,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     }
     const bars = ds.map(function (d) {
       const meta = d.n ? ('จาก ' + d.games.length + ' เกม · ' + d.students + ' คน') : '';
-      const lvOnly = d.n && d.avg == null;
+      const lvOnly = d.n && d.avg == null && d.lvN > 0;
+      /* ยังเก็บหลักฐานอยู่: เกมส่งแถวมาแล้ว แต่ยังสรุประดับไม่ได้
+         ต้องต่างจาก "ยังไม่มีเกมวัดด้านนี้" ให้ชัด — คนละความหมายกันคนละเรื่อง */
+      const gathering = d.n && d.avg == null && !d.lvN;
       return '<div class="c6row">'
         + '<button type="button" class="c6head" data-c6="' + d.code + '" aria-expanded="false"' + (d.n ? '' : ' disabled') + '>'
         + '<span class="c6name">' + G.esc(d.name) + '</span>'
@@ -1055,6 +1082,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
               + '<span class="c6val">' + d.avg.toFixed(1) + '</span>'
             : '<span class="c6none">' + (lvOnly
                 ? 'ประเมินเป็นระดับ' + ((d.perGame[0] && d.perGame[0].label) ? ' — ' + G.esc(d.perGame[0].label) : '')
+                : gathering ? '⏳ กำลังเก็บหลักฐาน — ยังสรุประดับไม่ได้'
                 : 'ยังไม่มีเกมวัดด้านนี้') + '</span>')
         + '</button>'
         + (d.n ? '<div class="c6body hidden" data-c6body="' + d.code + '">'
@@ -1938,11 +1966,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + pickerBar(cid)
       + tabs();
 
-    if (TAB === 'hots') {
-      html += hotsSection(cid);
-      html += '<h2 class="section-title">การคิดขั้นสูงรายคน</h2>'
-        + '<div class="card table-scroll">' + hotsTable(cid) + '</div>';
-    } else if (TAB === 'comp') {
+    /* [V.1.6.19] แท็บการคิดขั้นสูงถูกตัดออกตามคำสั่งครู — ดูที่แท็บสมรรถนะแทน */
+    if (TAB === 'comp') {
       html += comp6Section(cid) + comp6Table(cid) + compSection(cid);
       html += '<h2 class="section-title">สมรรถนะรายคน</h2>'
         + '<div class="card table-scroll">' + compTable(cid) + '</div>';
@@ -2364,6 +2389,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const lvColor = (lv) => lv >= 6 ? '#047857' : lv >= 5 ? '#0d9488' : lv >= 4 ? '#b45309' : '#b91c1c';
     return '<div class="grid cols-2">' + rows.map(function (r) {
       const has = r.score != null || r.level != null;
+      /* [V.1.6.17] แถวที่ยังสรุประดับไม่ได้ ห้ามขึ้นป้าย "ระดับ –" ให้ดูเหมือนข้อมูลเสีย
+         ขึ้นเป็นสถานะที่อ่านรู้เรื่องแทน แล้วให้ criteria_note ด้านล่างบอกเหตุผล */
+      const pend = r.level == null;
       const subs = (r.sub_scores && typeof r.sub_scores === 'object') ? r.sub_scores : null;
       const subRows = subs ? Object.keys(subs).map(function (k) {
         const v = subs[k];
@@ -2378,11 +2406,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       return '<div class="card">'
         + '<h3 style="margin:0 0 6px;font-size:15px;display:flex;align-items:center;gap:8px">'
         +   '<span style="flex:1">' + G.esc(r.comp_name || r.comp_code) + '</span>'
-        +   (has ? '<span class="badge" style="background:' + lvColor(r.level) + ';color:#fff">'
-                 + 'ระดับ ' + G.esc(String(r.level == null ? '–' : r.level))
+        +   (pend ? '<span class="badge">⏳ กำลังเก็บหลักฐาน</span>'
+             : has ? '<span class="badge" style="background:' + lvColor(r.level) + ';color:#fff">'
+                 + 'ระดับ ' + G.esc(String(r.level))
                  + (r.level_label ? ' ' + G.esc(r.level_label) : '') + '</span>' : '')
         + '</h3>'
-        + (has ? meter(r.score) : '<div class="muted small">ยังไม่มีหลักฐานสำหรับด้านนี้ในบทเรียนชุดนี้</div>')
+        + (r.score != null ? meter(r.score)
+             : pend ? '<div class="muted small">เกมเก็บหลักฐานด้านนี้อยู่ แต่ยังไม่พอสรุประดับ — ดูรายละเอียดด้านล่าง</div>'
+             : '<div class="muted small">ยังไม่มีหลักฐานสำหรับด้านนี้ในบทเรียนชุดนี้</div>')
         + (subRows ? '<table class="gol" style="margin-top:8px"><tbody>' + subRows + '</tbody></table>' : '')
         + (byTeacher ? '<div class="muted small" style="margin-top:8px">🧑‍🏫 <b>ครูตัดสินระดับเอง</b>'
               + (r.system_level != null ? ' · ระบบคิดไว้ที่ระดับ ' + G.esc(String(r.system_level))
@@ -2403,10 +2434,22 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     /* ── ส่วนที่ 1: สมรรถนะ 6 ด้าน รวมข้ามเกม ── */
     const dimHtml = COMP6.map(function (c) {
       const code = c[0], name = c[1];
-      const rs = dims.filter((r) => r.comp_code === code && r.level != null);
+      const all = dims.filter((r) => r.comp_code === code);
+      const rs = all.filter((r) => r.level != null);
       if (!rs.length) {
+        /* [V.1.6.17] เดิมกรอง level != null ทิ้งตั้งแต่ต้น ⇒ ด้านที่เกมส่งมาแล้ว
+           แต่ยังสรุประดับไม่ได้ ถูกเหมารวมเป็น "ยังไม่มีหลักฐานจากเกมใดเลย"
+           ครูอ่านแล้วเข้าใจว่าเกมไม่ได้วัด ทั้งที่วัดอยู่และเหตุผลก็ส่งมาด้วย */
+        if (!all.length) {
+          return '<tr><td>' + G.esc(name) + '</td>'
+            + '<td class="muted small" colspan="2">ยังไม่มีหลักฐานจากเกมใดเลย</td></tr>';
+        }
+        const why = [...new Set(all.map((r) => r.criteria_note).filter(Boolean))];
+        const gs = [...new Set(all.map(function (r) { const g = gameById(r.game_id); return g ? g.name : ''; }).filter(Boolean))];
         return '<tr><td>' + G.esc(name) + '</td>'
-          + '<td class="muted small" colspan="2">ยังไม่มีหลักฐานจากเกมใดเลย</td></tr>';
+          + '<td class="num"><span class="badge">⏳ กำลังเก็บ</span></td>'
+          + '<td class="muted small">' + G.esc(gs.join(' · '))
+          +   (why.length ? '<br>' + G.esc(why.join(' · ')) : '') + '</td></tr>';
       }
       /* ระดับที่ทำได้ดีที่สุด — ไม่ใช่ค่าเฉลี่ย (ดูเหตุผลหัวไฟล์) */
       const best = rs.reduce((a, b) => (Number(b.level) > Number(a.level) ? b : a));

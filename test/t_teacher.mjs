@@ -102,11 +102,22 @@ console.log('\n═══ 3) ตัวกรองรายเกมบน Dashbo
     body: document.getElementById('content').textContent,
   }));
   ok('เลือกเกมเดียว: "เกมที่ใช้งาน" = 1', /เกมที่ใช้งาน\s*1/.test(st1.tiles.join('|')), st1.tiles);
-  ok('รอบที่ส่งผลตัดเหลือของเกมนั้น (3 ไม่ใช่ 4)', /รอบที่ส่งผล\s*3/.test(st1.tiles.join('|')), st1.tiles);
   ok('ความคืบหน้าเฉลี่ยคิดเฉพาะเกมนั้น (60% ไม่ใช่ 40%)',
     /ความคืบหน้าเฉลี่ย\s*60/.test(st1.tiles.join('|')), st1.tiles);
-  ok('"บันทึกการเล่นสะสม" แสดง – เพราะแยกรายเกมไม่ได้',
-    /บันทึกการเล่นสะสม\s*–/.test(st1.tiles.join('|')), st1.tiles);
+
+  /* [V.1.6.18 · ครูสั่ง] สองช่องเดิมเป็นตัวเลขเชิงระบบ ไม่ใช่การเรียนรู้ — ถอดออกแล้ว
+     ข้อเดิมสองข้อที่ยึดช่องพวกนั้น เขียนใหม่ให้คุมเรื่องเดียวกันกับช่องใหม่
+     (เรื่องที่ต้องคุมคือ "ตัวกรองเกมทำให้ตัวเลขแคบลงจริง" ไม่ใช่ชื่อช่อง) */
+  ok('ช่อง "รอบที่ส่งผล" ถูกถอดออกจากแถบสรุปแล้ว (ยังดูได้ที่หน้ารายคน)',
+    !/รอบที่ส่งผล/.test(st1.tiles.join('|')), st1.tiles);
+  ok('ช่อง "บันทึกการเล่นสะสม" ถูกถอดออกแล้ว',
+    !/บันทึกการเล่นสะสม/.test(st1.tiles.join('|')), st1.tiles);
+  ok('มีช่อง "ประเมินแล้ว" บอกเป็นสัดส่วนคน ไม่ใช่จำนวนใบ',
+    /ประเมินแล้ว\s*\d+\/\d+\s*คน/.test(st1.tiles.join('|')), st1.tiles);
+  ok('⭐ "สมรรถนะที่สรุปได้" ตัดเหลือของเกมที่กรอง (1/6 ไม่ใช่ 2/6)',
+    /สมรรถนะที่สรุปได้\s*1\/6/.test(st1.tiles.join('|')), st1.tiles);
+  ok('⭐ ยกเลิกตัวกรองแล้วกลับเป็น 2/6 — พิสูจน์ว่าตัวเลขขยับตามตัวกรองจริง',
+    /สมรรถนะที่สรุปได้\s*2\/6/.test(st0.tiles.join('|')), st0.tiles);
 
   await p.click('[data-tab="comp"]'); await sleep(400);
   /* ดูที่แถวสมรรถนะจริง ไม่ใช่ทั้งหน้า — ชื่อเกมโผล่ในช่องเลือกเกมอยู่แล้วโดยธรรมชาติ */
@@ -284,6 +295,73 @@ console.log('\n═══ 8) หน้า Admin เห็นห้องผู้
   ok('แต่ไม่แสดงโค้ดห้อง', !st.wrap.includes('ZZZ999') && st.wrap.includes('ไม่แจกโค้ด'), st.wrap.slice(0, 300));
   ok('ไม่ติดป้าย "ยังไม่มีเจ้าของ" ให้ห้องนั้น', st.wrap.includes('ไม่ใช่ห้องของครู'), st.wrap.slice(0, 300));
   ok('สรุปยอดแยกให้เห็นว่ามีผู้เล่นทั่วไปกี่คน', st.stat.includes('ผู้เล่นทั่วไป'), st.stat);
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+
+
+console.log('\n═══ 9) สมรรถนะสามสถานะ — "ยังไม่มีหลักฐาน" ต้องไม่ปนกับ "เก็บอยู่แต่ยังสรุปไม่ได้" ═══');
+/* ที่มา: ครูรายงาน 20 ส.ค. ว่าสมรรถนะภาค 1 ขึ้นแค่ด้านการคิดขั้นสูง ด้านอื่นเขียนว่า
+   "ยังไม่มีเกมวัดด้านนี้" ทั้งที่เกมวัดอยู่ ต้นเหตุมีสองชั้น:
+     ฝั่งเกม  — ด้านที่หลักฐานยังไม่พอ ไม่ส่งแถวขึ้นมาเลย (แก้ที่ภาค 1 V.7.99.44)
+     ฝั่งเว็บ — ต่อให้ส่งขึ้นมา ก็ถูกกรอง level != null ทิ้งตั้งแต่ต้น (แก้ในรุ่นนี้)
+   ชุดนี้คุมฝั่งเว็บ: เมื่อได้แถวที่ไม่มีระดับ ต้องแยกให้ครูเห็นว่าเป็นคนละเรื่องกัน */
+{
+  const partialDims = [
+    { student_id: F.S1, classroom_id: F.R1, comp_code: 'HOT', game_name: 'กาญจนบุรี 2050',
+      score: 72, level: 5, level_label: 'สามารถ', sub_scores: { ctc: 70 },
+      evidence: 'scored', decided_by: 'system', system_score: 72, criteria_note: 'คะแนนรวม HOTS' },
+    /* เกมส่งมาแล้ว แต่หลักฐานยังไม่พอสรุประดับ */
+    { student_id: F.S1, classroom_id: F.R1, comp_code: 'CZ', game_name: 'กาญจนบุรี 2050',
+      score: null, level: null, level_label: null, sub_scores: null,
+      evidence: 'scored', decided_by: 'game', system_score: null,
+      criteria_note: 'หลักฐานยังไม่พอสรุประดับ — มี 2 ชิ้น ต้องการอย่างน้อย 4 ชิ้น' },
+    /* เกมไม่มีด่านที่วัดด้านนี้โดยตรง — บอกเหตุผล ไม่ใช่เงียบ */
+    { student_id: F.S1, classroom_id: F.R1, comp_code: 'TW', game_name: 'กาญจนบุรี 2050',
+      score: null, level: null, level_label: null, sub_scores: null,
+      evidence: 'scored', decided_by: 'game', system_score: null,
+      criteria_note: 'บทเรียนชุดนี้ยังไม่มีด่านที่วัดด้านนี้โดยตรง · มีเพียงหลักฐานประกอบ' },
+  ];
+  const p = await b.newPage();
+  const calls = await stub(p, { compDims: partialDims });
+  await login(p);
+  await p.goto(BASE + '/teacher.html#/student/' + F.S1);
+  await sleep(1600);
+  /* อ่าน "ตารางสมรรถนะรวมข้ามเกม" ทีละแถว ไม่ใช่ข้อความทั้งหน้า
+     เพราะการ์ดรายด้านด้านล่างแสดงเหตุผลอยู่ก่อนแล้ว ⇒ อ่านทั้งหน้าจะเขียวโดยไม่พิสูจน์อะไร
+     จุดที่ครูเห็นปัญหาคือตารางนี้ ซึ่งเดิมกรองแถวที่ยังไม่มีระดับทิ้งตั้งแต่ต้น */
+  const cross = await p.evaluate(() => {
+    const h = [...document.querySelectorAll('h2.section-title')]
+      .find((x) => /ภาพรวมทุกเกม/.test(x.textContent));
+    if (!h) return null;
+    const tb = h.nextElementSibling && h.nextElementSibling.querySelector('table.gol tbody');
+    if (!tb) return null;
+    const rows = {};
+    [...tb.rows].forEach((tr) => { rows[(tr.cells[0] || {}).textContent.trim()] = tr.textContent; });
+    return rows;
+  });
+  const txt = await p.evaluate(() => document.body.innerText);
+  const rowOf = (frag) => {
+    const k = cross && Object.keys(cross).find((x) => x.indexOf(frag) >= 0);
+    return k ? cross[k] : null;
+  };
+
+  ok('ตารางสมรรถนะรวมข้ามเกมมีอยู่จริง (กันเคสหาไม่เจอแล้วข้อล่างเขียวหลอก)',
+    !!cross && Object.keys(cross).length >= 6, cross && Object.keys(cross));
+  ok('⭐ ด้านพลเมืองที่เกมส่งมาแล้วแต่หลักฐานยังไม่พอ — ต้องขึ้นว่ากำลังเก็บ',
+    /กำลังเก็บ/.test(rowOf('พลเมือง') || ''), rowOf('พลเมือง'));
+  ok('⭐ และต้องไม่ถูกเหมาว่า "ยังไม่มีหลักฐานจากเกมใดเลย" (นี่คือข้อที่ครูทักมา)',
+    !/ยังไม่มีหลักฐานจากเกมใดเลย/.test(rowOf('พลเมือง') || ''), rowOf('พลเมือง'));
+  ok('⭐ บอกเหตุผลที่ยังสรุปไม่ได้ในแถวนั้นเลย ครูไม่ต้องเลื่อนหา',
+    /ต้องการอย่างน้อย 4 ชิ้น/.test(rowOf('พลเมือง') || ''), rowOf('พลเมือง'));
+  ok('⭐ ด้านทีมที่เกมไม่ได้วัด ก็ต้องบอกเหตุผลในตารางนี้ ไม่ใช่เงียบ',
+    /ยังไม่มีด่านที่วัดด้านนี้โดยตรง/.test(rowOf('ทีม') || ''), rowOf('ทีม'));
+  ok('ด้านที่สรุประดับได้แล้ว ยังแสดงระดับตามปกติ — ของใหม่ต้องไม่กลบของเดิม',
+    /ระดับ 5/.test(rowOf('คิดขั้นสูง') || ''), rowOf('คิดขั้นสูง'));
+  ok('ด้านที่ไม่มีแถวจากเกมใดเลย ยังขึ้นข้อความเดิมของมัน (สามสถานะครบจริง)',
+    /ยังไม่มีหลักฐานจากเกมใดเลย/.test(rowOf('สื่อสาร') || ''), rowOf('สื่อสาร'));
+  ok('ห้ามขึ้นป้าย "ระดับ –" ให้แถวที่ยังไม่มีระดับ (ครูจะนึกว่าข้อมูลเสีย)',
+    !/ระดับ\s*–/.test(txt), txt.slice(0, 700));
   ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
   await p.close();
 }

@@ -65,6 +65,10 @@
     '.gpstd .gp-meta dd{margin:0;font-size:12.5px;color:var(--ink-2,#52514e)}',
     '.gpstd .gp-kids{margin:8px 0 0;padding-left:14px;border-left:2px dotted var(--grid,#e1e0d9)}',
     '.gpstd .gp-kid{font-size:13.5px;color:var(--ink-2,#52514e);padding:3px 0}',
+    /* [V.1.6.18] ป้ายที่มา — ใช้ตัวแปรธีมเดียวกับป้ายอื่นในแผงนี้ จึงไม่พังในธีมมืด */
+    '.gpstd .gp-manual{display:inline-block;margin-left:7px;padding:1px 7px;border-radius:999px;',
+    'font-size:10.5px;font-weight:600;white-space:nowrap;vertical-align:1px;',
+    'color:var(--muted,#6d6b66);border:1px solid var(--line,#e5e3de)}',
     '.gpstd .gp-sec-src{font-weight:400;font-size:12px;color:var(--muted,#6d6b66);margin-top:2px}',
     '.gpstd .gp-sec-head{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px}',
     '.gpstd .gp-sec-head::before{content:"";flex:none;width:4px;align-self:stretch;border-radius:2px;',
@@ -142,8 +146,14 @@
   function nameLine(it, cls) {
     var code = it.code && it.code !== it.name_th
       ? '<span class="gp-code">' + esc(it.code) + '</span>' : '';
+    /* [V.1.6.18 · ครูถามว่ากลุ่มสาระนี้มาจากไหน] บรรทัดที่เกมไม่ได้ประกาศเอง ต้องบอกให้รู้
+       ไม่ใช่ข้อมูลผิด แต่เป็นของที่ "ผู้ดูแลกรอกไว้ และเกมลบเองไม่ได้"
+       ถ้าไม่บอก ครูจะเห็นกลุ่มสาระโผล่มาโดยไม่มีคำอธิบาย แล้วไม่รู้จะไปแก้ที่ไหน */
+    var flag = (it.__src && it.__src !== 'game-sync')
+      ? '<span class="gp-manual" title="ผู้ดูแลกรอกไว้ในทะเบียนกลาง — ตัวเกมไม่ได้ประกาศว่าวัดข้อนี้ '
+        + 'จึงลบออกเองไม่ได้ ต้องให้ผู้ดูแลลบที่หน้าผู้ดูแล">ผู้ดูแลกรอกไว้</span>' : '';
     return '<div class="' + cls + '">' + code
-      + '<span class="gp-txt">' + esc(it.name_th || it.code) + '</span></div>';
+      + '<span class="gp-txt">' + esc(it.name_th || it.code) + '</span>' + flag + '</div>';
   }
 
   /* หัวข้อหมวด = ชื่อหมวดสั้นบรรทัดบน + ชื่อเต็มของกรอบหลักสูตรบรรทัดรอง
@@ -190,7 +200,11 @@
         var game = rows && rows[0];
         if (!game) throw new Error('ไม่พบเกมรหัส ' + cfg.gameCode + ' ในทะเบียนกลาง');
         return get(cfg, '/rest/v1/game_framework_items?game_id=eq.' + game.id
-          + '&select=note,weight,evidence,criteria,framework_items(id,code,name_th,depth,sort_order,parent_id,'
+          /* [V.1.6.18] ดึง source มาด้วย — ฐานมีคอลัมน์นี้อยู่แล้วตั้งแต่ไฟล์ 53
+             'game-sync' = เกมประกาศเองว่าวัดตัวนี้ · 'manual' = ผู้ดูแลกรอกไว้
+             ต้องแยกให้ครูเห็น เพราะแถว manual ที่เกมไม่ได้อ้าง ตัวเกมลบเองไม่ได้
+             (rpc_publish_standards ลบเฉพาะ source='game-sync' — ไฟล์ 71 บรรทัด 356) */
+          + '&select=note,weight,evidence,criteria,source,framework_items(id,code,name_th,depth,sort_order,parent_id,'
           + 'assessment_frameworks(code,kind,name_th,status))')
           .then(function (maps) { return { game: game, maps: maps || [] }; });
       })
@@ -198,6 +212,8 @@
         var comp = [], ach = [], attr = [], fwNames = {};
         data.maps.forEach(function (m) {
           var it = m.framework_items; if (!it) return;
+          /* [V.1.6.18] ติดที่มาไปกับตัวชี้วัด — ใช้ตอนวาดป้าย "เกมไม่ได้อ้าง" */
+          try { it.__src = m.source || ''; } catch (e) {}
           var f = it.assessment_frameworks || {};
           it._note = m.note || null;
           it._ev   = m.evidence || null;   /* แหล่งหลักฐาน (53 ฉบับแก้ 2) */
@@ -208,9 +224,13 @@
           else attr.push(it);
         });
 
-        var html = '<h3>มาตรฐานการเรียนรู้ที่เกมนี้วัด'
+        /* [V.1.6.18 · ครูสั่งข้อ 4] เดิมหัวเรื่องเขียนว่า "มาตรฐานการเรียนรู้ที่เกมนี้วัด"
+           เหมือนกันทุกใบ ส่วนชื่อเกมอยู่บรรทัดรองสีจาง 12.5px
+           พอหน้ามาตรฐานเรียงแผงของหลายเกมต่อกัน ครูดูไม่ออกว่ากรอบไหนของเกมไหน
+           สลับให้ชื่อเกมเป็นหัวเรื่อง แล้วย้ายคำอธิบายกรอบไปบรรทัดรองแทน */
+        var html = '<h3>' + esc(data.game.name)
           + '<span class="gp-grade">' + esc(gradeText(data.game)) + '</span></h3>'
-          + '<div class="gp-sub">' + esc(data.game.name) + ' · ข้อมูลจากทะเบียนกลางของเกมเพลิน</div>';
+          + '<div class="gp-sub">มาตรฐานการเรียนรู้ที่เกมนี้วัด · ข้อมูลจากทะเบียนกลางของเกมเพลิน</div>';
 
         /* หัวข้อหมวดใช้ชื่อเต็มของกรอบหลักสูตรจากฐานข้อมูล ไม่ตั้งชื่อย่อเอง */
         var sections =

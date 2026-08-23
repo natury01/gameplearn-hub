@@ -77,6 +77,18 @@ const PNG = Buffer.from(
    opt.noMedia = true → ยังไม่ได้รัน 57_GAME_MEDIA.sql */
 export async function stub(page, opt = {}) {
   const calls = [];
+
+  /* [V.1.6.18] กล่องแนะนำการใช้งานขึ้นเองครั้งแรกต่อเครื่อง และเป็นกล่องทึบ
+     ⇒ ชุดทดสอบอื่นที่กดปุ่มบนหน้าจะโดนฉากหลังบังทั้งหมด (เจอจริงตอนเพิ่มกล่องนี้:
+       4 ชุดที่เคยเขียวกลับแดงพร้อมกันด้วย "gp-tour-back intercepts pointer events")
+     ชุดอื่นทดสอบ "ครูที่ใช้งานอยู่แล้ว" จึงตั้งธงว่าเคยเห็นแล้วให้ตั้งแต่ต้น
+     ส่วน t_tour.mjs ส่ง { tour: true } มาเพื่อทดสอบประสบการณ์ครั้งแรกของจริง
+     ⚠️ ต้องเป็น addInitScript — วิ่งก่อนสคริปต์ของหน้า ถ้าตั้งทีหลังกล่องขึ้นไปแล้ว */
+  if (!opt.tour) {
+    await page.addInitScript(() => {
+      try { localStorage.setItem('gp_tour_seen', '1'); } catch (e) {}
+    });
+  }
   page.on('console', (m) => { if (m.type() === 'error') calls.push(['CONSOLE_ERROR', m.text()]); });
   page.on('pageerror', (e) => calls.push(['PAGE_ERROR', String(e)]));
 
@@ -130,9 +142,14 @@ export async function stub(page, opt = {}) {
     /* ยังไม่ได้รัน 43 = ไม่มีทั้งสองมุมมอง ไม่ใช่หายไปทีละอัน — จำลองให้ตรงกับฐานจริง */
     if (has('v_student_comp_dims')) {
       if (opt.has43 === false) return gone();
-      return json(opt.noData ? [] : inIds(F.compDims, 'classroom_id'));
+      /* [V.1.6.17] opt.compDims — ให้เทสต์จำลอง "แถวที่เกมส่งมาแล้วแต่ยังสรุประดับไม่ได้"
+         ซึ่งภาค 1 เริ่มส่งตั้งแต่ V.7.99.44 ตามที่ครูเคาะ (ติดป้ายแทนการเงียบ) */
+      return json(opt.noData ? [] : inIds(opt.compDims || F.compDims, 'classroom_id'));
     }
     if (has('v_student_competency')) return json(opt.noData ? [] : inIds(F.comp, 'classroom_id'));
+    /* [V.1.6.18] วิวสถิติรายเกม ฉบับที่ไฟล์ 83 ขยายให้ — มีช่องแยกตามแหล่งที่มา */
+    if (has('v_game_activity')) return json(opt.noStats ? [] : F.gameActivity);
+    if (has('v_visit_daily')) return json(opt.noStats ? [] : F.visitDaily);
     if (has('game_media')) return opt.noMedia ? gone() : json(opt.p1media ? F.p1Media : F.media);
     if (has('game_framework_items')) {
       /* ฐานที่ยังไม่ได้รันไฟล์ 71 ไม่มีคอลัมน์ admin_edited → PostgREST ตอบ 42703

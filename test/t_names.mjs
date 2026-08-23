@@ -166,6 +166,39 @@ const BANNED = ['วิทยาศาสตร์ฯ', 'สังคมศึ�
   ok('รหัสตัวชี้วัดแสดงเป็นชิปแยกจากชื่อ (ครูค้นด้วยรหัสก่อน)',
     panel.codes.includes('ส 5.1 ป.4/1') && panel.nameIsFlex, panel);
   ok('หัวข้อหมวดมีชื่อเต็มของกรอบหลักสูตรเป็นบรรทัดรอง', panel.hasSectionSrc, panel);
+
+  /* ── [V.1.6.18 · ครูสั่ง 2 ข้อ] ────────────────────────────────────────
+     ข้อ 4: "ชื่อเกมไม่เด่น ทำให้ดูไม่ออกว่ากรอบนี้เป็นของเกมไหน"
+       เดิมหัวเรื่องเขียนว่า "มาตรฐานการเรียนรู้ที่เกมนี้วัด" เหมือนกันทุกใบ
+       ชื่อเกมอยู่บรรทัดรองสีจาง 12.5px — พอเรียงหลายเกมต่อกันก็แยกไม่ออก
+     ข้อ 2: "อยู่ ๆ ก็แสดงกลุ่มสาระวิทยาศาสตร์และเทคโนโลยีมาด้วย"
+       ต้นเหตุ: แถว source='manual' ที่ผู้ดูแลกรอกไว้ ซึ่งตัวเกมลบเองไม่ได้
+       แก้ด้วยการบอกที่มาบนจอ ไม่ใช่แก้ฐาน — ครูจะได้รู้ว่าไปแก้ที่ไหน */
+  const head = await p.evaluate(() => {
+    const el = document.querySelector('.gpstd');
+    const h3 = el.querySelector('h3');
+    const flagged = [...el.querySelectorAll('.gp-manual')]
+      .map((x) => (x.closest('.gp-name, .gp-kid') || {}).textContent || '');
+    return {
+      h3: (h3 ? h3.textContent : '').trim(),
+      h3Size: h3 ? parseFloat(getComputedStyle(h3).fontSize) : 0,
+      sub: (el.querySelector('.gp-sub') || {}).textContent || '',
+      flagged,
+      flagTitle: (el.querySelector('.gp-manual') || {}).getAttribute
+        ? el.querySelector('.gp-manual').getAttribute('title') : '',
+    };
+  });
+  ok('⭐ ชื่อเกมเป็นหัวเรื่องของแผง ไม่ใช่บรรทัดรองสีจาง',
+    head.h3.includes('กาญจนบุรี 2050') && head.h3Size >= 15, head);
+  ok('คำอธิบายกรอบย้ายไปบรรทัดรอง — ไม่ได้หายไป ครูยังอ่านรู้ว่าแผงนี้คืออะไร',
+    /มาตรฐานการเรียนรู้ที่เกมนี้วัด/.test(head.sub), head.sub);
+  ok('⭐ ตัวชี้วัดที่ผู้ดูแลกรอกไว้ (เกมไม่ได้ประกาศ) ต้องติดป้ายบอก',
+    head.flagged.length === 1
+    && head.flagged[0].includes('การอยู่ร่วมกับธรรมชาติ'), head.flagged);
+  ok('ป้ายบอกด้วยว่าต้องไปแก้ที่ไหน ไม่ใช่ติดป้ายเฉย ๆ',
+    /ผู้ดูแล/.test(head.flagTitle) && /ลบ/.test(head.flagTitle), head.flagTitle);
+  ok('ตัวชี้วัดที่เกมประกาศเอง ต้องไม่ติดป้าย (ไม่ใช่ติดหมดทุกใบ)',
+    !head.flagged.some((t) => t.includes('สืบค้นและอธิบายลักษณะทางกายภาพ')), head.flagged);
   await p.close();
 }
 

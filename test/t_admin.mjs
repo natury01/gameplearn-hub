@@ -208,5 +208,56 @@ console.log('\n═══ 8) ประโยคใน admin.html ต้องต�
     labels.every((w) => js.includes("label: '" + w + "'") && sql.includes("array['" + w + "']")), labels);
 }
 
+
+console.log('\n═══ สถิติรายเกม — แยกตามแหล่งที่มา (V.1.6.18) ═══');
+/* ครูขอให้เห็นคนที่เข้าเกมโดยไม่ผ่านหน้าเว็บ (QR · ลิงก์ที่ครูส่งต่อ)
+   ⚠️ ต้องไม่ทับความหมายช่อง "กดเล่น" เดิม เพราะมีข้อมูลย้อนหลังผูกอยู่
+      ถ้ารวมช่องกัน ตัวเลขจะเด้งสองเท่าในวันที่ปล่อย แล้วเทียบย้อนหลังไม่ได้อีกเลย */
+{
+  const p = await b.newPage();
+  const calls = await stub(p);
+  await login(p);
+  await p.goto(BASE + '/admin.html');
+  await sleep(1000);
+  const st = await p.evaluate(() => {
+    const t = [...document.querySelectorAll('.tab')].find((x) => x.getAttribute('data-tab') === 'stats');
+    if (t) t.click();
+    return new Promise((r) => setTimeout(() => {
+      /* แผงนี้มีสองตาราง: "รายหน้า" มาก่อน แล้วค่อย "รายเกม"
+         เลือกตัวแรกจะได้ตารางผิด — เจาะจากหัวข้อ h3 "รายเกม" แทนเพื่อไม่ผูกกับลำดับ */
+      const h3 = [...document.querySelectorAll('#panel-stats h3')]
+        .find((x) => x.textContent.trim() === 'รายเกม');
+      let tb = null, notes = '';
+      for (let el = h3 && h3.nextElementSibling; el; el = el.nextElementSibling) {
+        if (!tb) tb = el.querySelector && el.querySelector('table.gol');
+        const nt = el.querySelector && el.querySelector('.panel-note');
+        if (nt) { notes = nt.textContent; break; }
+      }
+      r({
+        head: tb ? [...tb.querySelectorAll('thead th')].map((x) => x.textContent.trim()) : [],
+        rows: tb ? [...tb.querySelectorAll('tbody tr')].map((x) =>
+          [...x.cells].map((c) => c.textContent.trim())) : [],
+        note: notes,
+      });
+    }, 1200));
+  });
+  ok('ตารางรายเกมมีอยู่จริง', st.rows.length >= 2, st.head);
+  ok('⭐ มีช่อง "เปิดเกมจริง" แยกจาก "กดเล่น" — ไม่รวมช่องกันจนนับซ้ำ',
+    st.head.some((h) => /กดเล่น/.test(h)) && st.head.some((h) => /เปิดเกมจริง/.test(h)), st.head);
+  ok('⭐ แยกให้เห็นว่ามาจากไหน: จากเว็บ · QR · ลิงก์ตรง',
+    ['จากเว็บ', 'QR', 'ลิงก์ตรง'].every((k) => st.head.some((h) => h.includes(k))), st.head);
+  const alpha = st.rows.find((r) => (r[0] || '').includes('กาญจนบุรี 2050') && !(r[0] || '').includes('ภาค 2'));
+  ok('เกมที่อัปรุ่นแล้ว แสดงยอดแยกแหล่งที่มาถูกต้อง (18 จากเว็บ · 9 QR · 4 ลิงก์ตรง)',
+    !!alpha && alpha.join('|').includes('18') && alpha.join('|').includes('9') && alpha.join('|').includes('4'),
+    alpha);
+  const beta = st.rows.find((r) => (r[0] || '').includes('ภาค 2'));
+  ok('⭐ เกมที่ยังไม่ได้อัปรุ่น ขึ้น – ไม่ใช่ 0 ("ยังไม่ได้วัด" ไม่เท่ากับ "ไม่มีคนเข้า")',
+    !!beta && beta.filter((c) => c === '–').length >= 4, beta);
+  ok('คำอธิบายบอกครูว่า – แปลว่าอะไร ไม่ปล่อยให้เดา',
+    /ยังไม่ได้อัป/.test(st.note), st.note.slice(0, 200));
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+
 await b.close(); srv.close();
 process.exit(ok.done());

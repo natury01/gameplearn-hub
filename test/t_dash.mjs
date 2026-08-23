@@ -191,5 +191,41 @@ console.log('\n═══ 9) จอเล็ก 320px และหัวเว็
   await p.close();
 }
 
+
+console.log('\n═══ สถิติการเข้าถึงเกม — ป้ายแหล่งที่มา (V.1.6.18) ═══');
+/* ครูสั่ง: "อยากให้เก็บสถิติจากการเข้าถึงเกมเลย ปัจจุบันเก็บแค่จากการเข้าจากหน้าเว็บไซต์"
+   ⇒ ลิงก์เล่นเกมต้องติดป้าย src=hub เพื่อให้ตัวเกมรายงานกลับได้ว่าคนนี้มาจากเว็บ
+   คนที่ไม่มีป้าย = มาจาก QR หรือลิงก์ที่ครูส่งต่อ ซึ่งคือกลุ่มที่ครูมองไม่เห็นมาตลอด
+   ถ้าป้ายหาย ตัวเลข "จากเว็บ" จะเป็น 0 ตลอดโดยหน้าจอดูปกติทุกอย่าง = พังเงียบ */
+{
+  const p = await b.newPage();
+  const calls = await stub(p);
+  await p.goto(BASE + '/index.html');
+  await sleep(1500);
+  const links = await p.evaluate(() =>
+    [...document.querySelectorAll('a[data-game-play]')].map((a) => a.getAttribute('href')));
+  ok('หน้าแรกมีลิงก์เล่นเกมให้ตรวจจริง (กันเคสไม่มีลิงก์แล้วข้อล่างเขียวหลอก)',
+    links.length > 0, links);
+  ok('⭐ ลิงก์เล่นเกมทุกอันติดป้าย src=hub', links.every((h) => /[?&]src=hub/.test(h || '')), links);
+  ok('ป้ายไม่ทับพารามิเตอร์เดิมของลิงก์ (ใช้ & เมื่อมี ? อยู่แล้ว)',
+    links.every((h) => !/\?.*\?/.test(h || '')), links);
+
+  /* ติดป้ายซ้ำต้องไม่ได้ป้ายสองอัน — MutationObserver วิ่งทุกครั้งที่ DOM ขยับ */
+  const twice = await p.evaluate(() => {
+    document.body.appendChild(document.createElement('span'));
+    return [...document.querySelectorAll('a[data-game-play]')]
+      .map((a) => (a.getAttribute('href').match(/src=hub/g) || []).length);
+  });
+  ok('DOM ขยับซ้ำ ๆ แล้วป้ายไม่ซ้อนกัน', twice.every((c) => c === 1), twice);
+
+  const trk = calls.filter((c) => String(c[1]).includes('rpc_track_visit'));
+  ok('มีคำขอนับสถิติจริง', trk.length > 0, trk.length);
+  ok('⭐ ทุกคำขอนับสถิติแนบ p_source มาด้วย (ไม่งั้นกองรวมใน unknown หมด)',
+    trk.every((c) => { try { return JSON.parse(c[2]).p_source === 'hub'; } catch (e) { return false; } }),
+    trk.map((c) => c[2]).slice(0, 3));
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+
 await b.close(); srv.close();
 process.exit(ok.done());

@@ -25,7 +25,7 @@ if ! node -e "require.resolve('playwright')" >/dev/null 2>&1; then
 fi
 # [V.1.6.7] นับหัวก่อนเชื่อผล (STD-006 ข้อ 1): ชุดที่ "มีจริงในโฟลเดอร์" ต้องถูกเรียกครบ
 # ไฟล์ที่ไม่ได้อยู่ในรายการ = หลุดจากการนับ ต้องร้อง ไม่ใช่เงียบ
-SUITES="t_shots.mjs t_teacher.mjs t_round2.mjs t_names.mjs t_admin.mjs t_dash.mjs t_regress.mjs"
+SUITES="t_shots.mjs t_teacher.mjs t_round2.mjs t_names.mjs t_admin.mjs t_dash.mjs t_regress.mjs t_tour.mjs"
 for f in t_*.mjs; do
   case " $SUITES " in *" $f "*) ;; *)
     echo "⚠️  $f มีอยู่ในโฟลเดอร์แต่ไม่อยู่ในรายการที่รัน — เพิ่มเข้า SUITES หรือขึ้นทะเบียนเหตุผล (STD-006 ข้อ 1/5)";; esac

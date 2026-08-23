@@ -87,10 +87,32 @@
   function track(page, gameCode, isNew) {
     try {
       if (!G || !G.rpc) return;
-      var body = { p_page: page, p_new: !!isNew, p_device: deviceKind() };
+      /* [V.1.6.18] p_source บอกว่าคนนี้มาจากไหน — ทุกอย่างที่เกิดบนเว็บกลาง = 'hub'
+         ฐานรับแค่ hub/qr/direct ค่าอื่นถูกบังคับเป็น unknown ให้เอง (ไฟล์ 83) */
+      var body = { p_page: page, p_new: !!isNew, p_device: deviceKind(), p_source: 'hub' };
       if (gameCode) body.p_game_code = String(gameCode);
       G.rpc('rpc_track_visit', body).catch(function () {});
     } catch (e) { /* เงียบเสมอ */ }
+  }
+
+  /* [V.1.6.18] ติดป้าย src=hub ให้ลิงก์เล่นเกมทุกอัน
+     ตัวเกมอ่านค่านี้ตอนเปิดแล้วรายงานกลับ ⇒ แยกได้ว่าใครมาจากเว็บ ใครมาจาก QR/ลิงก์ตรง
+     ทำที่นี่ที่เดียวเพราะลิงก์ถูกสร้างหลายจุด (การ์ดหน้าแรก · กล่องห้องเรียน · อาจมีอีก)
+     ถ้าไปแก้ทีละจุด วันหน้ามีจุดใหม่แล้วลืม สถิติจะขาดโดยไม่มีอะไรเตือน */
+  function stampSrc(a) {
+    try {
+      if (!a || a.__gpSrc) return;
+      var h = a.getAttribute('href') || '';
+      if (!h || /[?&]src=/.test(h)) { a.__gpSrc = 1; return; }
+      a.setAttribute('href', h + (h.indexOf('?') >= 0 ? '&' : '?') + 'src=hub');
+      a.__gpSrc = 1;
+    } catch (e) {}
+  }
+  function stampAll() {
+    try {
+      var l = document.querySelectorAll('a[data-game-play][href]');
+      for (var i = 0; i < l.length; i++) stampSrc(l[i]);
+    } catch (e) {}
   }
   function trackVisit() {
     var isNew = false;
@@ -105,8 +127,19 @@
     document.addEventListener('click', function (ev) {
       var a = ev.target && ev.target.closest && ev.target.closest('[data-game-play]');
       if (!a) return;
+      stampSrc(a);        /* กันเหนียว เผื่อการ์ดเพิ่งวาดเสี้ยววินาทีก่อนกด */
       track('game', a.getAttribute('data-game-play'), false);
     });
+
+    /* การ์ดเกมวาดหลังโหลดข้อมูลเสร็จ จึงต้องติดป้ายให้ของที่มาทีหลังด้วย
+       ใช้ MutationObserver แทนการตั้งเวลาเดา — ตั้งเวลาเดาคือของที่พังเงียบวันที่เน็ตช้า
+       (การกดปุ่มยังติดป้ายซ้ำให้อีกชั้นข้างบน จึงไม่มีทางหลุดจากการกดปกติ) */
+    stampAll();
+    try {
+      if (window.MutationObserver) {
+        new MutationObserver(stampAll).observe(document.body, { childList: true, subtree: true });
+      }
+    } catch (e) {}
   }
 
   /* ============ ป้ายรุ่นของเว็บกลางท้ายหน้า ============

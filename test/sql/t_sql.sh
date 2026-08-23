@@ -19,6 +19,14 @@ if [ -z "${SQLDIR:-}" ] || [ ! -f "$SQLDIR/59_ROOM_BROWSE.sql" ]; then
   echo "❌ หาไฟล์ SQL ไม่เจอ — ตั้ง SQLDIR ให้ชี้ไปโฟลเดอร์ที่มี 59_ROOM_BROWSE.sql"
   exit 1
 fi
+# ── [V.1.6.17 · 23 ส.ค. 2569] บังคับ client encoding เป็น UTF8 ──
+#   psql บน Windows ภาษาไทย เดา client encoding จาก code page ของระบบ = WIN874 (cp874)
+#   ไฟล์ fixture และไฟล์ SQL ทุกไฟล์ในโครงการนี้เป็น UTF-8
+#   ⇒ psql อ่านไบต์ไทยแล้วแปลผิด ล้มที่บรรทัดแรกที่มีสระ/วรรณยุกต์นอกช่วง cp874
+#     ข้อความจริงที่เจอ: character with byte sequence 0x81 in encoding "WIN874" has no equivalent
+#   ตั้งตรงนี้ให้ครบทุกทางเรียก จะได้ไม่ต้องจำเองทุกครั้ง (เครื่องลินุกซ์ตั้งแล้วก็ไม่เสียหาย)
+export PGCLIENTENCODING="${PGCLIENTENCODING:-UTF8}"
+
 # ── V.1.6.6: เลือกทางเชื่อม Postgres (มติครู 19 ส.ค. — "ติดตั้ง" บนเครื่องครู) ──
 #   ทาง ก: มี GP_PGHOST → ต่อเซิร์ฟเวอร์ที่ติดตั้งไว้แล้ว (เครื่องครู · ดูวิธีในเอกสาร 80)
 #   ทาง ข: ไม่ตั้ง → ตั้งเซิร์ฟเวอร์ชั่วคราวเองเหมือนเดิม (เครื่องแชต/คอนเทนเนอร์)
@@ -941,11 +949,77 @@ n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary(null,'ป.5')->'ach'->>'avg_a
 ok "⭐ ค่าเฉลี่ยรวมทุกโรงเรียนยังคืนมาเป็นเส้นเทียบ แม้กรองอยู่" "$n" "64.3"
 
 echo ""
+echo "═══ 13) 52+83 — สถิติการเข้าถึงเกม + ป้ายแหล่งที่มา ═══"
+
+out=$($PSQL -f $SQLDIR/52_VISIT_STATS.sql 2>&1)
+if [ $? -eq 0 ]; then echo "  ✅ 52_VISIT_STATS.sql รันผ่าน"; else echo "  ❌ 52 ล้ม"; echo "$out" | tail -3; bad=$((bad+1)); fi
+out=$($PSQL -f $SQLDIR/83_VISIT_SOURCE.sql 2>&1)
+if [ $? -eq 0 ]; then echo "  ✅ 83_VISIT_SOURCE.sql รันผ่าน"; else echo "  ❌ 83 ล้ม"; echo "$out" | tail -3; bad=$((bad+1)); fi
+
+# ── รันซ้ำได้จริง ──
+# ⭐ ท่อนย้ายโครงสร้างตรวจ "กุญแจหลักมี source แล้วหรือยัง" ไม่ใช่ "คอลัมน์มีแล้วหรือยัง"
+#    ถ้าตรวจด้วยคอลัมน์ รอบสองจะข้ามทั้งบล็อก ⇒ กุญแจหลักไม่ถูกขยาย
+#    แล้ว on conflict จะพังตอนมีคนเข้าเว็บจริง ไม่ใช่ตอนรันไฟล์ — หาสาเหตุยากที่สุด
+out=$($PSQL -f $SQLDIR/83_VISIT_SOURCE.sql 2>&1)
+if [ $? -eq 0 ]; then echo "  ✅ ⭐ รัน 83 ซ้ำได้ ไม่พัง (ท่อนย้ายโครงสร้างข้ามเองรอบสอง)"; else echo "  ❌ รันซ้ำแล้วพัง"; echo "$out" | tail -3; bad=$((bad+1)); fi
+
+n=$($Q -c "select count(*) from information_schema.columns where table_schema='public' and table_name='visit_daily' and column_name='source';")
+ok "visit_daily มีคอลัมน์ source" "$n" "1"
+n=$($Q -c "select count(*) from pg_index i join pg_attribute a on a.attrelid=i.indrelid and a.attnum=any(i.indkey) where i.indrelid='public.visit_daily'::regclass and i.indisprimary and a.attname='source';")
+ok "⭐ source อยู่ในกุญแจหลักจริง (ไม่งั้น on conflict พังตอนใช้งาน)" "$n" "1"
+
+n=$($Q -c "select count(*) from pg_proc where proname='rpc_track_visit';")
+ok "⭐ เหลือ rpc_track_visit ตัวเดียว (ชื่อซ้ำ = PostgREST เลือกไม่ถูก)" "$n" "1"
+n=$($Q -c "select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace where p.proname='rpc_track_visit' and pronargdefaults>=5;")
+ok "⭐ พารามิเตอร์ใหม่มีค่าตั้งต้นครบ (เว็บรุ่นเก่าที่ยังไม่อัปต้องยิงติดอยู่)" "$n" "1"
+
+# ── พฤติกรรมจริง ──
+$Q -c "delete from public.visit_daily;" >/dev/null 2>&1
+$Q -c "select public.rpc_track_visit('dashboard', null, true, 'pc');" >/dev/null 2>&1
+n=$($Q -c "select count(*) from public.visit_daily where page='dashboard';")
+ok "⭐ หน้า 'ผลการเรียนรู้' ถูกนับแล้ว (บั๊กเดิม: ไม่อยู่ใน whitelist จึงถูกทิ้งเงียบมาตลอด)" "$n" "1"
+
+$Q -c "select public.rpc_track_visit('gameopen','kanchanaburi2050',true,'mobile','qr');" >/dev/null 2>&1
+$Q -c "select public.rpc_track_visit('gameopen','kanchanaburi2050',false,'mobile','qr');" >/dev/null 2>&1
+n=$($Q -c "select views::text || '/' || visitors::text from public.visit_daily where page='gameopen' and source='qr';")
+ok "เข้าจาก QR สองครั้ง = 2 ครั้ง / 1 เครื่อง" "$n" "2/1"
+
+$Q -c "select public.rpc_track_visit('gameopen','kanchanaburi2050',true,'pc','ค่ามั่วที่ไม่ได้อนุญาต');" >/dev/null 2>&1
+n=$($Q -c "select count(*) from public.visit_daily where source='unknown' and page='gameopen';")
+ok "แหล่งที่มาที่ไม่ได้อนุญาต ถูกบังคับเป็น unknown ไม่ใช่เก็บตามที่ส่งมา" "$n" "1"
+
+$Q -c "select public.rpc_track_visit('หน้าที่ไม่มีจริง', null, true, 'pc', 'hub');" >/dev/null 2>&1
+n=$($Q -c "select count(*) from public.visit_daily where page='หน้าที่ไม่มีจริง';")
+ok "หน้าที่ไม่อยู่ในรายการ ไม่ถูกบันทึก (กันคนยิงสร้างแถวมั่ว)" "$n" "0"
+
+# ── แยกภาค: สองภาคใช้รหัสส่งคะแนนเดียวกันเป๊ะ ──
+# ⭐ ถ้าไม่แยก ตัวเลขของสองภาคจะกองรวมกัน แล้วแยกกลับไม่ได้อีกเลยเพราะข้อมูลปนไปแล้ว
+$Q -c "alter table public.games add column if not exists score_code text;" >/dev/null 2>&1
+$Q -c "insert into public.games (id, code, name, status) values ('dddddddd-0000-4000-8000-000000000002','kanchanaburi2050-p2','ภาค 2','active') on conflict (id) do nothing;" >/dev/null 2>&1
+$Q -c "update public.games set score_code='kanchanaburi2050' where code='kanchanaburi2050-p2';" >/dev/null 2>&1
+$Q -c "delete from public.visit_daily;" >/dev/null 2>&1
+$Q -c "select public.rpc_track_visit('gameopen','kanchanaburi2050',true,'pc','hub','V.8.68-p2-2569.140');" >/dev/null 2>&1
+$Q -c "select public.rpc_track_visit('gameopen','kanchanaburi2050',true,'pc','hub','V.7.99.45-IX2050-2569.79');" >/dev/null 2>&1
+n=$($Q -c "select count(distinct game_code) from public.visit_daily where page='gameopen';")
+ok "⭐ สองภาคที่ส่งรหัสเดียวกัน ถูกแยกเป็นสองรหัสด้วย gp_resolve_game" "$n" "2"
+n=$($Q -c "select count(*) from public.visit_daily where page='gameopen' and game_code='kanchanaburi2050-p2';")
+ok "ภาค 2 เข้าถูกช่องของตัวเอง" "$n" "1"
+
+# ── ไม่ทับความหมายเดิมของ page='game' ──
+$Q -c "select public.rpc_track_visit('game','kanchanaburi2050',true,'pc');" >/dev/null 2>&1
+n=$($Q -c "select (click_all::text || '/' || open_all::text) from public.v_game_activity where game_code='kanchanaburi2050';")
+ok "⭐ 'กดจากเว็บกลาง' กับ 'เกมเปิดจริง' แยกช่องกัน ไม่นับซ้ำเป็นสองเท่า" "$n" "1/1"
+n=$($Q -c "select (open_hub::text) from public.v_game_activity where game_code='kanchanaburi2050-p2';")
+ok "วิวแยกยอดตามแหล่งที่มาได้จริง" "$n" "1"
+n=$($Q -c "select count(*) from information_schema.columns where table_schema='public' and table_name='v_visit_daily' and column_name='source';")
+ok "วิวรายวันเปิดช่อง source ให้หน้าผู้ดูแลใช้" "$n" "1"
+
+echo ""
 # [V.1.6.7] บรรทัดสุดท้ายต้องเป็น X/Y เสมอ (STD-006 ข้อ 1)
 # ยามพื้น: ถ้าจำนวนข้อลดฮวบ แปลว่ามีหมวดหนึ่ง "ไม่ได้รัน" (เช่นไฟล์ SQL หาย แล้วกิ่งนั้นถูกข้าม)
 # ซึ่งจะไม่มีข้อตกให้เห็นเลย — เป็นรูปแบบ "ตายเงียบ" ที่ STD-006 ข้อ 1 ตั้งมาเพื่อกัน
 # ฐาน ณ V.1.6.7 = 184 ข้อ (ผ่าน ok/okc) · อีกราว 26 ข้อเป็น echo ตรงในหมวด 0 ไม่ถูกนับ
-FLOOR=199
+FLOOR=212   # [V.1.6.18] +13 ข้อจากหมวด 13 (สถิติการเข้าถึงเกม) · ของจริง 213 เผื่อ 1 แบบเดิม
 if [ "$_nchk" -lt "$FLOOR" ]; then
   echo "❌ นับหัวได้แค่ $_nchk ข้อ (ฐานที่ควรได้ ≥ $FLOOR) — สงสัยมีหมวดที่ไม่ได้รัน"
   echo "   อ่านผลข้างบนว่าหมวดไหนหายไป · ถ้าตั้งใจตัดข้อออกจริง ให้ลด FLOOR พร้อมบันทึกเหตุผล"

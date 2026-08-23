@@ -24,16 +24,17 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     </a>
     <div class="sp"></div>
     <nav class="navlinks" aria-label="เมนูหลัก">
-      <!-- ⭐ V.1.4.3 — ครูสั่ง: ปุ่ม "สร้างห้องเรียน" มา **แทนที่** เมนู "เกมทั้งหมด"
-           กลับหน้าแรก/ดูเกมทั้งหมดได้จากโลโก้มุมซ้ายบน ซึ่งมีอยู่ทุกหน้าอยู่แล้ว
-           ปุ่มย้ายจากขวาสุดมาอยู่ตรงนี้ หัวเว็บจึงเหลือปุ่มบัญชีฝั่งขวาชุดเดียว -->
+      <!-- [V.1.6.12] เมนูหลักชุดเดียวกันทุกหน้า 6 รายการ · ลำดับเดียวกันทุกหน้า
+           เลิกใช้คำว่า "ผลการเรียนรู้" ทั้งเว็บ — เดิมคำเดียวใช้ 3 ความหมาย
+           "ผลการเรียนรู้" = ข้อมูลของทุกคน (ไม่ต้องล็อกอิน) · "ห้องเรียนของฉัน" = ของครูคนนั้น -->
       <a class="btn btn-primary" id="new-room-btn" href="teacher.html#/rooms">🏫 สร้างห้องเรียน</a>
-      <a href="dashboard.html">สรุปผลรวม</a>
-      <a href="teacher.html">สำหรับครู</a>
-      <a href="standards.html" class="on">มาตรฐาน</a>
+      <a href="index.html#games">🎮 เกม</a>
+      <a href="dashboard.html">📊 ผลการเรียนรู้</a>
+      <a href="teacher.html">🏫 ห้องเรียนของฉัน</a>
+      <a href="standards.html" class="on" aria-current="page">📐 มาตรฐาน</a>
       <a href="support.html">สนับสนุน</a>
       <a href="contact.html">ติดต่อ</a>
-    </nav>
+</nav>
     <a class="btn" id="auth-btn" href="teacher.html">👩‍🏫 เข้าสู่ระบบครู</a>
   </header>
 
@@ -46,7 +47,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     <h1 style="margin:.2em 0">📋 มาตรฐาน ตัวชี้วัด และสมรรถนะที่แต่ละเกมวัด</h1>
     <p class="lede">
       อ้างอิงได้ในแผนการสอนและงานประกันคุณภาพ — <b>เปิดดูได้เลย ไม่ต้องเข้าสู่ระบบ</b>
-      ข้อมูลทั้งหมดมาจากทะเบียนกลางของเกมเพลิน ชุดเดียวกับที่แสดงในหน้า Dashboard ของตัวเกม
+      ข้อมูลทั้งหมดมาจากทะเบียนกลางของเกมเพลิน ชุดเดียวกับที่แสดงในหน้า ผลการเรียนรู้ ของตัวเกม
       เจ้าของเกมแก้ที่ทะเบียนแล้วทุกหน้าจออัปเดตพร้อมกัน
     </p>
   </section>
@@ -65,10 +66,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   <div class="card" style="margin-top:18px">
     <b>อยากดูว่านักเรียนทำได้แค่ไหนในแต่ละตัวชี้วัด?</b>
     <div class="muted small" style="margin:6px 0 12px">
-      สร้างห้องเรียน แจกโค้ดให้นักเรียน แล้วดูผลรายคนรายด้านได้ที่ Dashboard กลาง
+      สร้างห้องเรียน แจกโค้ดให้นักเรียน แล้วดูผลรายคนรายด้านได้ที่ ห้องเรียนของฉัน
     </div>
     <a class="btn btn-primary" href="teacher.html#/rooms">🏫 สร้างห้องเรียน</a>
-    <a class="btn" href="teacher.html">📊 Dashboard กลาง</a>
+    <a class="btn" href="teacher.html">📊 ห้องเรียนของฉัน</a>
   </div>
 
   </main>
@@ -135,7 +136,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     $('std-wrap').innerHTML = html;
   }
 
-  /* แผงรายละเอียดต่อเกม — คอมโพเนนต์กลางตัวเดียวกับที่ Dashboard ของเกมใช้
+  /* แผงรายละเอียดต่อเกม — คอมโพเนนต์กลางตัวเดียวกับที่ ผลการเรียนรู้ ของเกมใช้
      อ่านด้วยคีย์ anon จึงเปิดดูได้โดยไม่ต้องล็อกอิน */
   function renderPanels(list) {
     if (!list.length) { $('std-panels').innerHTML = '<div class="card muted">ยังไม่มีเกมในระบบ</div>'; return; }

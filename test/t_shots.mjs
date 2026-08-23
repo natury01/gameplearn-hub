@@ -126,12 +126,17 @@ console.log('\n═══ 3) บล็อก "สำหรับคุณคร�
     deadLinks: [...document.querySelectorAll('a[href^="#"]')]
       .map((a) => a.getAttribute('href'))
       .filter((h) => h !== '#' && h.length > 1 && !document.querySelector(h)),
+    navText: [...document.querySelectorAll('.navlinks a')].map((a) => a.textContent).join(' | '),
     navTeacher: [...document.querySelectorAll('.navlinks a')]
-      .filter((a) => a.textContent.includes('สำหรับครู')).map((a) => a.getAttribute('href')),
+      .filter((a) => a.textContent.includes('ห้องเรียนของฉัน')).map((a) => a.getAttribute('href')),
   }));
   ok('บล็อก 4 การ์ดหายไปแล้ว', st.zcards === 0 && st.zone === 0, st);
   ok('ไม่มีลิงก์ในหน้าที่ชี้ไปที่ที่ไม่มีอยู่แล้ว', st.deadLinks.length === 0, st.deadLinks);
-  ok('เมนู "สำหรับครู" ชี้ไปหน้าครูแทน', st.navTeacher[0] === 'teacher.html', st);
+  /* [V.1.6.12] ครูเคาะให้เลิกใช้คำว่า "Dashboard" ทั้งเว็บ และเรียกหน้าครูว่า "ห้องเรียนของฉัน"
+     ข้อสอบเดิมเช็กป้ายเก่า "สำหรับครู" — เขียนใหม่ให้ตรงฐานปัจจุบัน (STD-006 ห้ามลดเพดาน)
+     ฉบับนี้เข้มกว่าเดิม: เช็กทั้งว่าชี้ถูกหน้า และว่าไม่มีคำว่า Dashboard หลงเหลือบนเมนู */
+  ok('เมนู "ห้องเรียนของฉัน" ชี้ไปหน้าครู', st.navTeacher[0] === 'teacher.html', st);
+  ok('ไม่มีคำว่า "Dashboard" หลงเหลือบนเมนูอีกแล้ว', !/dashboard/i.test(st.navText || ''), st.navText);
   await p.close();
 }
 

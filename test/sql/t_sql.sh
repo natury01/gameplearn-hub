@@ -332,11 +332,36 @@ S2=$($Q -c "select id from students where last_name='สอง'  limit 1;")
 S3=$($Q -c "select id from students where last_name='สาม'  limit 1;")
 GV="V.7.99.30-IX2050-2569.71"
 
+# ── [F2 · 20 ส.ค. 2569] ยามพิสูจน์ผู้ส่งใบรายงานผล ──
+out=$($PSQL -f $SQLDIR/82_REPORT_SENDER_PROOF.sql 2>&1)
+if [ $? -eq 0 ]; then echo "  ✅ 82_REPORT_SENDER_PROOF.sql รันผ่าน 0 error"; else echo "  ❌ 82 ล้ม"; echo "$out" | tail -5; bad=$((bad+1)); fi
+out=$($PSQL -f $SQLDIR/82_REPORT_SENDER_PROOF.sql 2>&1)
+if [ $? -eq 0 ]; then echo "  ✅ 82 รันซ้ำได้ (idempotent)"; else echo "  ❌ 82 รันซ้ำแล้วล้ม"; echo "$out" | tail -5; bad=$((bad+1)); fi
+
 # ── ส่งชุดที่ถูกทุกอย่าง — ต้องไม่มีอะไรตก และค่าที่คืนต้องเหมือนของเดิมเป๊ะ ──
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S1',
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S1',
   '{\"score\":78,\"max_score\":100,\"grade_label\":\"ดีมาก\"}'::jsonb,
   '[{\"code\":\"HT\",\"score\":72,\"level\":5},{\"code\":\"TW\",\"level\":4,\"evidence\":\"observed\"}]'::jsonb); commit;")
 okc "ส่งชุดที่ถูกต้อง = รับครบ ไม่มีอะไรตก" "$res" '"skipped_total": 0'
+
+# ── [F2] ยามพิสูจน์ผู้ส่ง — ต้องกันได้จริง ไม่ใช่แค่มีโค้ดอยู่ ──
+#  ก่อนปิด F2: ใครก็ตามที่ยิง RPC นี้ได้ เขียนใบรายงานผลให้เด็กคนไหนก็ได้ ขอแค่รู้ uuid
+#  และเด็กมี uuid ของเพื่อนทั้งห้องอยู่ในเครื่องอยู่แล้วจากรายชื่อห้อง
+f2res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S1',
+  '{\"score\":99,\"max_score\":100}'::jsonb, null); commit;" 2>&1)
+okc "⭐ anon (คนนอก/เด็ก) ส่งใบรายงานผลไม่ได้แล้ว" "$f2res" 'ต้องเป็นครูเจ้าของห้อง'
+f2res=$($Q -c "begin; $AS_A select rpc_submit_report('kanchanaburi2050','$GV','$S1',
+  '{\"score\":99,\"max_score\":100}'::jsonb, null); commit;" 2>&1)
+okc "⭐ ครูคนอื่น (ไม่ใช่เจ้าของห้อง) ส่งไม่ได้" "$f2res" 'ต้องเป็นครูเจ้าของห้อง'
+f2res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S1',
+  '{\"score\":77,\"max_score\":100}'::jsonb, null); commit;" 2>&1)
+okc "⭐ ครูเจ้าของห้องยังส่งได้ตามปกติ (ยามไม่ปิดทางที่ถูกต้อง)" "$f2res" '"ok": true'
+n=$($Q -c "begin; $AS_B select (rpc_submit_report('kanchanaburi2050','$GV','$S1',
+  '{\"score\":77,\"max_score\":100}'::jsonb, null)->>'ok'); rollback;")
+ok "ยามไม่ทำให้ผลลัพธ์เดิมเพี้ยน" "$n" "true"
+n=$($Q -c "select (pg_get_functiondef(oid) like '%ต้องเป็นครูเจ้าของห้อง%')::text
+             from pg_proc where proname='rpc_submit_report' limit 1;")
+ok "ยามฝังอยู่ในตัวฟังก์ชันจริง (ไม่ใช่แค่ในไฟล์)" "$n" "true"
 okc "ช่องเดิม ok ยังอยู่" "$res" '"ok": true'
 okc "ช่องเดิม achievement ยังอยู่" "$res" '"achievement": true'
 okc "ช่องเดิม competencies ยังอยู่และนับถูก" "$res" '"competencies": 2'
@@ -352,7 +377,7 @@ n=$($Q -c "select level_label from competency_dim_results where student_id='$S1'
 ok "ป้ายระดับเป็นคำยังเติมให้เอง" "$n" "สามารถ"
 
 # ส่งซ้ำต้องทับของเดิม ไม่ใช่เพิ่มแถวใหม่
-$Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S1',
+$Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S1',
   '{\"score\":90,\"max_score\":100}'::jsonb, null); commit;" >/dev/null
 n=$($Q -c "select count(*) from achievement_results where student_id='$S1';")
 ok "ส่งซ้ำทับของเดิม ไม่เพิ่มแถว" "$n" "1"
@@ -360,7 +385,7 @@ n=$($Q -c "select score::int from achievement_results where student_id='$S1';")
 ok "ส่งซ้ำแล้วค่าอัปเดตจริง" "$n" "90"
 
 # ── ⭐ ข้อสำคัญที่สุด: รายการเดียวผิด ต้องไม่ลากใบที่เหลือตกไปด้วย ──
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S2',
   '{\"score\":55,\"max_score\":100}'::jsonb,
   '[{\"code\":\"HOT\",\"score\":60},{\"code\":\"XX\",\"score\":50}]'::jsonb); commit;")
 okc "รหัสผิดหนึ่งด้าน — ใบผลสัมฤทธิ์ยังถูกเก็บ (ของเดิมย้อนกลับทั้งใบ)" "$res" '"achievement": true'
@@ -374,69 +399,69 @@ n=$($Q -c "select count(*) from achievement_results where student_id='$S2';")
 ok "ยืนยันจากตารางจริง: ใบผลสัมฤทธิ์ของเด็กคนนี้อยู่ในฐาน" "$n" "1"
 
 # ── เหตุผลแต่ละแบบ ──
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S2',
   '{\"score\":55}'::jsonb, '[{\"score\":10},{\"code\":\"  \"}]'::jsonb); rollback;")
 okc "เหตุผล: ไม่มีรหัสด้านสมรรถนะ" "$res" "ไม่มีรหัสด้านสมรรถนะ"
 okc "ไม่มีรหัส 2 รายการ นับครบทั้งสอง" "$res" '"skipped_total": 2'
 
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S2',
   null, '[{\"code\":\"HT\",\"score\":70},{\"code\":\"HOT\",\"score\":10}]'::jsonb); rollback;")
 okc "เหตุผล: รหัสซ้ำในคำขอเดียวกัน (หลังแปลง HT→HOT แล้วชนกัน)" "$res" "ซ้ำกับรายการก่อนหน้า"
 okc "รหัสซ้ำ — เก็บของที่ส่งมาก่อน" "$res" '"competencies": 1'
 
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S2',
   '{\"score\":10}'::jsonb, '[{\"code\":\"TW\",\"level\":\"สูง\"}]'::jsonb); rollback;")
 okc "เหตุผล: ระดับต้องเป็นจำนวนเต็ม (ของเดิมพังทั้งใบด้วย error อังกฤษ)" "$res" "ต้องเป็นจำนวนเต็ม"
 okc "ระดับผิด — ใบผลสัมฤทธิ์ยังรอด" "$res" '"stored": 1'
 
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S2',
   '{\"score\":\"ดีมาก\"}'::jsonb, '[{\"code\":\"CM\",\"level\":4}]'::jsonb); rollback;")
 okc "เหตุผล: คะแนนในใบผลสัมฤทธิ์ไม่ใช่ตัวเลข" "$res" "ต้องเป็นตัวเลข"
 okc "คะแนนผิด — ใบสมรรถนะยังรอด" "$res" '"achievement": false'
 okc "รายการที่ตกบอกว่าเป็นใบผลสัมฤทธิ์" "$res" '"part": "achievement"'
 
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S2',
   '{\"score\":10}'::jsonb, '[{\"code\":\"CZ\",\"level\":4,\"evidence\":\"ครูดูเอา\"}]'::jsonb); rollback;")
 okc "เหตุผล: evidence ไม่ถูกต้อง — บอกเป็นไทย ไม่ใช่ check constraint อังกฤษ" "$res" "ไม่ถูกต้อง"
 okc "evidence ผิด ไม่โผล่ข้อความดิบของ PostgreSQL ใส่ครู" "$res" "scored (คิดจากคะแนน)"
 
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S2',
   '{\"score\":10}'::jsonb, '\"ไม่ใช่อาเรย์\"'::jsonb); rollback;")
 okc "รูปแบบใบสมรรถนะผิด — บอกเป็นไทย ไม่ทำให้ใบที่ 1 ตก" "$res" "ต้องเป็นอาเรย์"
 
 # ── อาเรย์ที่ตกถูกตัดที่ 25 แต่ยอดรวมต้องตรง ──
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S2',
   '{\"score\":10}'::jsonb,
   (select jsonb_agg(jsonb_build_object('code','ZZ'||g)) from generate_series(1,30) g)); rollback;")
 okc "ตกเกิน 25 รายการ — ยอดรวมยังตรง" "$res" '"skipped_total": 30'
-n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_submit_report('kanchanaburi2050','$GV','$S2',
+n=$($Q -c "begin; $AS_B select jsonb_array_length(rpc_submit_report('kanchanaburi2050','$GV','$S2',
   '{\"score\":10}'::jsonb,
   (select jsonb_agg(jsonb_build_object('code','ZZ'||g)) from generate_series(1,30) g))->'skipped'); rollback;")
 ok "อาเรย์ที่ตกถูกตัดไว้ที่ 25 รายการ (กันคำตอบบวม)" "$n" "25"
 
 # ── เก็บไม่ได้เลย = ต้องโยน error ไม่ใช่ตอบ 200 พร้อม ok:false ──
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S2',
   null, '[{\"code\":\"XX\"}]'::jsonb); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
 okc "เก็บไม่ได้เลย = โยน error (ห้ามตอบ ok:false — ภาค 2 ดักด้วย .catch อย่างเดียว)" "$res" "ERROR"
 okc "ข้อความ error บอกเหตุผลแรกเป็นภาษาไทย" "$res" "ไม่รู้จักรหัสสมรรถนะ"
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S2',
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S2',
   null, '[{\"code\":\"XX\"}]'::jsonb); rollback;" 2>&1)
 okc "ยืนยันว่าไม่มีทางคืน ok:false" "$res" "ERROR"
 
 # ── ด่านเดิมของไฟล์ 43 ต้องไม่หายไปสักข้อ ──
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV',null,'{\"score\":1}'::jsonb,null); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV',null,'{\"score\":1}'::jsonb,null); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
 okc "ด่านเดิม: ไม่ระบุนักเรียน" "$res" "ต้องระบุนักเรียน"
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S1','{\"score\":1}'::jsonb,null,'LEGACY-SHEETS'); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S1','{\"score\":1}'::jsonb,null,'LEGACY-SHEETS'); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
 okc "ด่านเดิม: run_id LEGACY-SHEETS สงวนไว้" "$res" "LEGACY-SHEETS"
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S1',null,'[]'::jsonb); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S1',null,'[]'::jsonb); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
 okc "ด่านเดิม: ต้องส่งอย่างน้อยหนึ่งใบ" "$res" "อย่างน้อยหนึ่งใบ"
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('ไม่มีเกมนี้','$GV','$S1','{\"score\":1}'::jsonb,null); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
+res=$($Q -c "begin; $AS_B select rpc_submit_report('ไม่มีเกมนี้','$GV','$S1','{\"score\":1}'::jsonb,null); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
 okc "ด่านเดิม: ไม่พบเกม" "$res" "ไม่พบเกม"
-res=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','99999999-9999-4999-8999-999999999999','{\"score\":1}'::jsonb,null); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
+res=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','99999999-9999-4999-8999-999999999999','{\"score\":1}'::jsonb,null); rollback;" 2>&1 | grep -m1 -E 'ERROR|denied' || echo NO_ERROR)
 okc "ด่านเดิม: ไม่พบนักเรียน" "$res" "ไม่พบนักเรียนรหัสนี้"
 
 # ── ครูตัดสินระดับทับ ต้องยังทำงาน (กติกาเดิมของไฟล์ 43) ──
-$Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$S3',null,
+$Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$S3',null,
   '[{\"code\":\"SM\",\"level\":6,\"decided_by\":\"teacher\",\"system_level\":4,\"system_score\":55}]'::jsonb); commit;" >/dev/null
 n=$($Q -c "select decided_by from competency_dim_results where student_id='$S3' and comp_code='SM';")
 ok "ครูตัดสินระดับทับยังบันทึกได้ (decided_by)" "$n" "teacher"
@@ -449,9 +474,9 @@ fail=0; okn=0
 for st in "$S1|78" "$S2|BAD" "$S3|91"; do
   sid=${st%%|*}; sc=${st##*|}
   if [ "$sc" = "BAD" ]; then
-    r=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$sid',null,'[{\"code\":\"XX\"}]'::jsonb); commit;" 2>&1)
+    r=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$sid',null,'[{\"code\":\"XX\"}]'::jsonb); commit;" 2>&1)
   else
-    r=$($Q -c "begin; $AS_ANON select rpc_submit_report('kanchanaburi2050','$GV','$sid','{\"score\":$sc,\"max_score\":100}'::jsonb,null); commit;" 2>&1)
+    r=$($Q -c "begin; $AS_B select rpc_submit_report('kanchanaburi2050','$GV','$sid','{\"score\":$sc,\"max_score\":100}'::jsonb,null); commit;" 2>&1)
   fi
   if echo "$r" | grep -q ERROR; then fail=$((fail+1)); else okn=$((okn+1)); fi
 done
@@ -481,7 +506,7 @@ out=$($Q -c "begin;
   insert into games (id, code, name) values
     ('44444444-4444-4444-8444-44444444444b','kanchanaburi2050-p2','กาญจนบุรี 2050 ภาค 2')
     on conflict do nothing;
-  $AS_ANON
+  $AS_B   -- [F2] ต้องส่งในฐานะครูเจ้าของห้อง — anon ส่งไม่ได้แล้ว
   select rpc_submit_report('kanchanaburi2050','V.8.63-p2-2569.127','$S1',
     '{\"score\":42,\"max_score\":160}'::jsonb, '[]'::jsonb);
   reset role;   -- อ่านตารางตรง ๆ ต้องถอดหมวก anon ก่อน (RLS ปัด anon ถูกต้องแล้ว — เทสต์หมวด 12 คุมอยู่)
@@ -491,7 +516,7 @@ out=$($Q -c "begin;
     where a.student_id='$S1' and g.code='kanchanaburi2050-p2';
   select 'P1UNTOUCHED=' || (score is distinct from 42) from achievement_results a join games g on g.id=a.game_id
     where a.student_id='$S1' and g.code='kanchanaburi2050';
-  set role anon;
+  $AS_B
   select rpc_submit_report('kanchanaburi2050','V.7.99.37-IX2050-2569.71','$S1',
     '{\"score\":99,\"max_score\":160}'::jsonb, '[]'::jsonb);
   reset role;
@@ -920,7 +945,7 @@ echo ""
 # ยามพื้น: ถ้าจำนวนข้อลดฮวบ แปลว่ามีหมวดหนึ่ง "ไม่ได้รัน" (เช่นไฟล์ SQL หาย แล้วกิ่งนั้นถูกข้าม)
 # ซึ่งจะไม่มีข้อตกให้เห็นเลย — เป็นรูปแบบ "ตายเงียบ" ที่ STD-006 ข้อ 1 ตั้งมาเพื่อกัน
 # ฐาน ณ V.1.6.7 = 184 ข้อ (ผ่าน ok/okc) · อีกราว 26 ข้อเป็น echo ตรงในหมวด 0 ไม่ถูกนับ
-FLOOR=192
+FLOOR=199
 if [ "$_nchk" -lt "$FLOOR" ]; then
   echo "❌ นับหัวได้แค่ $_nchk ข้อ (ฐานที่ควรได้ ≥ $FLOOR) — สงสัยมีหมวดที่ไม่ได้รัน"
   echo "   อ่านผลข้างบนว่าหมวดไหนหายไป · ถ้าตั้งใจตัดข้อออกจริง ให้ลด FLOOR พร้อมบันทึกเหตุผล"

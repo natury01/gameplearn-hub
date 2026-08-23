@@ -21,18 +21,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <span class="bname"><span class="th" id="brand-th">เกมเพลิน</span><span class="en">GamePlearn · สำหรับครู</span></span></a>
     <div class="sp"></div>
     <nav class="navlinks" aria-label="เมนูหลัก">
-      <!-- ⭐ V.1.4.3 — ครูสั่ง: "สร้างห้องเรียน" มาแทนที่ "เกมทั้งหมด" ตัวแรกของเมนู
-           หน้านี้มีตัวนี้อยู่แล้วกลางเมนู จึงไม่ใส่ซ้ำ — ย้ายขึ้นมาเป็นตัวแรกแทน
-           และคงเป็นลิงก์เมนู (ไม่ใช่ปุ่มสีทึบ) เพราะต้องใช้ขีดใต้บอก "กำลังอยู่หน้านี้" ร่วมกับเพื่อน ๆ
-
-           เมนูหน้าครู 3 หน้า อยู่บนแถบหัวเว็บ (เดิมเป็นแถบย่อยใต้หัวเว็บ — ครูสั่งให้เอาออก)
-           ตัวที่กำลังเปิดอยู่ติด .on + aria-current ผ่าน syncNav() ทุกครั้งที่เปลี่ยน route
-           จึงไม่ต้องใส่ class="on" ตายตัวให้ "สำหรับครู" อีก (จะไฮไลต์ซ้อนกันสองอัน) -->
-      <a href="#/rooms" data-nav="#/rooms">🏫 สร้างห้องเรียน</a>
-      <a href="#/" data-nav="#/">📊 Dashboard</a>
-      <a href="#/browse" data-nav="#/browse">🔎 ห้องของครูคนอื่น</a>
-      <a href="dashboard.html">📊 สรุปผลรวม</a>
-      <a href="standards.html">📋 มาตรฐาน</a>
+      <!-- [V.1.6.12] เมนูหลักชุดเดียวกันทุกหน้า 6 รายการ · ลำดับเดียวกันทุกหน้า
+           เลิกใช้คำว่า "Dashboard" ทั้งเว็บ — เดิมคำเดียวใช้ 3 ความหมาย
+           "ผลการเรียนรู้" = ข้อมูลของทุกคน (ไม่ต้องล็อกอิน) · "ห้องเรียนของฉัน" = ของครูคนนั้น -->
+      <!-- [V.1.6.12] หน้านี้ไม่ใส่ปุ่ม "สร้างห้องเรียน" ซ้ำ — ตัวหน้าเองคือที่สร้างห้องอยู่แล้ว
+           (เจตนาเดิมของหน้านี้ก็ไม่ใส่ · ใส่ซ้ำแล้วหัวเว็บตกบรรทัดบนจอโน้ตบุ๊กด้วย) -->
+      <a href="index.html#games">🎮 เกม</a>
+      <a href="dashboard.html">📊 ผลการเรียนรู้</a>
+      <a href="teacher.html" class="on" aria-current="page">🏫 ห้องเรียนของฉัน</a>
+      <a href="standards.html">📐 มาตรฐาน</a>
       <a href="support.html">สนับสนุน</a>
       <a href="contact.html">ติดต่อ</a>
     </nav>
@@ -79,7 +76,16 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   <!-- ================= หน้าเนื้อหา (หลัง login) ================= -->
   <div id="v-app" class="hidden">
-    <h1 class="sr-only">แดชบอร์ดครู — เกมเพลิน</h1>
+    <h1 class="sr-only">ห้องเรียนของฉัน — เกมเพลิน</h1>
+      <!-- [V.1.6.12] เมนู "ภายในหน้าครู" แยกเป็นแถวที่สอง ไม่ปนกับเมนูข้ามหน้า
+         และซ่อนตอนยังไม่ล็อกอิน — เดิมกดแล้วหน้าจอไม่เปลี่ยนเลย เพราะวาดลงกล่องที่ยังถูกซ่อน
+         แต่เมนูกลับติดสถานะ "กำลังอยู่หน้านี้" ให้ ⇒ ครูกดแล้วงงว่าเว็บค้าง
+         คง class="navlinks" และ data-nav ไว้ เพราะ syncNav() และชุดทดสอบใช้ตัวเลือกนี้ -->
+      <nav class="navlinks navsub" id="nav-teacher" aria-label="เมนูในหน้าครู">
+        <a href="#/rooms" data-nav="#/rooms">🏫 ห้องเรียนของฉัน</a>
+        <a href="#/" data-nav="#/">📊 ภาพรวมห้องของฉัน</a>
+        <a href="#/browse" data-nav="#/browse">🔎 ห้องของครูคนอื่น</a>
+      </nav>
     <div id="crumb" class="crumb hidden"><a href="#/">← กลับหน้ารวม</a></div>
     <div id="content"><div class="card muted"><span class="loading"></span> กำลังโหลดข้อมูล…</div></div>
   </div>
@@ -287,6 +293,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     }
     $('v-login').classList.add('hidden');
     $('v-app').classList.remove('hidden');
+
     $('btn-logout').classList.remove('hidden');
     try {
       S.teacher = await G.ensureTeacherRow();
@@ -457,6 +464,22 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      ทำไมต้องมีเงื่อนไข ไม่สั่งรัวทุกครั้งที่เปิดหน้า:
        การสั่งหนึ่งครั้งเปิด iframe + ไล่ยิงใบรายงานผลทีละคน กินเวลาหลายวินาที
        และเขียนฐานจริง · เปิดหน้าเฉย ๆ แล้วสั่งทุกครั้ง = กวนฐานโดยเปล่าประโยชน์ */
+  /* [V.1.6.11] ป้ายบอกรุ่นบนการ์ดเกม อัปเดตเองจากรุ่นที่เกมรายงาน
+     เดิมครูต้องพิมพ์เองในหน้าผู้ดูแลทุกครั้งที่ออกรุ่น แล้วก็ลืม (ค้างจริงหลายวัน)
+     ตอนนี้เกมตอบเลขรุ่นกลับมาทุกครั้งที่ถูกสั่งอัปเดตผล ⇒ เอาค่านั้นมาเขียนให้เลย
+     ได้ "รุ่นที่อยู่บนเว็บจริง" ไม่ใช่ "รุ่นที่ใครพิมพ์ไว้" */
+  async function noteGameVersion(game, ver) {
+    try {
+      if (!game || !ver || typeof ver !== 'string') return;
+      if (String(game.current_version || '') === ver) return;   /* ตรงอยู่แล้ว ไม่ต้องเขียน */
+      await G.api('/rest/v1/games?id=eq.' + game.id, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ current_version: ver }),
+      });
+      game.current_version = ver;
+    } catch (e) { /* ไม่มีสิทธิ์เขียนก็เงียบ — เป็นแค่ป้ายบอกรุ่น ไม่ใช่ของจำเป็นต่อการใช้งาน */ }
+  }
+
   const AutoSync = {
     GAP_MS: 90 * 1000,        /* เผื่อนาฬิกาเครื่อง/เซิร์ฟเวอร์คลาดกัน — ต่างกันไม่ถึงนี้ถือว่าไม่เก่า */
     COOLDOWN_MS: 3 * 60 * 1000,  /* ห้องเดิมสั่งซ้ำได้เร็วสุดทุก 3 นาที กันวนลูปถ้าเกมส่งไม่สำเร็จ */
@@ -492,6 +515,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       try {
         for (const g of list) {
           const r = await GameRefresh.room(g, cid);
+          if (r && r.ver) noteGameVersion(g, r.ver);
           if (r && r.ok) okAny = true;
         }
       } catch (e) { /* เงียบ — นี่คืองานเบื้องหลัง ห้ามทำให้หน้าจอครูพัง */ }
@@ -505,7 +529,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const uid = G.session().user_id;
 
     const [games, roomsRaw, frameworks, coverage, schools, has43] = await Promise.all([
-      G.get('/rest/v1/games?select=id,code,name,status,launch_url,dashboard_url,minimum_grade,maximum_grade&order=name'),
+      G.get('/rest/v1/games?select=id,code,name,status,launch_url,dashboard_url,minimum_grade,maximum_grade,current_version&order=name'),
       G.get('/rest/v1/classrooms?select=*&teacher_id=eq.' + encodeURIComponent(uid) + '&order=created_at.desc'),
       soft('/rest/v1/assessment_frameworks?select=code,kind,name_th,status,level_scale&status=eq.active'),
       soft('/rest/v1/v_framework_coverage?select=*&depth=eq.1'),
@@ -2023,7 +2047,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         try {
           for (const g of list) {
             msg.textContent = 'กำลังให้ ' + g.name + ' คำนวณผลของห้องนี้… (อาจใช้เวลาสักครู่)';
-            done.push({ g: g.name, r: await GameRefresh.room(g, cid) });
+            const _r = await GameRefresh.room(g, cid);
+            if (_r && _r.ver) noteGameVersion(g, _r.ver);
+            done.push({ g: g.name, r: _r });
           }
         } finally {
           GameRefresh.cleanup();
@@ -2127,6 +2153,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           +   (x.is_active === false ? ' <span class="badge">ปิดใช้งาน</span>' : '') + '</td>'
           + '<td class="muted small">' + G.esc(x.character_name || '–') + '</td>'
           + '<td class="muted small">' + G.esc(x.join_pin || '–') + '</td>'
+          + '<td><button class="btn btn-sm" data-kru-open="' + x.id + '" title="ครูประเมินสมรรถนะจากการสังเกต 19 ด้านย่อย">🧑‍🏫 ประเมิน</button> '
           + '<td><button class="btn btn-sm" data-edit-stu="' + x.id + '">✏️ แก้ไข</button> '
           +   '<button class="btn btn-sm" data-off-stu="' + x.id + '">'
           +     (x.is_active === false ? 'เปิดใช้งาน' : 'ปิดการใช้งาน') + '</button> '
@@ -2162,6 +2189,45 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   function bindRoster(cid) {
+    /* [V.1.6.16] ครูประเมินสมรรถนะ — บันทึกผ่าน rpc_kru_assess ตัวเดียวกับที่เกมใช้
+       เสร็จแล้วสั่งเกมคำนวณใหม่ทันที ตัวเลขสมรรถนะจะขยับเองโดยครูไม่ต้องกดอะไรอีก */
+    document.querySelectorAll('[data-kru-open]').forEach(function (b) {
+      b.onclick = async function () {
+        const id = b.getAttribute('data-kru-open');
+        await kruLoad(cid);
+        KRU.sid = id; KRU.form = Object.assign({}, KRU.saved[id] || {});
+        let box = document.getElementById('kru-host');
+        if (!box) { box = document.createElement('div'); box.id = 'kru-host'; b.closest('table').parentNode.appendChild(box); }
+        const draw = () => {
+          box.innerHTML = kruFormHtml(id);
+          box.querySelectorAll('[data-kru]').forEach(function (k) {
+            k.onclick = function () {
+              const code = k.getAttribute('data-kru'), v = Number(k.getAttribute('data-kruv'));
+              if (Number(KRU.form[code]) === v) delete KRU.form[code]; else KRU.form[code] = v;
+              draw();
+            };
+          });
+          box.querySelector('#kru-cancel').onclick = () => { box.innerHTML = ''; };
+          box.querySelector('#kru-save').onclick = async function () {
+            try {
+              await G.api('/rest/v1/rpc/rpc_kru_assess', { method: 'POST',
+                body: JSON.stringify({ p_student: id, p_payload: {
+                  dims: KRU.form,
+                  by: (S.teacher && (S.teacher.email || S.teacher.display_name)) || 'ครู',
+                  at: new Date().toISOString(), source: 'hub' } }) });
+              box.innerHTML = '<div class="card muted small">✅ บันทึกแล้ว — กำลังให้เกมคำนวณผลใหม่…</div>';
+              /* คะแนนสมรรถนะเป็นของเกม — บันทึกแล้วต้องให้เกมคิดใหม่ ไม่งั้นตัวเลขบนจอยังเป็นของเก่า */
+              await AutoSync.maybe(cid, async () => { await loadAll(); renderRoom(cid); });
+              await loadAll(); renderRoom(cid);
+            } catch (e) {
+              box.innerHTML = '<div class="card err" style="display:block">บันทึกไม่สำเร็จ — '
+                + (/permission|denied|42501/i.test(String(e.message)) ? 'ต้องเป็นครูเจ้าของห้องนี้' : 'ลองใหม่อีกครั้ง') + '</div>';
+            }
+          };
+        };
+        draw();
+      };
+    });
     document.querySelectorAll('[data-edit-stu]').forEach(function (b) {
       b.onclick = function () {
         const id = b.getAttribute('data-edit-stu');
@@ -2288,6 +2354,178 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   /* ===================== หน้านักเรียน ===================== */
+  /* ══ [V.1.6.13] ใบสมรรถนะรายคนแบบละเอียด — ตามภาพที่ครูส่งมา ═════════════
+     แสดงสิ่งที่เกมคิดมาแล้ว ไม่คิดใหม่: ระดับรายด้าน · ด้านย่อย · แหล่งหลักฐาน
+     · ใครเป็นคนตัดสิน (ระบบ หรือครูปรับเอง) · เกณฑ์ที่ใช้
+     ⚠️ 'ว่าง ≠ 0' — ด้านที่เกมยังไม่ได้วัด ต้องขึ้นว่า 'ยังไม่มีหลักฐาน'
+        ห้ามแสดง 0 เพราะ 0 แปลว่า 'วัดแล้วได้ศูนย์' ซึ่งไม่จริงและทำครูเข้าใจผิด */
+  function compDimCard(rows) {
+    if (!rows.length) return '';
+    const lvColor = (lv) => lv >= 6 ? '#047857' : lv >= 5 ? '#0d9488' : lv >= 4 ? '#b45309' : '#b91c1c';
+    return '<div class="grid cols-2">' + rows.map(function (r) {
+      const has = r.score != null || r.level != null;
+      const subs = (r.sub_scores && typeof r.sub_scores === 'object') ? r.sub_scores : null;
+      const subRows = subs ? Object.keys(subs).map(function (k) {
+        const v = subs[k];
+        const pct = (typeof v === 'number') ? v : (v && typeof v.percent === 'number' ? v.percent : null);
+        const nm = (v && (v.name || v.name_th)) || k;
+        return '<tr><td class="muted small">' + G.esc(nm) + '</td><td class="num">'
+          + (pct == null ? '<span class="muted">—</span>' : '<b>' + G.fmt(pct) + '%</b>') + '</td></tr>';
+      }).join('') : '';
+      /* ครูปรับระดับเองไหม — ถ้าปรับ ต้องเห็นทั้งค่าที่ระบบคิดและค่าที่ครูตัดสิน
+         เพื่อให้ตามรอยได้ว่าเลขมาจากไหน (ข้อกำหนดงานวิจัย) */
+      const byTeacher = r.decided_by && String(r.decided_by) !== 'system';
+      return '<div class="card">'
+        + '<h3 style="margin:0 0 6px;font-size:15px;display:flex;align-items:center;gap:8px">'
+        +   '<span style="flex:1">' + G.esc(r.comp_name || r.comp_code) + '</span>'
+        +   (has ? '<span class="badge" style="background:' + lvColor(r.level) + ';color:#fff">'
+                 + 'ระดับ ' + G.esc(String(r.level == null ? '–' : r.level))
+                 + (r.level_label ? ' ' + G.esc(r.level_label) : '') + '</span>' : '')
+        + '</h3>'
+        + (has ? meter(r.score) : '<div class="muted small">ยังไม่มีหลักฐานสำหรับด้านนี้ในบทเรียนชุดนี้</div>')
+        + (subRows ? '<table class="gol" style="margin-top:8px"><tbody>' + subRows + '</tbody></table>' : '')
+        + (byTeacher ? '<div class="muted small" style="margin-top:8px">🧑‍🏫 <b>ครูตัดสินระดับเอง</b>'
+              + (r.system_level != null ? ' · ระบบคิดไว้ที่ระดับ ' + G.esc(String(r.system_level))
+                   + (r.system_score != null ? ' (' + G.fmt(r.system_score) + '%)' : '') : '') + '</div>' : '')
+        + (r.evidence ? '<div class="muted small" style="margin-top:6px">แหล่งหลักฐาน: ' + G.esc(String(r.evidence)) + '</div>' : '')
+        + (r.criteria_note ? '<div class="muted small" style="margin-top:4px">' + G.esc(r.criteria_note) + '</div>' : '')
+        + '</div>';
+    }).join('') + '</div>';
+  }
+  /* ══ [V.1.6.15] ใบสรุปข้ามเกมของนักเรียนหนึ่งคน ═══════════════════════════
+     สมรรถนะ = รวมข้ามเกมได้ (กรอบร่วม 6 ด้าน) · คะแนน = แยกรายเกมเสมอ
+     อยู่หน้าเดียวกันเพื่อให้ครูเห็นภาพรวมโดยไม่ต้องสลับหน้า */
+  function crossGameCard(sid) {
+    const dims = (S.compDims || []).filter((x) => x.student_id === sid && x.evidence !== 'self_report');
+    const prows = progOf(sid);
+    if (!dims.length && !prows.length) return '';
+
+    /* ── ส่วนที่ 1: สมรรถนะ 6 ด้าน รวมข้ามเกม ── */
+    const dimHtml = COMP6.map(function (c) {
+      const code = c[0], name = c[1];
+      const rs = dims.filter((r) => r.comp_code === code && r.level != null);
+      if (!rs.length) {
+        return '<tr><td>' + G.esc(name) + '</td>'
+          + '<td class="muted small" colspan="2">ยังไม่มีหลักฐานจากเกมใดเลย</td></tr>';
+      }
+      /* ระดับที่ทำได้ดีที่สุด — ไม่ใช่ค่าเฉลี่ย (ดูเหตุผลหัวไฟล์) */
+      const best = rs.reduce((a, b) => (Number(b.level) > Number(a.level) ? b : a));
+      const lvs = [...new Set(rs.map((r) => Number(r.level)))];
+      const spread = lvs.length > 1 ? (Math.max(...lvs) - Math.min(...lvs)) : 0;
+      const from = rs.map(function (r) {
+        const g = gameById(r.game_id);
+        return G.esc((g ? g.name : '') + ' — ระดับ ' + r.level);
+      }).join(' · ');
+      return '<tr><td><b>' + G.esc(name) + '</b></td>'
+        + '<td class="num"><span class="badge">ระดับ ' + G.esc(String(best.level))
+        +   (best.level_label ? ' ' + G.esc(best.level_label) : '') + '</span></td>'
+        + '<td class="muted small">' + from
+        +   (spread >= 2 ? ' <b style="color:#b45309">⚠️ ผลจากสองเกมต่างกันมาก — ควรดูหลักฐานประกอบก่อนสรุป</b>' : '')
+        + '</td></tr>';
+    }).join('');
+
+    /* ── ส่วนที่ 2: คะแนนผลสัมฤทธิ์ แยกรายเกมเสมอ ── */
+    const scoreHtml = prows.length ? prows.map(function (p) {
+      const g = gameById(p.game_id);
+      const a = (S.achieve || []).find((x) => x.student_id === sid && x.game_id === p.game_id);
+      return '<div class="card" style="padding:12px 14px">'
+        + '<div style="font-weight:700;font-size:14px">' + G.esc(g ? g.name : '') + '</div>'
+        + (a && a.percent != null
+             ? '<div style="font-size:22px;font-weight:800;margin:4px 0">' + G.fmt(a.percent) + '%</div>'
+               + '<div class="muted small">' + G.esc(a.grade_label || '') + '</div>'
+             : '<div class="muted small" style="margin:6px 0">ยังไม่มีใบผลสัมฤทธิ์</div>')
+        + '<div class="muted small">ความก้าวหน้า ' + G.fmt(p.progress_percent) + '%</div>'
+        + '</div>';
+    }).join('') : '';
+
+    return '<h2 class="section-title">ภาพรวมทุกเกม '
+      + '<span class="sub">สมรรถนะรวมข้ามเกมได้ · คะแนนแยกรายเกมเสมอ</span></h2>'
+      + '<div class="card">'
+      +   '<div style="font-weight:700;margin-bottom:6px">สมรรถนะหลัก 6 ด้าน <span class="muted small">(ระดับที่ทำได้ดีที่สุดจากทุกเกม)</span></div>'
+      +   '<table class="gol"><tbody>' + dimHtml + '</tbody></table>'
+      +   '<div class="muted small" style="margin-top:8px">ใช้ระดับที่ทำได้ดีที่สุด ไม่ใช่ค่าเฉลี่ย — '
+      +     'สมรรถนะตอบว่า "ทำได้ไหม" การเฉลี่ยจะลงโทษเด็กที่ครั้งแรกยังไม่ได้แล้วค่อยทำได้</div>'
+      + '</div>'
+      + (scoreHtml
+          ? '<div style="font-weight:700;margin:14px 0 6px">คะแนนผลสัมฤทธิ์ <span class="muted small">แยกรายเกม — คนละเครื่องมือวัด จึงไม่รวมเป็นเลขเดียว</span></div>'
+            + '<div class="grid cols-3">' + scoreHtml + '</div>'
+          : '');
+  }
+  /* ══ [V.1.6.16] ครูประเมินสมรรถนะจากการสังเกต ═══════════════════════════
+     ใช้ rpc_kru_assess ตัวเดียวกับที่เกมใช้ — ซึ่งตรวจครูเจ้าของห้องอยู่แล้วในตัว
+     เว็บกลางไม่คิดคะแนนเอง แค่บันทึกสิ่งที่ครูสังเกต แล้วให้เกมคำนวณใหม่ (กฎล็อกข้อ 3)
+     รายการ 19 ด้านย่อยคัดจากเกมโดยตรง — รหัสต้องตรงกันเป๊ะ ไม่งั้นจับคู่ไม่ติดแล้วเงียบหาย */
+  const KRU_SUB = [
+    ['SM-A', 'รู้จักและเห็นคุณค่าในตนเอง', 'SM'],
+    ['SM-B', 'กำกับตนเอง จัดการอารมณ์และเวลา', 'SM'],
+    ['SM-C', 'ตั้งเป้าหมายและมุ่งมั่นพัฒนาตนเอง', 'SM'],
+    ['HT-CTC', 'คิดอย่างมีวิจารณญาณ (คิดก่อนเชื่อ)', 'HT'],
+    ['HT-STM', 'คิดเชิงระบบ (มองความเกี่ยวข้อง)', 'HT'],
+    ['HT-CRT', 'คิดสร้างสรรค์', 'HT'],
+    ['HT-PRB', 'คิดแก้ปัญหา', 'HT'],
+    ['CM-A', 'รับสาร (ฟังและอ่านจับใจความ)', 'CM'],
+    ['CM-B', 'ส่งสาร (พูดและเขียนให้เข้าใจ)', 'CM'],
+    ['CM-C', 'สื่อสารให้เหมาะกับบุคคลและกาลเทศะ', 'CM'],
+    ['TW-A', 'เป็นสมาชิกทีมที่ดีและมีภาวะผู้นำ', 'TW'],
+    ['TW-B', 'ร่วมมือรวมพลังอย่างเป็นระบบ', 'TW'],
+    ['TW-C', 'สร้างความสัมพันธ์และจัดการความขัดแย้ง', 'TW'],
+    ['CZ-A', 'ปฏิบัติตนอย่างรับผิดชอบตามบทบาทหน้าที่', 'CZ'],
+    ['CZ-B', 'เคารพสิทธิผู้อื่นและอยู่ร่วมกันในความต่าง', 'CZ'],
+    ['CZ-C', 'มีส่วนร่วมทำเพื่อส่วนรวมและท้องถิ่น', 'CZ'],
+    ['NS-A', 'เข้าใจธรรมชาติ ช่างสังเกตและตั้งคำถาม', 'NS'],
+    ['NS-B', 'ใช้ทรัพยากรและวิทยาการอย่างรู้คุณค่า', 'NS'],
+    ['NS-C', 'ร่วมดูแลรักษาเพื่อความยั่งยืน', 'NS']
+  ];
+  const KRU_LV = [[1, 'ต้องช่วยเหลือ'], [2, 'เริ่มทำได้'], [3, 'ทำได้ดี'], [4, 'ทำได้ดีมาก']];
+  const KRU_COMP = { SM: 'จัดการตนเอง', HT: 'คิดขั้นสูง', CM: 'สื่อสาร',
+                     TW: 'รวมพลังทำงานเป็นทีม', CZ: 'พลเมืองเข้มแข็ง', NS: 'อยู่กับธรรมชาติ' };
+  let KRU = { sid: null, form: {}, saved: {} };
+
+  async function kruLoad(cid) {
+    try {
+      const ids = studentsOf(cid).map((s) => s.id);
+      if (!ids.length) return;
+      const rows = await getIn('/rest/v1/surveys?kind=eq.kru_assess&select=student_id,payload,created_at&order=created_at.desc',
+        'student_id', ids);
+      KRU.saved = {};
+      (rows || []).forEach((r) => { if (!KRU.saved[r.student_id]) KRU.saved[r.student_id] = ((r.payload || {}).dims) || {}; });
+    } catch (e) { KRU.saved = {}; }
+  }
+
+  function kruFormHtml(sid) {
+    const cur = KRU.form;
+    const byComp = {};
+    KRU_SUB.forEach((r) => { (byComp[r[2]] = byComp[r[2]] || []).push(r); });
+    const given = Object.keys(cur).filter((k) => cur[k]).length;
+    return '<div class="card" id="kru-form">'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'
+      +   '<b style="flex:1">🧑‍🏫 ครูประเมินจากการสังเกต</b>'
+      +   '<span class="badge">ให้แล้ว ' + given + '/19 ด้าน</span>'
+      +   '<button class="btn btn-sm btn-primary" id="kru-save">บันทึก</button>'
+      +   '<button class="btn btn-sm" id="kru-cancel">ปิด</button>'
+      + '</div>'
+      + '<div class="muted small" style="margin-bottom:8px">ให้คะแนน 1-4 จากพฤติกรรมจริงที่ครูสังเกตเห็น · '
+      +   '<b>เว้นว่างได้</b> = ยังไม่ได้สังเกต ระบบจะไม่เดาแทนครู (ว่างไม่เท่ากับ 0) · '
+      +   'กดซ้ำที่คะแนนเดิมเพื่อล้าง</div>'
+      + ['SM', 'HT', 'CM', 'TW', 'CZ', 'NS'].map(function (c) {
+          const rows = byComp[c] || [];
+          if (!rows.length) return '';
+          return '<div style="margin-top:10px"><div style="font-weight:700;font-size:13.5px">' + G.esc(KRU_COMP[c] || c) + '</div>'
+            + rows.map(function (r) {
+                return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 0;border-bottom:1px solid var(--line)">'
+                  + '<span style="flex:1;min-width:200px;font-size:13px">' + G.esc(r[1]) + '</span>'
+                  + KRU_LV.map(function (L) {
+                      const on = Number(cur[r[0]]) === L[0];
+                      return '<button class="btn btn-sm' + (on ? ' btn-primary' : '') + '" '
+                        + 'data-kru="' + G.esc(r[0]) + '" data-kruv="' + L[0] + '" title="' + G.esc(L[1]) + '">' + L[0] + '</button>';
+                    }).join('')
+                  + '</div>';
+              }).join('')
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+
   async function renderStudent(sid) {
     const s = S.students.find((x) => x.id === sid);
     if (!s) { location.hash = '#/'; return; }
@@ -2301,6 +2539,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + (isOn(s) ? '' : '<div class="card muted small" style="margin-top:10px">⏸ <b>ปิดการใช้งานอยู่</b> — '
           + 'ข้อมูลและผลการเล่นทั้งหมดยังอยู่ครบ (หน้านี้แสดงให้ดูได้ตามปกติ) '
           + 'แต่ไม่ถูกนับในยอดรวมและค่าเฉลี่ยของห้อง · เปิดกลับได้ที่หน้า “สร้างห้องเรียน”</div>');
+
+    /* [V.1.6.15] ภาพรวมทุกเกมอยู่บนสุด — ครูเห็นภาพรวมก่อนแล้วค่อยเจาะรายเกม */
+    html += crossGameCard(sid);
 
     // ---- มิติที่ 1: ผลสัมฤทธิ์ ----
     html += '<h2 class="section-title">ผลสัมฤทธิ์ <span class="sub">ความก้าวหน้าและคะแนนรายเกม</span></h2>';
@@ -2363,6 +2604,23 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       html += '<div id="stu-sub" class="card muted small" style="margin-top:14px"><span class="loading"></span> กำลังโหลดรายละเอียดด้านย่อย…</div>';
     } else {
       html += '<div class="card muted">ยังไม่มีข้อมูลสมรรถนะ</div>';
+    }
+
+    /* [V.1.6.13] ใบสมรรถนะรายด้านจากเกม — เรียงตามลำดับ 6 ด้านของ CBE
+       ถ้ามีหลายเกม แยกหัวข้อตามเกม เพราะแต่ละเกมเป็นคนละเครื่องมือวัด ห้ามเอามาเฉลี่ยรวมกัน */
+    const myDims = (S.compDims || []).filter((x) => x.student_id === sid);
+    if (myDims.length) {
+      const byGame = {};
+      myDims.forEach((r) => { (byGame[r.game_id] = byGame[r.game_id] || []).push(r); });
+      html += '<h2 class="section-title">ผลสมรรถนะรายด้าน <span class="sub">ตามที่เกมคำนวณและส่งมา — เว็บกลางไม่คิดซ้ำ</span></h2>';
+      Object.keys(byGame).forEach(function (gid) {
+        const g = gameById(gid);
+        const rows = byGame[gid].slice().sort((a, b) => String(a.comp_code).localeCompare(String(b.comp_code)));
+        html += '<div class="muted small" style="margin:10px 0 6px">🎮 <b>' + G.esc(g ? g.name : '') + '</b>'
+          + (rows[0] && rows[0].game_version ? ' · รุ่น ' + G.esc(rows[0].game_version) : '')
+          + (rows[0] && rows[0].computed_at ? ' · คิดเมื่อ ' + G.timeAgo(rows[0].computed_at) : '') + '</div>';
+        html += compDimCard(rows);
+      });
     }
 
     html += '<h2 class="section-title">กิจกรรมล่าสุด</h2><div id="stu-ev" class="card muted small"><span class="loading"></span> กำลังโหลด…</div>';

@@ -25,7 +25,19 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     <div class="sp"></div>
     <span class="who" id="who"></span>
     <button class="btn hidden" id="logout">ออกจากระบบ</button>
-  </header>
+      <nav class="navlinks" aria-label="เมนูหลัก">
+      <!-- [V.1.6.12] เมนูหลักชุดเดียวกันทุกหน้า 6 รายการ · ลำดับเดียวกันทุกหน้า
+           เลิกใช้คำว่า "Dashboard" ทั้งเว็บ — เดิมคำเดียวใช้ 3 ความหมาย
+           "ผลการเรียนรู้" = ข้อมูลของทุกคน (ไม่ต้องล็อกอิน) · "ห้องเรียนของฉัน" = ของครูคนนั้น -->
+      <a class="btn btn-primary" id="new-room-btn" href="teacher.html#/rooms">🏫 สร้างห้องเรียน</a>
+      <a href="index.html#games">🎮 เกม</a>
+      <a href="dashboard.html">📊 ผลการเรียนรู้</a>
+      <a href="teacher.html">🏫 ห้องเรียนของฉัน</a>
+      <a href="standards.html">📐 มาตรฐาน</a>
+      <a href="support.html">สนับสนุน</a>
+      <a href="contact.html">ติดต่อ</a>
+    </nav>
+</header>
 
   <main id="content">
 

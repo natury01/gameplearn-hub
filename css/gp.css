@@ -1016,3 +1016,24 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
 .ok-box { display: none; background: var(--tint-teal); border: 1px solid var(--good);
   color: var(--ink); border-radius: var(--r-sm); padding: 10px 12px; font-size: 13.5px; }
 .ok-box.on { display: block; }
+
+/* [V.1.6.12] แถบมุมมองภายในหน้าครู — เป็น "แท็บในหน้า" ไม่ใช่เมนูข้ามหน้า
+   หลักที่ใช้: เมนูข้ามหน้ากับเมนูในหน้าต้องแยกกันด้วยสายตาและด้วยตำแหน่ง
+   ไม่งั้นครูเดาไม่ออกว่ากดแล้วจะ "เปลี่ยนหน้า" หรือ "เปลี่ยนมุมมองในหน้าเดิม"
+   — นี่คือต้นเหตุของอาการ "กดไปเด้งไปเด้งมา" ที่ครูรายงาน
+   วางไว้ในหน้า (ไม่ใช่บนหัวเว็บ) เพราะถ้าอยู่บนหัวเว็บจะไปดันปุ่มบัญชีตกบรรทัด */
+.navlinks.navsub{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px;
+  padding:4px; background:var(--card,#fff); border:1px solid var(--line,#e2e8f0); border-radius:12px; }
+.navlinks.navsub a{ padding:7px 13px; border-radius:9px; font-size:13px; font-weight:700;
+  color:var(--muted,#64748b); text-decoration:none; }
+.navlinks.navsub a:hover{ background:#f1f5f9; }
+.navlinks.navsub a.on{ background:var(--primary,#2563eb); color:#fff; }
+
+/* [V.1.6.12] เมนูหลัก 6 รายการ ต้องอยู่แถวเดียวกับปุ่มบัญชีบนจอโน้ตบุ๊ก
+   หัวเว็บถูกจำกัดที่ max-width:1240px ⇒ จอ 1280 กับ 1440 มีที่เท่ากัน
+   ป้ายชุดใหม่ยาวกว่าเดิม (ครูเคาะให้ใช้คำเต็มที่อ่านเข้าใจ) จึงบีบที่ระยะขอบแทนการตัดคำ
+   — ตัดคำทิ้งจะเสียสิ่งที่ครูขอ ส่วนระยะขอบไม่มีใครสังเกต */
+.topbar .navlinks a:not(.btn){ padding:5px 6px; font-size:11.5px; letter-spacing:-.1px; }
+.topbar .navlinks a:not(.btn) + a:not(.btn){ margin-left:0; }   /* ยกเว้นปุ่ม CTA — ต้องเด่นกว่าลิงก์เมนูตามกฎเดิม */
+.topbar .navlinks{ gap:2px; }
+.topbar-in{ max-width:1400px; }

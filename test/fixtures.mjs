@@ -78,6 +78,21 @@ export const achieve = [
     progress_percent: 60, unit_scores: { '1': 10, _boss: 25 }, criteria_note: null, is_legacy: false },
 ];
 
+/* [V.1.6.21] ชุดสำหรับทดสอบ "การกระจายตามช่วงคะแนน" โดยเฉพาะ
+   ผูกกับ S1 คนเดียวแต่คนละเกม ⇒ ไม่ต้องเพิ่มนักเรียนในชุดกลาง
+   (การเพิ่มนักเรียนจะไปพังข้อที่นับหัวในชุดทดสอบอื่น) */
+export const achieveSpread = [
+  { student_id: S1, classroom_id: R1, game_id: G1, game_name: 'กาญจนบุรี 2050',
+    game_version: 'V.7.99', score: 60, max_score: 150, percent: 40, grade_label: 'ต้องปรับปรุง',
+    progress_percent: 30, unit_scores: { '1': 5 }, criteria_note: null, is_legacy: false },
+  { student_id: S2, classroom_id: R1, game_id: G1, game_name: 'กาญจนบุรี 2050',
+    game_version: 'V.7.99', score: 98, max_score: 150, percent: 65, grade_label: 'พอใช้',
+    progress_percent: 50, unit_scores: { '1': 8 }, criteria_note: null, is_legacy: false },
+  { student_id: SP, classroom_id: R1, game_id: G1, game_name: 'กาญจนบุรี 2050',
+    game_version: 'V.7.99', score: 120, max_score: 150, percent: 85, grade_label: 'ดีเยี่ยม',
+    progress_percent: 70, unit_scores: { '1': 10 }, criteria_note: null, is_legacy: false },
+];
+
 export const compDims = [
   { student_id: S1, classroom_id: R1, comp_code: 'HOT', game_name: 'กาญจนบุรี 2050',
     score: 72, level: 5, level_label: 'สามารถ', sub_scores: { ctc: 70, stm: 74 },

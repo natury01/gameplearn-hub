@@ -1430,7 +1430,64 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             + tile('คอมพิวเตอร์', Math.round(dev.pc / known * 100), '%');
         })();
 
-    let html = '<h3 style="margin:16px 0 8px;font-size:16px">แต่ละหน้าถูกเปิดกี่ครั้ง</h3>';
+    /* ══ [V.1.6.20 · ครูสั่ง] สถิติรายวัน ══════════════════════════════════
+       "สถิติการใช้งาน ควรระบุเป็นรายวันด้วย"
+       ฐานเก็บรายวันอยู่แล้ว (visit_daily.day) แค่ไม่เคยเอามาแสดง
+       ⚠️ เติมวันที่ไม่มีใครเข้าให้เป็น 0 ไม่ใช่ข้ามไป — วันที่หายจากตาราง
+          อ่านแล้วนึกว่า "ไม่มีข้อมูล" ทั้งที่ความจริงคือ "ไม่มีคนเข้า"
+          (ตรงนี้ 0 ถูก เพราะเรารู้ว่าวันนั้นผ่านไปแล้วจริง) */
+    let html = '<h3 style="margin:16px 0 8px;font-size:16px">รายวัน '
+      + '<span class="muted small" style="font-weight:400">วันใหม่อยู่บนสุด</span></h3>';
+    (function () {
+      const byDay = {};
+      rows.forEach(function (r) {
+        const d = String(r.day || '').slice(0, 10);
+        if (!d) return;
+        const o = byDay[d] || (byDay[d] = { views: 0, visitors: 0, open: 0 });
+        const v = Number(r.views) || 0;
+        o.views += v;
+        o.visitors += Number(r.visitors) || 0;
+        if (r.page === 'gameopen') o.open += v;
+      });
+      /* ไล่ทุกวันในช่วงที่เลือก ไม่ใช่เฉพาะวันที่มีแถวในฐาน */
+      const days = [];
+      for (let i = 0; i < ST_RANGE; i++) {
+        const dt = new Date(Date.now() - i * 86400e3);
+        days.push(dt.toISOString().slice(0, 10));
+      }
+      const maxV = Math.max(1, ...days.map((d) => (byDay[d] || {}).views || 0));
+      const TH_MON = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+                      'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+      const thDay = function (d) {
+        const p2 = d.split('-');
+        if (p2.length !== 3) return d;
+        return Number(p2[2]) + ' ' + (TH_MON[Number(p2[1]) - 1] || p2[1]) + ' ' + (Number(p2[0]) + 543 - 2000);
+      };
+      html += '<div class="table-scroll"><table class="gol"><thead><tr>'
+        + '<th scope="col">วันที่</th>'
+        + '<th scope="col" class="num">เปิดหน้าเว็บ</th>'
+        + '<th scope="col" class="num">ผู้เยี่ยมชม</th>'
+        + '<th scope="col" class="num">เปิดเกมจริง</th>'
+        + '<th scope="col">เทียบสายตา</th></tr></thead><tbody>'
+        + days.map(function (d) {
+            const o = byDay[d] || { views: 0, visitors: 0, open: 0 };
+            const w = Math.round(o.views / maxV * 100);
+            return '<tr><td style="white-space:nowrap">' + G.esc(thDay(d)) + '</td>'
+              + '<td class="num">' + o.views.toLocaleString('th-TH') + '</td>'
+              + '<td class="num">' + o.visitors.toLocaleString('th-TH') + '</td>'
+              + '<td class="num">' + (o.open ? o.open.toLocaleString('th-TH')
+                  : '<span class="muted">0</span>') + '</td>'
+              + '<td><span style="display:inline-block;height:9px;border-radius:5px;'
+              +   'background:var(--accent,#2a78d6);width:' + Math.max(o.views ? 3 : 0, w) + '%"></span></td>'
+              + '</tr>';
+          }).join('')
+        + '</tbody></table>'
+        + '<div class="panel-note">วันที่ขึ้น 0 คือ<b>วันนั้นไม่มีคนเข้า</b> '
+        + '— ไม่ใช่ว่าไม่มีข้อมูล · "เปิดเกมจริง" นับจากตัวเกมเอง '
+        + 'จึงจะขึ้นเมื่อเกมอัปเป็นรุ่นที่ส่งสถิติแล้ว</div></div>';
+    })();
+
+    html += '<h3 style="margin:20px 0 8px;font-size:16px">แต่ละหน้าถูกเปิดกี่ครั้ง</h3>';
     const list = Object.keys(pageRows).sort((a, b) => pageRows[b].views - pageRows[a].views);
     html += !list.length
       ? '<div class="card muted">ยังไม่มีข้อมูลในช่วงนี้ — ถ้าเพิ่งรัน 52 ให้ลองเปิดหน้าเว็บสัก 2-3 หน้าแล้วกลับมาดูใหม่</div>'

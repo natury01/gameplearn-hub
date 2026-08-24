@@ -255,13 +255,82 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     box.querySelectorAll('.gshot[data-src]').forEach(wakeOne);
   }
   function shotsStart(box) {
-    if (shotBox === box) return;
-    shotsStop();
-    if (REDUCED || !box.classList.contains('gshots')) return;
+    /* [V.1.6.20] เก็บไว้เพื่อ "ตื่นภาพทันที" ตอนครูชี้เมาส์/แท็บเข้าการ์ด
+       การเดินสไลด์ย้ายไปเป็นแบบอัตโนมัติด้านล่างแล้ว ไม่ต้องรอ hover อีก */
+    if (REDUCED || !box || !box.classList.contains('gshots')) return;
     shotBox = box;
     shotsWake(box);
-    shotTimer = setInterval(function () { shotsStep(box); }, SHOT_MS);
   }
+
+  /* ══ [V.1.6.20 · ครูถาม] สไลด์ต้องเดินเอง ไม่ต้องเอาเมาส์ไปจ่อ ══════════
+     ของเดิมเดินเฉพาะตอน hover/focus ⇒ **บนมือถือไม่เดินเลย** เพราะไม่มี hover
+     และบนคอมครูต้องเอาเมาส์จ่อค้างไว้ถึงจะเห็นด่านอื่น
+
+     ที่ทำ: นาฬิกาตัวเดียวเหมือนเดิม แต่เดินทุกการ์ดที่อยู่ในจอพร้อมกัน
+       · การ์ดที่เลื่อนพ้นจอ = ไม่เดิน ไม่กินแรงเครื่อง และภาพยังโหลดแบบขี้เกียจ
+       · สลับแท็บเบราว์เซอร์ไปทำอย่างอื่น = หยุด ไม่กินแบตเปล่า
+       · prefers-reduced-motion = ไม่เดินเลย (เคารพการตั้งค่าของผู้ใช้) */
+  var autoTimer = null;
+  var inView = new Set();
+
+  function autoStep() {
+    try {
+      if (document.hidden) return;
+      inView.forEach(function (box) {
+        if (!box.isConnected) { inView.delete(box); return; }
+        shotsStep(box);
+      });
+    } catch (e) { /* สไลด์พังต้องไม่ทำให้หน้าเว็บพัง */ }
+  }
+  function autoOn() {
+    if (REDUCED || autoTimer) return;
+    autoTimer = setInterval(autoStep, SHOT_MS);
+  }
+  function autoOff() {
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  }
+
+  var shotsIO = null;
+  function watchShots() {
+    if (REDUCED) return;
+    try {
+      if (!window.IntersectionObserver) {
+        /* เบราว์เซอร์เก่าที่ไม่รู้จัก IntersectionObserver — เดินทุกใบไปเลย
+           ดีกว่าไม่เดินเลย และหน้านี้มีการ์ดไม่กี่ใบ */
+        document.querySelectorAll('.gshots').forEach(function (b) { inView.add(b); });
+        autoOn();
+        return;
+      }
+      if (!shotsIO) {
+        shotsIO = new IntersectionObserver(function (ents) {
+          ents.forEach(function (e) {
+            /* ⚠️ ห้ามเรียก shotsWake ตรงนี้ — มันปลุกภาพ **ทุกใบ** ของการ์ด
+               ภาค 1 มี 14 ใบต่อการ์ด ⇒ เปิดหน้าแล้วดึงภาพทั้งหมดทันที
+               เน็ตโรงเรียนรับไม่ไหว และเทสต์เดิมตั้งขึ้นมาเพื่อกันเรื่องนี้โดยเฉพาะ
+               shotsStep ปลุกเฉพาะ "ใบที่กำลังจะโชว์" อยู่แล้ว ⇒ โหลดตามที่ดูจริง */
+            if (e.isIntersecting) inView.add(e.target);
+            else inView.delete(e.target);
+          });
+          if (inView.size) autoOn(); else autoOff();
+        }, { rootMargin: '80px' });
+      }
+      document.querySelectorAll('.gshots').forEach(function (b) { shotsIO.observe(b); });
+    } catch (e) {}
+  }
+  try { window.GP_WATCH_SHOTS = watchShots; } catch (e) {}
+
+  /* การ์ดเกมวาดหลังโหลดข้อมูลเสร็จ จึงต้องเฝ้าของที่มาทีหลังด้วย
+     (เหตุผลเดียวกับที่ป้าย src=hub ใช้ MutationObserver ใน gp-brand.js) */
+  try {
+    if (window.MutationObserver) {
+      new MutationObserver(function () { watchShots(); }).observe(document.body, { childList: true, subtree: true });
+    }
+  } catch (e) {}
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) autoOff(); else if (inView.size) autoOn();
+  });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchShots);
+  else watchShots();
   /* เลื่อนไปใบถัดไปที่ยังใช้ได้ — ใบที่โหลดไม่ขึ้น (.dead) ถูกข้ามไปเลย
      ถ้าเหลือใบเดียว (หรือไม่เหลือเลย) ก็หยุดนาฬิกา แล้วปกเดิมชั้นล่างทำหน้าที่ต่อ
 
@@ -311,14 +380,18 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   /* ชี้ด้วยเมาส์ หรือโฟกัสด้วยคีย์บอร์ด (แท็บเข้าไปที่ปุ่มเล่นเกม) ก็ให้เริ่มเลื่อนเหมือนกัน
      ใช้ mouseover/mouseout เพราะ mouseenter ไม่ลอยขึ้นมาถึง document (การ์ดวาดใหม่ทุกครั้งที่กรอง) */
+  /* [V.1.6.20] เดิมสองตัวนี้เป็น **เงื่อนไขเดียว** ที่ทำให้สไลด์เดิน
+     ตอนนี้สไลด์เดินเองแล้ว เหลือหน้าที่แค่ "ตื่นภาพทันที" ตอนครูชี้/แท็บเข้าการ์ด
+     ⚠️ ห้ามให้สองตัวนี้เรียก shotsStop() อีก — เดิมพอเมาส์ออกจากการ์ดมันหยุดนาฬิกา
+        ซึ่งจะไปดับสไลด์อัตโนมัติของทุกใบทิ้ง */
   document.addEventListener('mouseover', function (ev) {
     const box = ev.target.closest && ev.target.closest('.gshots');
-    if (box) shotsStart(box); else if (shotBox) shotsStop();
+    if (box) shotsStart(box);
   });
   document.addEventListener('focusin', function (ev) {
     const card = ev.target.closest && ev.target.closest('.gcard');
     const box = card && card.querySelector('.gshots');
-    if (box) shotsStart(box); else if (shotBox) shotsStop();
+    if (box) shotsStart(box);
   });
   /* ภาพโหลดไม่ขึ้น (เกมย้ายไฟล์ / เปลี่ยนโดเมน) — ปิดใบนั้นทิ้ง ไม่ให้เป็นช่องว่างขาว
      error ไม่ลอยขึ้น document จึงต้องดักในขา capture */

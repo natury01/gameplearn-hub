@@ -366,5 +366,146 @@ console.log('\n═══ 9) สมรรถนะสามสถานะ — "�
   await p.close();
 }
 
+
+console.log('\n═══ 10) แท็บผลสัมฤทธิ์ — กราฟการกระจาย + กดดูรายชื่อ (V.1.6.21) ═══');
+/* ครูสั่ง: "แท็บผลสัมฤทธิ์ควรแสดงกราฟของคะแนนผลสัมฤทธิ์รวม และมีตัวกรองเหมือนแท็บสมรรถนะ"
+
+   ผมเลือก **กราฟการกระจาย** ไม่ใช่กราฟค่าเฉลี่ย โดยตั้งใจ:
+   ห้องที่เด็กครึ่งหนึ่งได้ 90 อีกครึ่งได้ 30 กับห้องที่ทุกคนได้ 60
+   มีค่าเฉลี่ยเท่ากันเป๊ะ แต่เป็นคนละสถานการณ์การสอนโดยสิ้นเชิง
+   — อันแรกต้องแยกกลุ่มสอน อันหลังต้องทบทวนทั้งห้อง
+   ⇒ ค่าเฉลี่ยตัวเดียวซ่อนสิ่งที่ครูต้องรู้ที่สุด */
+{
+  const p = await b.newPage();
+  const calls = await stub(p, { achieve: F.achieveSpread });
+  await login(p);
+  await p.goto(BASE + '/teacher.html');
+  await sleep(1600);
+
+  const st = await p.evaluate(() => {
+    const bar = document.querySelector('.lvbar');
+    const keys = [...document.querySelectorAll('[data-ach-band]')].map((x) => ({
+      band: x.getAttribute('data-ach-band'), txt: x.textContent.trim(), tag: x.tagName }));
+    return { hasBar: !!bar, segs: bar ? bar.children.length : 0, keys };
+  });
+  ok('แท็บผลสัมฤทธิ์มีแถบการกระจาย ไม่ใช่แค่ค่าเฉลี่ยตัวเดียว', st.hasBar, st.segs);
+  ok('⭐ กระจายเป็นหลายช่วงจริง (40% กับ 85% คนละช่วง)', st.segs >= 2, st.segs);
+  ok('⭐ ช่วงคะแนนตรงกับที่ฐานใช้ (ไฟล์ 72) — หน้าครูกับหน้าสาธารณะต้องพูดตรงกัน',
+    st.keys.some((k) => k.txt.includes('ต้องช่วยเหลือ (ต่ำกว่า 50)'))
+    && st.keys.some((k) => k.txt.includes('ดีเยี่ยม (80–100)')), st.keys.map((k) => k.txt));
+  ok('⭐ เรียง "ต้องช่วยเหลือ" ขึ้นก่อน — ครูเปิดหน้านี้เพื่อหาคนที่ต้องช่วย',
+    (st.keys[0] || {}).band === 'low', st.keys.map((k) => k.band));
+  ok('ช่วงคะแนนกดได้ (เป็นปุ่ม ไม่ใช่ข้อความเฉย ๆ)',
+    st.keys.length > 0 && st.keys.every((k) => k.tag === 'BUTTON'), st.keys.map((k) => k.tag));
+  /* นักเรียนที่ครูปิดใช้งานต้องไม่โผล่ในการกระจาย — กติกาเดิมของทั้งระบบ
+     (ตัวอย่างมี S2 ที่ถูกปิด ได้ 65% ซึ่งอยู่ช่วง "พอใช้") */
+  ok('⭐ นักเรียนที่ถูกปิดใช้งานไม่ถูกนับในการกระจาย (กติกาเดิมของระบบ)',
+    !st.keys.some((k) => k.txt.includes('พอใช้')), st.keys.map((k) => k.txt));
+
+  await p.click('[data-ach-band="low"]');
+  await sleep(400);
+  const opened = await p.evaluate(() => {
+    const box = document.querySelector('.achnames');
+    return { shown: box && box.style.display !== 'none', txt: box ? box.textContent : '' };
+  });
+  ok('⭐⭐ กดที่ช่วงคะแนนแล้วเห็น**รายชื่อ** — สถิติที่กดไม่ได้ ครูต้องไปไล่หาเองอีกรอบ',
+    opened.shown && /สมชาย|ใจดี/.test(opened.txt), opened.txt.slice(0, 160));
+  ok('บอกเปอร์เซ็นต์รายคนด้วย ครูจะได้รู้ว่าห่างเกณฑ์แค่ไหน',
+    /40(\.0)?%/.test(opened.txt), opened.txt.slice(0, 160));
+
+  await p.click('[data-ach-band="low"]');
+  await sleep(300);
+  const closed = await p.evaluate(() => {
+    const box = document.querySelector('.achnames');
+    return box && box.style.display === 'none';
+  });
+  ok('กดซ้ำที่ช่วงเดิมแล้วปิด — ไม่ต้องหาปุ่มปิด', closed, closed);
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+
+console.log('\n═══ 11) ตารางรายคนหน้าเดียว + แท็บเทียบเกณฑ์ (V.1.6.22) ═══');
+/* ครูสั่ง: "เอาจุดเด่นของ Dashboard ภาค 1 และ ภาค 2 มาปรับใช้ใน Dashboard กลาง
+   คือดูรายชื่อ ผลสัมฤทธิ์ สมรรถนะ ได้ในหน้าเดียว และมีแท็บเทียบเกณฑ์ ครู/เพื่อน/ตนเอง"
+
+   ของเดิมแยกสองแท็บ ⇒ ครูที่อยากรู้ว่า "เด็กคนนี้เป็นยังไง"
+   ต้องสลับแท็บไปมาแล้วจำเลขข้ามหน้าเอง */
+{
+  const p = await b.newPage();
+  const calls = await stub(p);
+  await login(p);
+  await p.goto(BASE + '/teacher.html#/room/' + F.R1);
+  await sleep(1800);
+
+  const uni = await p.evaluate(() => {
+    const t = document.querySelector('table.utable');
+    if (!t) return { none: true };
+    const rows = [...t.querySelectorAll('thead tr')].map((r) =>
+      [...r.children].map((c) => ({ txt: c.textContent.trim(), span: c.getAttribute('colspan') })));
+    const dots = [...t.querySelectorAll('.c6dot')].map((d) => ({
+      txt: d.textContent.trim(), bg: getComputedStyle(d).backgroundColor }));
+    return { none: false, headRows: rows.length, groups: rows[0] || [], subs: rows[1] || [],
+      dots, bodyRows: t.querySelectorAll('tbody tr.urow').length };
+  });
+  ok('หน้าห้องมีตารางรวมรายคน', !uni.none, uni);
+  ok('⭐ หัวตารางสองชั้น — ชั้นบนคือชื่อกลุ่ม (โครงเดียวกับภาค 2)',
+    uni.headRows === 2, uni.headRows);
+  ok('⭐ กลุ่ม "ผลสัมฤทธิ์" กับ "สมรรถนะหลัก" อยู่ตารางเดียวกัน ไม่ต้องสลับแท็บ',
+    (uni.groups || []).some((g) => /ผลสัมฤทธิ์/.test(g.txt))
+    && (uni.groups || []).some((g) => /สมรรถนะหลัก/.test(g.txt)), uni.groups);
+  ok('สมรรถนะครบ 6 คอลัมน์',
+    (uni.groups || []).some((g) => Number(g.span) === 6), uni.groups.map((g) => g.span));
+  ok('มีแถวนักเรียนจริง', uni.bodyRows >= 1, uni.bodyRows);
+  ok('⭐ ระดับสมรรถนะแสดงเป็นวงกลมมีสีประจำด้าน (จุดเด่นของภาค 1 ที่ครูชม)',
+    uni.dots.length >= 1 && uni.dots.every((d) => /rgb/.test(d.bg)), uni.dots);
+
+  /* แตะแถว → กางรายละเอียดตรงนั้น ไม่เด้งไปหน้าใหม่ */
+  const before = await p.evaluate(() => location.hash);
+  await p.click('tr.urow');
+  await sleep(500);
+  const opened = await p.evaluate(() => {
+    const det = document.querySelector('[data-udet]:not(.hidden)');
+    return { open: !!det, txt: det ? det.textContent.slice(0, 120) : '', hash: location.hash };
+  });
+  ok('⭐⭐ แตะแถวแล้วกางรายละเอียดในที่เดิม', opened.open, opened.txt);
+  ok('ไม่เด้งออกจากหน้าห้อง — ครูยังเทียบกับเพื่อนในห้องได้',
+    opened.hash === before, { before, after: opened.hash });
+
+  await p.click('tr.urow');
+  await sleep(400);
+  const closed = await p.evaluate(() => !document.querySelector('[data-udet]:not(.hidden)'));
+  ok('แตะซ้ำแล้วปิด', closed, closed);
+
+  /* แท็บเทียบเกณฑ์ */
+  await p.click('[data-tab="cmp"]');
+  await sleep(900);
+  const cmp = await p.evaluate(() => {
+    const t = document.querySelector('table.cmptable');
+    if (!t) return { none: true };
+    const chips = [...t.querySelectorAll('.cmpchip')].length;
+    const sts = [...t.querySelectorAll('.cmpst')].map((x) => x.textContent.trim());
+    /* ⚠️ ต้องเจาะคำอธิบาย "ของตารางเทียบเกณฑ์" ไม่ใช่ตัวแรกที่เจอในหน้า
+       เพราะตารางรวมด้านบนก็มี .panel-note ของตัวเอง (เจอจริงตอนเขียนชุดนี้) */
+    let note = '';
+    for (let el = t.parentElement; el; el = el.nextElementSibling) {
+      const nt = el.querySelector && el.querySelector('.panel-note');
+      if (nt) { note = nt.textContent; break; }
+      if (el.classList && el.classList.contains('panel-note')) { note = el.textContent; break; }
+    }
+    return { none: false, chips, sts: [...new Set(sts)], note };
+  });
+  ok('⭐ มีแท็บเทียบเกณฑ์ (ครู/เพื่อน/ตนเอง) ตามที่ครูขอ', !cmp.none, cmp);
+  ok('แต่ละช่องมีสี่ชิป — เกม · ครู · เพื่อน · ตนเอง',
+    !cmp.none && cmp.chips >= 4 && cmp.chips % 4 === 0, cmp.chips);
+  ok('⭐ บอกสถานะการสอดคล้อง ไม่ใช่วางตัวเลขเรียงกันเฉย ๆ',
+    !cmp.none && cmp.sts.length > 0, cmp.sts);
+  ok('⭐ แหล่งเดียวต้องไม่ขึ้นว่า "สอดคล้อง" — ไม่มีอะไรให้สอดคล้องด้วย',
+    !cmp.sts.includes('สอดคล้อง') || cmp.sts.some((x) => /แหล่งเดียว|ยังไม่มีหลักฐาน/.test(x)),
+    cmp.sts);
+  ok('อธิบายว่า – แปลว่าไม่มีข้อมูล ไม่ใช่ศูนย์', /ไม่ใช่ศูนย์/.test(cmp.note), cmp.note.slice(0, 140));
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+
 await b.close(); srv.close();
 process.exit(ok.done());

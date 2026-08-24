@@ -259,5 +259,56 @@ console.log('\n═══ สถิติรายเกม — แยกตา�
   await p.close();
 }
 
+
+console.log('\n═══ สถิติการใช้งานแยกรายวัน (V.1.6.20) ═══');
+/* ครูสั่ง: "สถิติการใช้งาน ควรระบุเป็นรายวันด้วย"
+   ของเดิมทุกตัวเลขเป็นผลรวมของช่วง ⇒ ตอบไม่ได้ว่า "วันที่สั่งให้เด็กเล่น มีคนเข้าจริงไหม" */
+{
+  const p = await b.newPage();
+  const calls = await stub(p);
+  await login(p);
+  await p.goto(BASE + '/admin.html');
+  await sleep(1000);
+  /* กดแท็บแล้วรอด้วย sleep ข้างนอก ไม่ห่อ setTimeout ไว้ใน evaluate
+     (แบบห่อเคยล้มด้วย "Resulting promise was garbage collected" เพราะแผงวาดใหม่
+      ระหว่างที่ promise ยังค้างอยู่ ⇒ บริบทของหน้าเปลี่ยนไปแล้ว) */
+  await p.evaluate(() => {
+    const t = [...document.querySelectorAll('.tab')].find((x) => x.getAttribute('data-tab') === 'stats');
+    if (t) t.click();
+  });
+  await sleep(1500);
+  const st = await p.evaluate(() => {
+    const h3 = [...document.querySelectorAll('#panel-stats h3')]
+      .find((x) => x.textContent.indexOf('รายวัน') >= 0);
+    let tb = null, note = '';
+    for (let el = h3 && h3.nextElementSibling; el; el = el.nextElementSibling) {
+      if (!tb) tb = el.querySelector && el.querySelector('table.gol');
+      const nt = el.querySelector && el.querySelector('.panel-note');
+      if (nt) { note = nt.textContent; break; }
+    }
+    return {
+      hasHead: !!h3,
+      head: tb ? [...tb.querySelectorAll('thead th')].map((x) => x.textContent.trim()) : [],
+      rows: tb ? [...tb.querySelectorAll('tbody tr')].map((x) =>
+        [...x.cells].map((c) => c.textContent.trim())) : [],
+      note,
+    };
+  });
+  ok('มีหัวข้อ "รายวัน" ในแผงสถิติ', st.hasHead, st.head);
+  ok('⭐ มีช่องวันที่ · เปิดหน้าเว็บ · ผู้เยี่ยมชม · เปิดเกมจริง',
+    ['วันที่', 'เปิดหน้าเว็บ', 'ผู้เยี่ยมชม', 'เปิดเกมจริง'].every((k) => st.head.some((h) => h.includes(k))),
+    st.head);
+  ok('⭐ ไล่ครบทุกวันในช่วงที่เลือก (7 วัน = 7 แถว) ไม่ข้ามวันที่ไม่มีคนเข้า',
+    st.rows.length === 7, st.rows.length);
+  ok('วันที่เขียนเป็นไทย ไม่ใช่ 2026-08-23', st.rows.length > 0
+    && /[ก-ฮ]\.?[ก-ฮ]?\./.test(st.rows[0][0] || ''), st.rows[0] && st.rows[0][0]);
+  ok('⭐ วันที่ไม่มีคนเข้าขึ้น 0 พร้อมคำอธิบายว่า 0 แปลว่าอะไร',
+    /ไม่มีคนเข้า/.test(st.note), st.note.slice(0, 160));
+  ok('มีแถบเทียบสายตาในแต่ละแถว ไม่ต้องเพ่งตัวเลข',
+    st.head.some((h) => h.includes('เทียบสายตา')), st.head);
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+
 await b.close(); srv.close();
 process.exit(ok.done());

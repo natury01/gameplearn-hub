@@ -106,6 +106,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   const S = { teacher: null, games: [], rooms: [], cg: [], students: [], progress: [], summary: [],
               eventsCount: null, frameworks: [], coverage: [], itemSummary: [], itemProfile: [],
               compDims: [], achieve: [], schools: [],
+              /* [V.1.6.22] แหล่งเทียบเกณฑ์ที่เว็บกลางยังไม่เคยดึง
+                 peer = events kind='peer' · selfA = surveys kind='self_assessment'
+                 (ชื่อ kind ยืนยันจากโค้ดของภาค 2 ที่ดึงจริง ไม่ได้เดา) */
+              peer: [], selfA: [], kru: [],
+              /* [V.1.6.22] แหล่งเทียบเกณฑ์ที่เว็บกลางยังไม่เคยดึง
+                 peer = events kind='peer' · selfA = surveys kind='self_assessment'
+                 (ชื่อ kind ยืนยันจากโค้ดของภาค 2 ที่ดึงจริง ไม่ได้เดา) */
+              peer: [], selfA: [], kru: [],
               /* true = ฐานมีตารางใบรายงานผลแล้ว · false = ยังไม่ได้รัน 43 · null = ตรวจไม่ได้
                  ใช้แยกว่า "หน้าจอว่างเพราะยังไม่มีท่อ" หรือ "มีท่อแล้วแต่ยังไม่มีน้ำ" (ดู pipeNote) */
               has43: null };
@@ -563,6 +571,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
     /* student_game_progress กับ events ไม่มีคอลัมน์ห้อง จึงจำกัดด้วยรายชื่อนักเรียนแทน */
     const sid = students.map((x) => x.id);
+    /* [V.1.6.22 · ครูสั่ง] สามแหล่งของแท็บเทียบเกณฑ์
+       ชื่อ kind ยืนยันจากโค้ดของภาค 2 ที่ดึงจริง (บรรทัด 7555-7557 ของ dashboard ภาค 2)
+       ⚠️ ใช้ soft() ทุกตัว — ฐานที่ยังไม่มีตารางเหล่านี้ต้องไม่ทำให้หน้าครูทั้งหน้าล้ม
+          "ยังไม่มีข้อมูลให้เทียบ" กับ "หน้าเว็บพัง" คนละเรื่องกันโดยสิ้นเชิง */
+    const [peerRows, selfRows, kruRows] = await Promise.all([
+      getIn('/rest/v1/events?kind=eq.peer&select=student_id,score,created_at,raw', 'student_id', sid, true),
+      getIn('/rest/v1/surveys?kind=eq.self_assessment&select=student_id,payload,created_at&order=created_at.desc', 'student_id', sid, true),
+      getIn('/rest/v1/surveys?kind=eq.kru_assess&select=student_id,payload,created_at&order=created_at.desc', 'student_id', sid, true),
+    ]);
     const [progress, evCount] = await Promise.all([
       getIn('/rest/v1/student_game_progress?select=*', 'student_id', sid),
       countIn('/rest/v1/events', 'student_id', sid),
@@ -570,7 +587,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
     Object.assign(S, { games, rooms, cg, students, progress, summary, eventsCount: evCount,
       frameworks, coverage, itemSummary, itemProfile, comp,
-      compDims: compDims || [], achieve: achieve || [], schools: schools || [], has43: has43 });
+      compDims: compDims || [], achieve: achieve || [], schools: schools || [], has43: has43,
+      peer: peerRows || [], selfA: selfRows || [], kru: kruRows || [] });
   }
 
   const gameById = (id) => S.games.find((g) => g.id === id);
@@ -683,6 +701,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     return '<div class="tabs" role="tablist">'
       + '<button class="tab" role="tab" data-tab="ach"  aria-selected="' + (TAB === 'ach') + '">ผลสัมฤทธิ์</button>'
       + '<button class="tab" role="tab" data-tab="comp" aria-selected="' + (TAB === 'comp') + '">สมรรถนะหลัก</button>'
+      /* [V.1.6.22 · ครูสั่ง] แท็บเทียบเกณฑ์ — ยกมาจาก Dashboard ภาค 2 ตามที่ครูขอ */
+      + '<button class="tab" role="tab" data-tab="cmp" aria-selected="' + (TAB === 'cmp') + '">เทียบเกณฑ์ (ครู/เพื่อน/ตนเอง)</button>'
       /* [V.1.6.19 · ครูสั่ง] ตัดแท็บ "การคิดขั้นสูง (รายเกม)" ออก
          การคิดขั้นสูงเป็น 1 ใน 6 ด้านของกรอบสมรรถนะ มีแท็บของตัวเองแยกออกมา
          เป็นซากจากยุคที่เกมวัดได้ด้านเดียว ตอนนี้เป็นการแสดงของซ้ำสองที่
@@ -1204,6 +1224,55 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     return (S.achieve || []).filter((r) => (!cid || r.classroom_id === cid)
       && !off.has(r.student_id) && rowGameOk(r));
   }
+  /* ══ [V.1.6.21 · ครูสั่ง] ช่วงคะแนนผลสัมฤทธิ์ ═══════════════════════════
+     ⚠️ ใช้ชุดเดียวกับฐาน (ไฟล์ 72 บรรทัด 217-222) ห้ามตั้งเกณฑ์ใหม่เอง
+        ไม่งั้นหน้าครูกับหน้าสาธารณะจะพูดคนละเรื่องเรื่องเด็กคนเดียวกัน
+     เรียงจาก "ต้องช่วยเหลือ" ขึ้นก่อน — ครูเปิดหน้านี้เพื่อหาคนที่ต้องช่วย
+     ไม่ได้เปิดมาชื่นชมคนที่ได้ดีเยี่ยม */
+  const ACH_BANDS = [
+    { k: 'low',  lo: 0,  hi: 50,  name: 'ต้องช่วยเหลือ (ต่ำกว่า 50)', c: '#b91c1c' },
+    { k: 'pass', lo: 50, hi: 60,  name: 'ผ่านเกณฑ์ (50–59)',        c: '#b45309' },
+    { k: 'ok',   lo: 60, hi: 70,  name: 'พอใช้ (60–69)',            c: '#a16207' },
+    { k: 'good', lo: 70, hi: 80,  name: 'ดี (70–79)',               c: '#0d9488' },
+    { k: 'best', lo: 80, hi: 101, name: 'ดีเยี่ยม (80–100)',        c: '#047857' },
+  ];
+  const achBandOf = (pct) => ACH_BANDS.find((b) => pct >= b.lo && pct < b.hi) || null;
+
+  /* แถบการกระจาย — เลือกแบบนี้แทนกราฟค่าเฉลี่ยโดยตั้งใจ
+     ค่าเฉลี่ยตัวเดียวซ่อนสิ่งที่ครูต้องรู้ที่สุด: ห้องที่เด็กครึ่งหนึ่งได้ 90
+     อีกครึ่งได้ 30 กับห้องที่ทุกคนได้ 60 มีค่าเฉลี่ยเท่ากันเป๊ะ
+     แต่เป็นคนละสถานการณ์การสอน — อันแรกต้องแยกกลุ่มสอน อันหลังต้องทบทวนทั้งห้อง
+     (หลักเดียวกับที่แท็บสมรรถนะใช้แถบสัดส่วนระดับ ไม่ใช่ตัวเลขเฉลี่ย) */
+  function achDistBar(rows, gameKey) {
+    const wp = rows.filter((r) => r.percent != null);
+    if (!wp.length) return '<div class="muted small">ยังไม่มีคะแนนให้กระจาย</div>';
+    const seg = ACH_BANDS.map(function (b) {
+      const c = wp.filter((r) => achBandOf(Number(r.percent)) === b).length;
+      if (!c) return '';
+      const pct = (c / wp.length) * 100;
+      return '<div style="width:' + pct.toFixed(2) + '%;background:' + b.c + '"'
+        + ' title="' + G.esc(b.name) + ' — ' + c + ' คน">' + (pct >= 9 ? c : '') + '</div>';
+    }).join('');
+    /* กดที่ช่วงแล้วเห็นรายชื่อ — นี่คือ "ตัวกรอง" ที่ครูขอ ในรูปที่ใช้งานได้จริง
+       สถิติที่กดไม่ได้ ครูต้องไปไล่หาเองอีกรอบว่าใครอยู่กลุ่มไหน */
+    const legend = ACH_BANDS.map(function (b) {
+      const c = wp.filter((r) => achBandOf(Number(r.percent)) === b).length;
+      if (!c) return '';
+      return '<button type="button" class="lvkey achband" data-ach-band="' + b.k + '"'
+        + ' data-ach-game="' + G.esc(gameKey) + '"'
+        + ' style="background:none;border:0;padding:2px 4px;cursor:pointer;font:inherit"'
+        + ' title="กดเพื่อดูรายชื่อ">'
+        + '<i style="background:' + b.c + '"></i>' + G.esc(b.name) + ' <b>' + c + '</b></button>';
+    }).join('');
+    const none = rows.length - wp.length;
+    return '<div class="lvbar" style="margin-top:8px">' + seg + '</div>'
+      + '<div class="lvlegend">' + legend
+      + (none ? '<span class="lvkey"><i style="background:#e5e7eb"></i>ยังไม่มีคะแนน <b>'
+          + none + '</b></span>' : '')
+      + '</div><div class="achnames muted small" data-ach-names="' + G.esc(gameKey) + '"'
+      + ' style="display:none;margin-top:6px"></div>';
+  }
+
   function achSummaryCards(cid) {
     const rows = achRows(cid);
     if (!rows.length) return '';
@@ -1219,6 +1288,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + '<div class="muted small">' + g.length + ' คนมีผลสรุปจากเกม'
         + (legacy ? ' · ข้อมูลเก่าจากชีต ' + legacy + ' คน' : '') + '</div>'
         + (avg != null ? meter(avg) + '<div class="muted small">คะแนนเฉลี่ย ' + avg.toFixed(1) + '% ของคะแนนเต็ม</div>' : '')
+        /* [V.1.6.21] การกระจาย — ค่าเฉลี่ยข้างบนบอกไม่ได้ว่าห้องกระจุกอยู่ตรงไหน */
+        + achDistBar(g, gn)
         + (note ? '<div class="form-hint">' + G.esc(note) + '</div>' : '') + '</div>';
     }).join('');
     return '<h2 class="section-title">ผลสัมฤทธิ์จากใบรายงานผลของเกม '
@@ -1226,6 +1297,38 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + '<div class="grid cols-3">' + cards + '</div>';
   }
 
+
+  /* [V.1.6.21] กดที่ช่วงคะแนน → กางรายชื่อคนในช่วงนั้น
+     ดักที่ document ครั้งเดียว ใช้ได้กับการ์ดที่วาดใหม่ทุกครั้งที่เปลี่ยนตัวกรอง
+     ⚠️ ชื่อนักเรียนขึ้นได้ที่นี่เพราะเป็นหน้าครูที่ล็อกอินแล้วและเป็นห้องของตัวเอง
+        (หน้าสาธารณะยังห้ามขึ้นชื่อเหมือนเดิม — คนละหน้า คนละกติกา) */
+  document.addEventListener('click', function (ev) {
+    const btn = ev.target && ev.target.closest && ev.target.closest('[data-ach-band]');
+    if (!btn) return;
+    const bandK = btn.getAttribute('data-ach-band');
+    const gameKey = btn.getAttribute('data-ach-game');
+    const box = document.querySelector('[data-ach-names="' + gameKey + '"]');
+    if (!box) return;
+    const band = ACH_BANDS.find((b) => b.k === bandK);
+    if (!band) return;
+    /* กดซ้ำที่ช่วงเดิม = ปิด — ครูจะได้ไม่ต้องหาปุ่มปิด */
+    if (box.dataset.open === bandK) {
+      box.style.display = 'none'; box.dataset.open = ''; return;
+    }
+    const rows = achRows(ROOM || null).filter((r) => r.game_name === gameKey
+      && r.percent != null && achBandOf(Number(r.percent)) === band);
+    const names = rows.map(function (r) {
+      const s = S.students.find((x) => x.id === r.student_id);
+      const nm = s ? ((s.first_name || '') + ' ' + (s.last_name || '')).trim() : '(ไม่พบชื่อ)';
+      return '<span style="display:inline-block;margin:2px 8px 2px 0">'
+        + (s && s.student_number ? G.esc(s.student_number) + '. ' : '')
+        + G.esc(nm) + ' <b>' + G.fmt(r.percent) + '%</b></span>';
+    }).join('');
+    box.innerHTML = '<b style="color:' + band.c + '">' + G.esc(band.name) + '</b> — '
+      + rows.length + ' คน<br>' + (names || '<span class="muted">ไม่มีรายชื่อ</span>');
+    box.style.display = 'block';
+    box.dataset.open = bandK;
+  });
 
   const compRows = (cid) => (S.comp || [])
     .filter((r) => (!cid || r.classroom_id === cid) && rowGameOk(r));
@@ -1964,10 +2067,22 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       +   '<button class="btn btn-sm btn-primary" id="gr-go">🔄 อัปเดตผลจากเกม</button>'
       + '</div>'
       + pickerBar(cid)
+      /* [V.1.6.22 · ครูสั่ง] ตารางรวมอยู่**เหนือแท็บ** โดยตั้งใจ
+         ครูเปิดหน้าห้องมาเพื่อดูว่า "ห้องนี้เป็นยังไง" — ภาพรวมทั้งห้องคือคำตอบแรก
+         แท็บด้านล่างไว้เจาะลึกทีหลัง · ถ้าเอาไปซ่อนในแท็บ ครูต้องกดก่อนถึงจะเห็น
+         สิ่งที่สำคัญที่สุด ซึ่งกลับหัวลำดับความสำคัญ */
+      + '<h2 class="section-title">ภาพรวมรายคน '
+      +   '<span class="sub">ผลสัมฤทธิ์และสมรรถนะในตารางเดียว — แตะแถวเพื่อดูรายละเอียด</span></h2>'
+      + '<div class="card table-scroll">' + unifiedTable(cid) + '</div>'
       + tabs();
 
     /* [V.1.6.19] แท็บการคิดขั้นสูงถูกตัดออกตามคำสั่งครู — ดูที่แท็บสมรรถนะแทน */
-    if (TAB === 'comp') {
+    if (TAB === 'cmp') {
+      /* [V.1.6.22 · ครูสั่ง] เทียบเกณฑ์ เกม/ครู/เพื่อน/ตนเอง */
+      html += '<h2 class="section-title">เทียบเกณฑ์ '
+        + '<span class="sub">เกม · ครู · เพื่อน · ตนเอง — ดูว่าสี่แหล่งเห็นตรงกันไหม</span></h2>'
+        + '<div class="card table-scroll">' + compareTable(cid) + '</div>';
+    } else if (TAB === 'comp') {
       html += comp6Section(cid) + comp6Table(cid) + compSection(cid);
       html += '<h2 class="section-title">สมรรถนะรายคน</h2>'
         + '<div class="card table-scroll">' + compTable(cid) + '</div>';
@@ -2132,6 +2247,253 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   /** ตารางสมรรถนะรายคนของห้อง (คอลัมน์ = รายการระดับบนที่มีเกมวัด) */
+  /* ══ [V.1.6.22 · ครูสั่ง] ตารางรายคนหน้าเดียว ═══════════════════════════
+     "ดูรายชื่อ ผลสัมฤทธิ์ สมรรถนะ ได้ในหน้าเดียว"
+
+     ⚠️ สีประจำด้านใช้ชุดเดียวกับ Dashboard ภาค 2 เป๊ะ (CORE6 ในไฟล์ของภาค 2)
+        ครูสั่งให้สามหน้าจอเหมือนกัน — สีไม่ตรงกัน ครูจำสีข้ามหน้าไม่ได้
+        ซึ่งทำลายประโยชน์ของการใช้สีตั้งแต่แรก */
+  const C6_COLOR = { SM:'#0891b2', HOT:'#7c3aed', HT:'#7c3aed', CM:'#0ea5e9',
+                     TW:'#16a34a', CZ:'#d97706', NS:'#059669' };
+  const C6_SHORT = { SM:'จัดการตนเอง', HOT:'คิดขั้นสูง', HT:'คิดขั้นสูง', CM:'สื่อสาร',
+                     TW:'ทำงานเป็นทีม', CZ:'พลเมือง', NS:'ธรรมชาติ' };
+
+  /* ค่าที่จะโชว์ในช่องสมรรถนะของนักเรียนหนึ่งคน หนึ่งด้าน
+     สามสถานะเดียวกับที่ V.1.6.17 วางไว้ — ต้องไม่ยุบกลับเป็นสองสถานะอีก */
+  function c6Cell(sid, code) {
+    const rs = (S.compDims || []).filter((r) => r.student_id === sid && r.comp_code === code
+      && r.evidence !== 'self_report' && rowGameOk(r));
+    if (!rs.length) return { k: 'none', txt: '–', tip: 'ยังไม่มีหลักฐานจากเกมใดเลย' };
+    const lv = rs.filter((r) => r.level != null);
+    if (!lv.length) {
+      const why = (rs.find((r) => r.criteria_note) || {}).criteria_note || 'ยังสรุประดับไม่ได้';
+      return { k: 'wait', txt: '⏳', tip: why };
+    }
+    /* ระดับที่ทำได้ดีที่สุด — เหตุผลเดียวกับใบสรุปข้ามเกม (V.1.6.15)
+       สมรรถนะตอบว่า "ทำได้ไหม" การเฉลี่ยจะลงโทษเด็กที่ครั้งแรกยังไม่ได้แล้วค่อยทำได้ */
+    const best = lv.reduce((a, b) => (Number(b.level) > Number(a.level) ? b : a));
+    return { k: 'lv', txt: String(best.level), lv: Number(best.level),
+      tip: 'ระดับ ' + best.level + (best.level_label ? ' ' + best.level_label : '')
+        + (best.score != null ? ' · ' + G.fmt(best.score) + '%' : '') };
+  }
+
+  /* ══ [V.1.6.22 · ครูสั่ง] เทียบเกณฑ์ เกม/ครู/เพื่อน/ตนเอง ══════════════
+     ประโยชน์จริงของการเทียบสี่แหล่งคือการเจอ "ช่องว่าง" ไม่ใช่การวางตัวเลขเรียงกัน
+     เด็กที่เกมให้ระดับ 5 แต่ประเมินตัวเองระดับ 3 = ทำได้แต่ไม่รู้ว่าตัวเองทำได้
+     เด็กที่ตรงข้าม = ประเมินตัวเองสูงเกินจริง — ทั้งสองกรณีครูต้องรู้
+     และทั้งสองมองไม่เห็นถ้าดูแค่ตัวเลขเดี่ยว ๆ */
+  const CMP_SRC = [
+    { k: 'game', icon: '🎮', name: 'เกม' },
+    { k: 'kru',  icon: '🧑‍🏫', name: 'ครู' },
+    { k: 'peer', icon: '👥', name: 'เพื่อน' },
+    { k: 'self', icon: '🙋', name: 'ตนเอง' },
+  ];
+
+  /* แปลงคะแนน 1-4 ของแบบประเมิน (ครู/เพื่อน/ตนเอง) เป็นระดับสมรรถนะ 3-6
+     กรอบเดียวกับที่เกมใช้ — ถ้าไม่แปลง ตัวเลขสองสเกลจะถูกเทียบกันตรง ๆ ซึ่งผิด */
+  const to36 = (v) => {
+    const x = Number(v);
+    if (isNaN(x) || x <= 0) return null;
+    return Math.max(3, Math.min(6, Math.round(x) + 2));
+  };
+
+  /* ค่าของแต่ละแหล่งสำหรับนักเรียนหนึ่งคน หนึ่งด้าน — คืน null เมื่อไม่มีข้อมูล
+     ⚠️ null (ไม่มีข้อมูล) ห้ามกลายเป็น 0 — "ยังไม่ประเมิน" ไม่ใช่ "ประเมินแล้วได้ศูนย์" */
+  function cmpOf(sid, code) {
+    const out = { game: null, kru: null, peer: null, self: null };
+    try {
+      const g = (S.compDims || []).filter((r) => r.student_id === sid && r.comp_code === code
+        && r.evidence !== 'self_report' && r.level != null && rowGameOk(r));
+      if (g.length) out.game = g.reduce((a, b) => (Number(b.level) > Number(a.level) ? b : a)).level;
+
+      const sf = (S.compDims || []).find((r) => r.student_id === sid && r.comp_code === code
+        && r.evidence === 'self_report' && r.level != null);
+      if (sf) out.self = Number(sf.level);
+
+      /* ครู: payload.dims เก็บด้านย่อย 19 ตัว รหัสขึ้นต้นด้วยรหัสด้าน เช่น SM-PLN
+         เฉลี่ยเฉพาะด้านย่อยที่ครูให้ไว้จริง — ช่องที่เว้นว่าง = ยังไม่ได้สังเกต ไม่ใช่ 0 */
+      const kr = (S.kru || []).find((r) => r.student_id === sid);
+      if (kr && kr.payload && kr.payload.dims) {
+        const vals = Object.keys(kr.payload.dims)
+          .filter((k) => String(k).indexOf(code) === 0 || String(k).indexOf(code + '-') === 0)
+          .map((k) => Number(kr.payload.dims[k])).filter((x) => !isNaN(x) && x > 0);
+        if (vals.length) out.kru = to36(vals.reduce((a, b) => a + b, 0) / vals.length);
+      }
+
+      /* เพื่อน: events kind='peer' เก็บเป็นคะแนนรวม ไม่ได้แยกรายด้านในทุกรุ่น
+         ⇒ ถ้า raw ไม่มีรายด้าน จะไม่เดาให้ — แสดงว่า "ไม่มีข้อมูลด้านนี้" ตรงไปตรงมา */
+      const pr = (S.peer || []).filter((r) => r.student_id === sid);
+      if (pr.length) {
+        const vals = pr.map(function (r) {
+          const raw = r.raw || {};
+          const v = raw[code] != null ? raw[code] : (raw.dims && raw.dims[code]);
+          return Number(v);
+        }).filter((x) => !isNaN(x) && x > 0);
+        if (vals.length) out.peer = to36(vals.reduce((a, b) => a + b, 0) / vals.length);
+      }
+    } catch (e) {}
+    return out;
+  }
+
+  /* สถานะการสอดคล้อง — ต้องมีอย่างน้อย 2 แหล่งถึงตัดสิน
+     ⚠️ แหล่งเดียวห้ามแสดงว่า "สอดคล้อง" เพราะไม่มีอะไรให้สอดคล้องด้วย
+     เกณฑ์ห่าง 2 ระดับ: กรอบมี 4 ระดับใช้จริง (3-6) ห่าง 1 คือความคลาดเคลื่อนปกติ
+     ของการมองคนละมุม · ห่าง 2 ขึ้นไปคือคนละความเห็นจริง (เกณฑ์เดียวกับภาค 2) */
+  function cmpStatus(v) {
+    const nums = CMP_SRC.map((s) => v[s.k]).filter((x) => x != null).map(Number);
+    if (nums.length < 2) return { k: 'few', txt: nums.length ? 'มีแหล่งเดียว' : 'ยังไม่มีหลักฐาน',
+      c: '#94a3b8' };
+    const gap = Math.max.apply(null, nums) - Math.min.apply(null, nums);
+    if (gap >= 2) return { k: 'gap', txt: 'ต่างกัน ' + gap + ' ระดับ', c: '#dc2626' };
+    return { k: 'ok', txt: 'สอดคล้อง', c: '#16a34a' };
+  }
+
+  function compareTable(cid) {
+    const stu = studentsOf(cid).filter(isOn);
+    if (!stu.length) return '<div class="card muted">ยังไม่มีนักเรียนในห้องนี้</div>';
+    const dims = COMP6;
+    let head = '<thead><tr><th scope="col" rowspan="2" class="num">เลขที่</th>'
+      + '<th scope="col" rowspan="2">ชื่อ — นามสกุล</th>'
+      + dims.map(function (d) {
+          const c = C6_COLOR[d[0]] || '#475569';
+          return '<th scope="colgroup" colspan="1" class="sub-h" style="color:' + c
+            + ';border-bottom:3px solid ' + c + '" title="' + G.esc(d[1]) + '">'
+            + G.esc(C6_SHORT[d[0]] || d[1]) + '</th>';
+        }).join('')
+      + '</tr><tr>'
+      + dims.map(() => '<th scope="col" class="sub-h muted" style="font-weight:400">🎮 🧑‍🏫 👥 🙋</th>').join('')
+      + '</tr></thead>';
+
+    const body = stu.map(function (s) {
+      const nm = ((s.first_name || '') + ' ' + (s.last_name || '')).trim() || '–';
+      const cells = dims.map(function (d) {
+        const v = cmpOf(s.id, d[0]);
+        const st = cmpStatus(v);
+        const chips = CMP_SRC.map(function (src) {
+          const val = v[src.k];
+          if (val == null) return '<span class="cmpchip off" title="' + src.name + ': ยังไม่มีข้อมูล">–</span>';
+          return '<span class="cmpchip" title="' + src.name + ': ระดับ ' + val + '">' + val + '</span>';
+        }).join('');
+        return '<td class="num" title="' + G.esc(st.txt) + '">'
+          + '<div class="cmpcell">' + chips + '</div>'
+          + '<div class="cmpst" style="color:' + st.c + '">' + G.esc(st.txt) + '</div></td>';
+      }).join('');
+      return '<tr><td class="num">' + G.esc(s.student_number || '–') + '</td>'
+        + '<td><a href="#/student/' + s.id + '">' + G.esc(nm) + '</a></td>' + cells + '</tr>';
+    }).join('');
+
+    return '<table class="gol utable cmptable">' + head + '<tbody>' + body + '</tbody></table>'
+      + '<div class="panel-note">แต่ละช่องมีสี่ตัวเลขเรียงกัน: '
+      + CMP_SRC.map((x) => x.icon + ' ' + x.name).join(' · ')
+      + ' — ตัวเลขคือ<b>ระดับสมรรถนะ 3-6</b> · <b>–</b> คือยังไม่มีข้อมูลจากแหล่งนั้น '
+      + '(ไม่ใช่ศูนย์)<br>'
+      + '<b style="color:#16a34a">สอดคล้อง</b> = ทุกแหล่งเห็นตรงกันในระยะ 1 ระดับ · '
+      + '<b style="color:#dc2626">ต่างกัน N ระดับ</b> = ควรดูหลักฐานประกอบก่อนสรุป '
+      + '(เช่นเด็กที่เกมให้ระดับสูงแต่ประเมินตัวเองต่ำ = ทำได้แต่ยังไม่มั่นใจ) · '
+      + 'ต้องมีอย่างน้อย <b>2 แหล่ง</b> ถึงจะเทียบได้</div>';
+  }
+
+  function unifiedTable(cid) {
+    const stu = studentsOf(cid);
+    if (!stu.length) return '<div class="card muted">ยังไม่มีนักเรียนในห้องนี้</div>';
+    const games = gamesInScope(cid);
+    const dims = COMP6;
+
+    /* หัวตารางสองชั้น — ชั้นบนคือชื่อกลุ่ม ชั้นล่างคือคอลัมน์จริง
+       ครูกวาดตาเห็นทันทีว่าคอลัมน์ไหนเป็นเรื่องเดียวกัน (โครงเดียวกับภาค 2) */
+    let head = '<thead><tr>'
+      + '<th scope="col" rowspan="2" class="num">เลขที่</th>'
+      + '<th scope="col" rowspan="2">ชื่อ — นามสกุล</th>'
+      + (games.length ? '<th scope="colgroup" colspan="' + games.length + '" class="grp grp-ach">🏅 ผลสัมฤทธิ์</th>' : '')
+      + '<th scope="colgroup" colspan="' + dims.length + '" class="grp grp-c6">🌟 สมรรถนะหลัก ' + dims.length + ' ด้าน</th>'
+      + '</tr><tr>'
+      + games.map((g) => '<th scope="col" class="sub-h">' + G.esc(g.name) + '</th>').join('')
+      + dims.map(function (d) {
+          const c = C6_COLOR[d[0]] || '#475569';
+          return '<th scope="col" class="sub-h" style="color:' + c + ';border-bottom:3px solid ' + c + '"'
+            + ' title="' + G.esc(d[1]) + '">' + G.esc(C6_SHORT[d[0]] || d[2] || d[1]) + '</th>';
+        }).join('')
+      + '</tr></thead>';
+
+    const body = stu.map(function (s) {
+      const nm = ((s.first_name || '') + ' ' + (s.last_name || '')).trim() || '–';
+      const achCells = games.map(function (g) {
+        const a = (S.achieve || []).find((x) => x.student_id === s.id && x.game_id === g.id);
+        if (!a || a.percent == null) return '<td class="num"><span class="muted small">–</span></td>';
+        return '<td class="num"><b>' + G.fmt(a.percent) + '%</b></td>';
+      }).join('');
+      const c6Cells = dims.map(function (d) {
+        const v = c6Cell(s.id, d[0]);
+        const c = C6_COLOR[d[0]] || '#475569';
+        if (v.k === 'lv') {
+          return '<td class="num" title="' + G.esc(v.tip) + '">'
+            + '<span class="c6dot" style="background:' + c + '">' + G.esc(v.txt) + '</span></td>';
+        }
+        if (v.k === 'wait') {
+          return '<td class="num" title="' + G.esc(v.tip) + '"><span class="muted">⏳</span></td>';
+        }
+        return '<td class="num" title="' + G.esc(v.tip) + '"><span class="muted small">–</span></td>';
+      }).join('');
+      return '<tr class="urow" data-urow="' + s.id + '" tabindex="0">'
+        + '<td class="num">' + G.esc(s.student_number || '–') + '</td>'
+        + '<td><a href="#/student/' + s.id + '" onclick="event.stopPropagation()">' + G.esc(nm) + '</a>'
+        + (s.is_active === false ? ' <span class="badge">ปิดใช้งาน</span>' : '') + '</td>'
+        + achCells + c6Cells + '</tr>'
+        + '<tr class="hidden" data-udet="' + s.id + '"><td colspan="'
+        + (2 + games.length + dims.length) + '"></td></tr>';
+    }).join('');
+
+    return '<table class="gol utable">' + head + '<tbody>' + body + '</tbody></table>'
+      + '<div class="panel-note">ตัวเลขในวงกลมคือ<b>ระดับสมรรถนะ</b> (3-6) · '
+      + '<b>⏳</b> = เกมเก็บหลักฐานอยู่แต่ยังสรุประดับไม่ได้ · '
+      + '<b>–</b> = ยังไม่มีหลักฐานจากเกมใดเลย — สามอย่างนี้คนละความหมายกัน<br>'
+      + '<b>แตะที่แถว</b> เพื่อกางรายละเอียดของนักเรียนคนนั้นตรงนี้ · '
+      + 'หรือกดที่<b>ชื่อ</b>เพื่อเปิดหน้ารายคนแบบเต็ม</div>';
+  }
+
+  /* [V.1.6.22] แตะแถว → กางรายละเอียดของนักเรียนคนนั้นตรงนั้น ไม่เด้งไปหน้าใหม่
+     ครูดูทีละคนแล้วกลับมาเทียบกับเพื่อนในห้อง การเด้งออกไปทำให้เสียบริบท
+     ดักที่ document ครั้งเดียว ใช้ได้กับตารางที่วาดใหม่ทุกครั้งที่เปลี่ยนตัวกรอง */
+  function toggleURow(sid) {
+    try {
+      const row = document.querySelector('[data-urow="' + sid + '"]');
+      const det = document.querySelector('[data-udet="' + sid + '"]');
+      if (!row || !det) return;
+      const open = !det.classList.contains('hidden');
+      /* ปิดแถวอื่นก่อน — เปิดค้างหลายแถวพร้อมกันทำให้ตารางยาวจนหาแถวเดิมไม่เจอ */
+      document.querySelectorAll('[data-udet]').forEach(function (x) { x.classList.add('hidden'); });
+      document.querySelectorAll('tr.urow').forEach(function (x) { x.classList.remove('on'); });
+      if (open) return;
+      const cell = det.querySelector('td');
+      if (cell) {
+        cell.className = 'udetail';
+        cell.innerHTML = '<div class="muted small">กำลังรวบรวม…</div>';
+        try {
+          cell.innerHTML = crossGameCard(sid)
+            || '<div class="muted small">ยังไม่มีผลของนักเรียนคนนี้</div>';
+        } catch (e) {
+          /* กฎกลาง: ขึ้นจอครูได้เฉพาะ reason — ห้ามโยนข้อความ error ดิบขึ้นจอ */
+          cell.innerHTML = '<div class="muted small">แสดงรายละเอียดไม่ได้ในขณะนี้</div>';
+        }
+      }
+      det.classList.remove('hidden');
+      row.classList.add('on');
+    } catch (e) {}
+  }
+  document.addEventListener('click', function (ev) {
+    const row = ev.target && ev.target.closest && ev.target.closest('tr.urow');
+    if (!row) return;
+    toggleURow(row.getAttribute('data-urow'));
+  });
+  /* คนใช้คีย์บอร์ดต้องกางแถวได้ด้วย — แถวมี tabindex ให้แท็บเข้าไปได้แล้ว */
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    const row = ev.target && ev.target.closest && ev.target.closest('tr.urow');
+    if (!row) return;
+    ev.preventDefault();
+    toggleURow(row.getAttribute('data-urow'));
+  });
+
   function compTable(cid) {
     const fws = compFrameworks();
     if (!fws.length) return '<div class="muted">ยังไม่มีข้อมูลสมรรถนะ</div>';
@@ -2178,8 +2540,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           +   (x.is_active === false ? ' <span class="badge">ปิดใช้งาน</span>' : '') + '</td>'
           + '<td class="muted small">' + G.esc(x.character_name || '–') + '</td>'
           + '<td class="muted small">' + G.esc(x.join_pin || '–') + '</td>'
+          /* [V.1.6.22] เดิมเปิด <td> สองครั้งโดยไม่ปิดอันแรก ⇒ ตารางมี 6 ช่องใน 5 คอลัมน์
+             เบราว์เซอร์ปิดให้เองจึงไม่พังตา แต่หัวตารางกับเนื้อไม่ตรงกันจริง
+             รวมปุ่มไว้ช่องเดียวตามจำนวนคอลัมน์ที่ประกาศไว้ */
           + '<td><button class="btn btn-sm" data-kru-open="' + x.id + '" title="ครูประเมินสมรรถนะจากการสังเกต 19 ด้านย่อย">🧑‍🏫 ประเมิน</button> '
-          + '<td><button class="btn btn-sm" data-edit-stu="' + x.id + '">✏️ แก้ไข</button> '
+          +   '<button class="btn btn-sm" data-edit-stu="' + x.id + '">✏️ แก้ไข</button> '
           +   '<button class="btn btn-sm" data-off-stu="' + x.id + '">'
           +     (x.is_active === false ? 'เปิดใช้งาน' : 'ปิดการใช้งาน') + '</button> '
           +   '<button class="btn btn-sm btn-danger" data-del-stu="' + x.id + '">🗑 ลบ</button></td></tr>'

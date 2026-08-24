@@ -1037,3 +1037,32 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
 .topbar .navlinks a:not(.btn) + a:not(.btn){ margin-left:0; }   /* ยกเว้นปุ่ม CTA — ต้องเด่นกว่าลิงก์เมนูตามกฎเดิม */
 .topbar .navlinks{ gap:2px; }
 .topbar-in{ max-width:1400px; }
+
+/* ══ [V.1.6.22 · ครูสั่ง] ตารางรายคนหน้าเดียว ═══════════════════════════
+   "ดูรายชื่อ ผลสัมฤทธิ์ สมรรถนะ ได้ในหน้าเดียว" — โครงเดียวกับ Dashboard ภาค 2
+   หัวสองชั้น: ชั้นบนคือชื่อกลุ่ม ชั้นล่างคือคอลัมน์จริง */
+.utable th.grp { text-align:center; font-size:12.5px; letter-spacing:.2px;
+  border-bottom:2px solid var(--border); padding:6px 8px; }
+.utable th.grp-ach { background:rgba(217,119,6,.10); color:#92400e; }
+.utable th.grp-c6  { background:rgba(124,58,237,.10); color:#5b21b6; }
+.utable th.sub-h { font-size:11.5px; font-weight:700; text-align:center;
+  white-space:nowrap; padding:5px 7px; }
+/* วงกลมระดับสมรรถนะ — ตัวเลขเดียวอ่านเร็วกว่าแถบยาวเมื่อมี 6 คอลัมน์เรียงกัน
+   (แถบยาวกินความกว้างจนตารางเลื่อนแนวนอน ซึ่งครูต้องเลื่อนไปมาเพื่ออ่านแถวเดียว) */
+.utable .c6dot { display:inline-flex; align-items:center; justify-content:center;
+  width:26px; height:26px; border-radius:50%; color:#fff; font-weight:800; font-size:13px; }
+.utable tr.urow { cursor:pointer; }
+.utable tr.urow:hover, .utable tr.urow:focus-visible { background:var(--grid); outline:none; }
+.utable tr.urow.on { background:rgba(42,120,214,.10); }
+.utable td, .utable th { vertical-align:middle; }
+.udetail { padding:10px 12px; background:var(--surface); }
+/* [V.1.6.22] ตารางเทียบเกณฑ์ — สี่ตัวเลขเรียงกันในช่องเดียว
+   เลือกชิปเล็กสี่ตัวแทนสี่คอลัมน์แยก เพราะ 6 ด้าน × 4 แหล่ง = 24 คอลัมน์
+   ซึ่งกว้างเกินจอทุกขนาด ครูต้องเลื่อนแนวนอนตลอดเวลาจนเทียบแถวเดียวไม่ได้ */
+.cmptable .cmpcell { display:flex; gap:3px; justify-content:center; }
+.cmptable .cmpchip { display:inline-flex; align-items:center; justify-content:center;
+  min-width:20px; height:20px; border-radius:5px; font-size:11.5px; font-weight:700;
+  background:var(--grid); color:var(--ink); }
+.cmptable .cmpchip.off { background:transparent; color:var(--muted); font-weight:400; }
+.cmptable .cmpst { font-size:10px; margin-top:2px; white-space:nowrap; }
+

@@ -137,7 +137,11 @@ export async function stub(page, opt = {}) {
     if (has('v_classroom_game_summary')) return json(inIds(F.summary, 'classroom_id'));
     if (has('v_student_achievement')) {
       if (opt.has43 === false) return gone();
-      return json(opt.noData ? [] : inIds(F.achieve, 'classroom_id'));
+      /* [V.1.6.21] opt.achieve — ให้เทสต์ฉีดชุดใบผลสัมฤทธิ์ของตัวเองได้
+         ตัวอย่างจำลองกลางมีนักเรียนใช้งานจริงในห้อง R1 คนเดียว (S2 ถูกปิดใช้งาน)
+         ⇒ ทดสอบ "การกระจายตามช่วงคะแนน" ไม่ได้ ถ้าต้องพึ่งชุดกลาง
+         และการไปเพิ่มนักเรียนในชุดกลางจะไปพังข้อที่นับหัวในชุดอื่น */
+      return json(opt.noData ? [] : inIds(opt.achieve || F.achieve, 'classroom_id'));
     }
     /* ยังไม่ได้รัน 43 = ไม่มีทั้งสองมุมมอง ไม่ใช่หายไปทีละอัน — จำลองให้ตรงกับฐานจริง */
     if (has('v_student_comp_dims')) {

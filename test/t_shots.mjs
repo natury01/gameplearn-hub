@@ -60,8 +60,15 @@ console.log('═══ 1) หน้าแรก — สไลด์ภาพร�
     return { on: c.querySelector('.gshot.on').getAttribute('data-i'),
       loaded: [...c.querySelectorAll('.gshot')].filter((i) => i.getAttribute('src')).length };
   });
-  ok('ไม่ได้ชี้ = ไม่เลื่อนเอง (การ์ดทั้งหน้าไม่กระพริบพร้อมกัน)', idle.on === before.on, { before, idle });
-  ok('ไม่ได้ชี้ = ยังไม่โหลดภาพใบอื่น (ประหยัดเน็ตโรงเรียน)', idle.loaded === 1, idle);
+  /* [V.1.6.20 · ครูสั่ง] สองข้อนี้เดิมยึดสัญญา "เลื่อนเฉพาะตอนเอาเมาส์ชี้"
+     ครูถามว่า "ไม่สไลด์อัตโนมัติหรอ ต้องกดคลิกเลือกดูรูปเอง" ⇒ สัญญากลับด้านโดยตั้งใจ
+     (บนมือถือไม่มี hover เลย ⇒ ของเดิมเห็นแค่ภาพแรกใบเดียวตลอด)
+     แต่สิ่งที่ข้อเดิม "ปกป้อง" ไว้จริง ๆ คือ **ไม่ดึงภาพทุกใบตอนเปิดหน้า**
+     ซึ่งยังสำคัญเท่าเดิมกับเน็ตโรงเรียน — ข้อใหม่จึงคุมเรื่องนั้นต่อในรูปแบบใหม่ */
+  ok('⭐ ไม่ได้ชี้ก็เลื่อนเอง (ครูสั่ง — บนมือถือไม่มี hover)',
+    idle.on !== before.on, { before, idle });
+  ok('⭐ แต่ยังโหลดภาพทีละใบตามที่แสดงจริง ไม่ดึงมาทั้งชุด (เน็ตโรงเรียน)',
+    idle.loaded <= 3, idle);
 
   await p.hover('#cat .gcard .gcover.gshots');
   await sleep(3200);
@@ -75,7 +82,9 @@ console.log('═══ 1) หน้าแรก — สไลด์ภาพร�
       dead: [...c.querySelectorAll('.gshot.dead')].length,
       goneDots: dots.filter((d) => d.classList.contains('gone')).length };
   });
-  ok('ชี้แล้วเลื่อนไปใบถัดไป', hov.on !== before.on, { before, hov });
+  /* [V.1.6.20] การชี้ไม่ใช่ตัวสั่งเลื่อนอีกแล้ว — หน้าที่ของมันคือ
+     "ครูสนใจการ์ดนี้" ⇒ ปลุกภาพที่เหลือมารอ จะได้ไม่สะดุดตอนสไลด์เดินถึง */
+  ok('ชี้แล้วสไลด์ยังเดินต่อ ไม่หยุดค้าง', hov.on !== null, { before, hov });
   ok('ชี้แล้วค่อยโหลดภาพที่เหลือ', hov.loaded === 3, hov);
   ok('จุดบอกหน้าตรงกับภาพที่เห็นอยู่', String(hov.dotOn) === String(hov.on), hov);
   ok('คำบรรยายเปลี่ยนตามภาพ', hov.cap === 'ด่าน 3 ถ้ำกระแซ' || hov.cap === 'ด่าน 1 นักสืบสะพานแคว', hov);
@@ -84,10 +93,21 @@ console.log('═══ 1) หน้าแรก — สไลด์ภาพร�
 
   await p.mouse.move(5, 5);
   await sleep(200);
-  const stopped = await p.evaluate(() => document.querySelector('.gcover.gshots .gshot.on').getAttribute('data-i'));
-  await sleep(3000);
-  const stillStopped = await p.evaluate(() => document.querySelector('.gcover.gshots .gshot.on').getAttribute('data-i'));
-  ok('เอาเมาส์ออกแล้วหยุดเลื่อนทันที', stopped === stillStopped, { stopped, stillStopped });
+  /* ⚠️ ห้ามเทียบแค่สองจุดเวลา — การ์ดตัวอย่างมีภาพใช้ได้ 2 ใบ สลับไปมา
+     ถ้าจับตัวอย่างห่างกันพอดีสองรอบ จะได้ค่าเท่ากันแล้วแดงทั้งที่สไลด์เดินอยู่
+     (เทสต์เปราะแบบนี้แย่กว่าไม่มีเทสต์ เพราะทำให้คนเลิกเชื่อผลสีแดง) */
+  let offPrev = await p.evaluate(() => document.querySelector('.gcover.gshots .gshot.on').getAttribute('data-i'));
+  let offChanges = 0;
+  for (let i = 0; i < 12; i++) {
+    await sleep(600);
+    const c = await p.evaluate(() => {
+      const on = document.querySelector('.gcover.gshots .gshot.on');
+      return on ? on.getAttribute('data-i') : null;
+    });
+    if (c !== null && c !== offPrev) { offChanges++; offPrev = c; }
+  }
+  ok('⭐ เอาเมาส์ออกแล้วสไลด์ต้องเดินต่อ (ไม่ไปดับนาฬิกาอัตโนมัติทิ้ง)',
+    offChanges >= 2, { เปลี่ยนกี่ครั้งหลังเอาเมาส์ออก: offChanges });
 
   ok('สคริปต์ไม่พัง (ภาพเสีย 1 ใบไม่ทำให้หน้าล้ม)', realErrors(calls).length === 0, realErrors(calls));
   await p.close();
@@ -221,6 +241,76 @@ console.log('\n═══ 4) ชุดจริงจากภาค 1 — 14 ด
   ok('ไม่มีชื่อด่านค้างอยู่บนปกที่ไม่ใช่ด่านนั้น', st.capText === '', st);
   ok('สคริปต์ไม่พังแม้ภาพตายทั้ง 14 ใบ', realErrors(calls).length === 0, realErrors(calls));
   await p.close();
+}
+
+
+console.log('\n═══ สไลด์ต้องเดินเอง ไม่ต้องเอาเมาส์จ่อ (V.1.6.20) ═══');
+/* ครูถาม: "ภาพสไลด์ของเกมในหน้าเว็บกลาง ไม่สไลด์อัตโนมัติหรอ ต้องกดคลิกเลือกดูรูปเอง"
+   ของเดิมเดินเฉพาะตอน hover/focus ⇒ **บนมือถือไม่เดินเลย** เพราะไม่มี hover
+   ชุดนี้จึงตรวจโดย **ไม่แตะเมาส์เลยสักครั้ง** — ถ้าต้อง hover ถึงจะผ่าน แปลว่ายังไม่ได้แก้ */
+{
+  const p = await b.newPage();
+  const calls = await stub(p);
+  await p.goto(BASE + '/index.html');
+  await sleep(2500);
+
+  const first = await p.evaluate(() => {
+    const box = document.querySelector('.gshots');
+    if (!box) return { none: true };
+    const on = box.querySelector('.gshot.on');
+    return { none: false, idx: on ? on.getAttribute('data-i') : null,
+      total: box.querySelectorAll('.gshot').length };
+  });
+  ok('หน้าแรกมีการ์ดที่มีสไลด์ให้ตรวจจริง', !first.none && first.total > 1, first);
+
+  /* ⚠️ ห้ามเทียบแค่ "ก่อน" กับ "หลัง" — การ์ดตัวอย่างมีภาพใช้ได้ 2 ใบ
+     มันสลับไปมา ⇒ สองจุดเวลาที่ห่างกันเลขคู่ของรอบ จะได้ค่าเท่ากันพอดี
+     แล้วเทสต์จะแดงทั้งที่สไลด์เดินอยู่ (เจอจริงตอนเขียนชุดนี้)
+     ⇒ ต้องเก็บตัวอย่างถี่ ๆ แล้วนับว่า "เปลี่ยนไหม" ไม่ใช่ "ต่างจากตอนแรกไหม" */
+  const seen = new Set([String(first.idx)]);
+  let changes = 0, prev = String(first.idx);
+  for (let i = 0; i < 14; i++) {
+    await sleep(600);
+    const cur = await p.evaluate(() => {
+      const on = document.querySelector('.gshots .gshot.on');
+      return on ? on.getAttribute('data-i') : null;
+    });
+    if (cur !== null && String(cur) !== prev) { changes++; prev = String(cur); seen.add(prev); }
+  }
+  ok('⭐ สไลด์เปลี่ยนภาพเองโดยไม่ต้องเอาเมาส์ไปจ่อ (ไม่แตะเมาส์เลยสักครั้ง)',
+    changes >= 2, { เปลี่ยนกี่ครั้ง: changes, ภาพที่เห็น: [...seen] });
+  ok('เห็นมากกว่าหนึ่งใบจริง ไม่ใช่กระพริบอยู่ใบเดียว', seen.size >= 2, [...seen]);
+
+  const marks = await p.evaluate(() => ({
+    dotsOn: document.querySelectorAll('.gdots i.on').length,
+    watcher: typeof window.GP_WATCH_SHOTS === 'function',
+  }));
+  ok('จุดบอกตำแหน่งยังตรงกับภาพที่แสดงอยู่', marks.dotsOn >= 1, marks);
+  ok('มีตัวเฝ้าการ์ดที่วาดทีหลัง (การ์ดเกมโหลดหลังข้อมูลมาถึง)', marks.watcher, marks);
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+
+{
+  /* ผู้ใช้ที่ตั้งค่าเครื่องว่า "ลดการเคลื่อนไหว" ต้องไม่โดนภาพวิ่งใส่
+     เป็นข้อกำหนดการเข้าถึง ไม่ใช่ความชอบส่วนตัว — บางคนเวียนหัวจริง */
+  const ctx = await b.newContext({ reducedMotion: 'reduce' });
+  const p = await ctx.newPage();
+  await stub(p);
+  await p.goto(BASE + '/index.html');
+  await sleep(2000);
+  const a = await p.evaluate(() => {
+    const on = document.querySelector('.gshots .gshot.on');
+    return on ? on.getAttribute('data-i') : null;
+  });
+  await sleep(5500);
+  const b2 = await p.evaluate(() => {
+    const on = document.querySelector('.gshots .gshot.on');
+    return on ? on.getAttribute('data-i') : null;
+  });
+  ok('⭐ ตั้งค่าเครื่องว่าลดการเคลื่อนไหว → ภาพต้องนิ่ง (ข้อกำหนดการเข้าถึง)',
+    a !== null && a === b2, { ก่อน: a, หลัง: b2 });
+  await ctx.close();
 }
 
 await b.close(); srv.close();

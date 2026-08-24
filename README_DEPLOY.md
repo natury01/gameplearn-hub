@@ -76,7 +76,9 @@ gameplearn-hub/
 
 ## ขั้นตอน Deploy (~15 นาที)
 
-1. **สร้าง GitHub repo** ชื่อ `gameplearn-hub` → อัปโหลดไฟล์ทั้งโฟลเดอร์นี้ **รวม `wrangler.jsonc` และ `_headers`** (คงโครง `js/` และ `css/`)
+1. **สร้าง GitHub repo** ชื่อ `gameplearn-hub` → อัปโหลดไฟล์ทั้งโฟลเดอร์นี้ **รวม `wrangler.jsonc` · `_headers` · `.assetsignore`** (คงโครง `js/` และ `css/`)
+   > ⚠️ **`.assetsignore` เป็นไฟล์ซ่อน (ขึ้นต้นด้วยจุด)** — เครื่องมืออัปโหลดหลายตัว และ `git add .` บางกรณีข้ามไฟล์แบบนี้ **ตรวจให้เห็นกับตาว่าขึ้นไปจริง**
+   > ไม่มีไฟล์นี้ = ซอร์ส SQL ทั้ง 10 ไฟล์และชุดทดสอบ 15 ไฟล์กลับไปเปิดให้คนนอกอ่านทันที (เหตุการณ์จริง 24 ส.ค. 2569 — งาน N15)
 2. **Cloudflare** → Workers & Pages → Create → **Workers** → Import a repository → เลือก repo
    - Build command: **เว้นว่าง** (เว็บนี้ไม่มี build step และไม่มี `package.json`)
    - Deploy → ได้ URL ชั่วคราวของ Worker
@@ -144,3 +146,38 @@ select * from events where created_at >= now() - interval '90 days';
 - **เพิ่มเกมใหม่**: ไม่ต้องแตะโค้ด hub เลย — เพิ่มแถวใน `games` (status=published) + ลงทะเบียน `game_framework_items`
 - **เปลี่ยนหลักสูตร**: เพิ่มกรอบใหม่ใน `assessment_frameworks` + `framework_items` แล้วชี้เกมไปกรอบใหม่ — หน้าเว็บตามเอง
 - **เปลี่ยนสโลแกน**: แก้ `SLOGAN_MODE` ใน `js/config.js` (0, 1 หรือ `'random'`)
+
+---
+
+## ✅ ตรวจหลังอัปทุกครั้ง — **วัดที่เนื้อ ไม่ใช่ที่สถานะ**
+
+> ⚠️ **`curl -I` ดูรหัส 404 ใช้ไม่ได้กับเว็บนี้** — `wrangler.jsonc` ตั้ง
+> `not_found_handling: "single-page-application"` ⇒ ไฟล์ที่หาไม่เจอจะถูกตอบด้วย
+> `index.html` พร้อมสถานะ **200** เสมอ · พิสูจน์แล้วด้วยการยิงพาธมั่ว
+> `gameplearn.com/zzz/nope.sql` → **HTTP 200 · 50,232 ไบต์ = index.html**
+> ⇒ ถ้าดูแต่สถานะ จะแยก "ปิดสำเร็จ" กับ "ยังหลุด" ไม่ออกเลย เพราะเป็น 200 ทั้งคู่
+
+**⚠️ Purge Cache ก่อนตรวจเสมอ** ไม่งั้นจะได้ของเก่าจาก edge แล้วสรุปผิด (บทเรียน F11)
+
+```bash
+# ① ของที่ต้องถูกปิด — ต้องได้ index.html กลับมา
+for p in sql/60_ROOM_CLAIM.sql sql/83_VISIT_SOURCE.sql test/t_regress.mjs          test/sql/00_fixture.sql README_DEPLOY.md wrangler.jsonc ; do
+  b=$(curl -s "https://gameplearn.com/$p")
+  printf '%s' "$b" | head -1 | grep -qi '<!doctype html'     && echo "✅ $p ปิดแล้ว" || echo "❌ $p ยังหลุด ($(printf '%s' "$b" | wc -c) ไบต์)"
+done
+
+# ② ของที่ต้องยังเปิด — ห้ามได้ index.html
+for p in teacher.html admin.html js/config.js css/gp.css robots.txt favicon.svg ; do
+  b=$(curl -s "https://gameplearn.com/$p")
+  printf '%s' "$b" | head -1 | grep -qi '<!doctype html'     && echo "❌ $p หายไปแล้ว!" || echo "✅ $p ยังอยู่"
+done
+
+# ③ หัวความปลอดภัยจาก _headers ยังทำงาน (กัน F11 ถอย)
+curl -sI https://gameplearn.com/ | grep -iE 'content-security-policy|cache-control'
+
+# ④ เลขรุ่นบนเว็บตรงกับที่เพิ่งอัป
+curl -s https://gameplearn.com/js/config.js | grep -i -m1 version
+```
+
+ก่อนอัปก็ตรวจได้จากเครื่องโดยไม่ต้องมี wrangler: `cd test && node t_assets.mjs`
+(ชุดนี้อยู่ใน `run-all.sh` อยู่แล้ว รันทุกครั้งที่รันแบตเตอรี่)

@@ -25,7 +25,7 @@ if ! node -e "require.resolve('playwright')" >/dev/null 2>&1; then
 fi
 # [V.1.6.7] นับหัวก่อนเชื่อผล (STD-006 ข้อ 1): ชุดที่ "มีจริงในโฟลเดอร์" ต้องถูกเรียกครบ
 # ไฟล์ที่ไม่ได้อยู่ในรายการ = หลุดจากการนับ ต้องร้อง ไม่ใช่เงียบ
-SUITES="t_shots.mjs t_teacher.mjs t_round2.mjs t_names.mjs t_admin.mjs t_dash.mjs t_regress.mjs t_tour.mjs t_assets.mjs"
+SUITES="t_shots.mjs t_teacher.mjs t_round2.mjs t_names.mjs t_admin.mjs t_dash.mjs t_regress.mjs t_tour.mjs t_assets.mjs t_err.mjs"
 for f in t_*.mjs; do
   case " $SUITES " in *" $f "*) ;; *)
     echo "⚠️  $f มีอยู่ในโฟลเดอร์แต่ไม่อยู่ในรายการที่รัน — เพิ่มเข้า SUITES หรือขึ้นทะเบียนเหตุผล (STD-006 ข้อ 1/5)";; esac
@@ -41,7 +41,7 @@ echo ""
 echo "████ sql/t_sql.sh (ไฟล์ SQL 59/60 บน Postgres จริง) ████"
 total=$((total+1))
 bash sql/t_sql.sh; rc=$?
-# [V.1.6.7] รหัส 3 = ข้าม (ไม่มี Postgres) — ต้องไม่ถูกนับเป็นผ่าน
+# [V.1.6.7] รหัส 77 = ข้าม (ไม่มี Postgres) — ต้องไม่ถูกนับเป็นผ่าน
 if [ "$rc" -eq 77 ]; then skipped=$((skipped+1)); elif [ "$rc" -ne 0 ]; then bad=$((bad+1)); fi
 
 echo ""
@@ -56,5 +56,5 @@ else
   echo "✅ ผ่านครบทุกชุด"
 fi
 echo "สรุปแบตเตอรี่: $green/$total ชุดรันสำเร็จ · ข้าม $skipped · แดง $bad"
-# exit: แดงคืนจำนวนชุดแดง · ไม่มีแดงแต่มีข้าม คืน 3 (ไม่สมบูรณ์ — CI ต้องเห็น) · ครบคืน 0
+# exit: แดงคืน 1 · ไม่มีแดงแต่มีข้าม คืน 77 (ไม่สมบูรณ์ — CI ต้องเห็น) · ครบคืน 0
 if [ "$bad" -gt 0 ]; then exit 1; elif [ "$skipped" -gt 0 ]; then exit 77; else exit 0; fi

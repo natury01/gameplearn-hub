@@ -51,6 +51,20 @@
     return /jwt|token|expired|invalid claim/i.test(m) || !m;
   }
 
+  /* [N10 · ADR-010 · STD-001] จอครู/เด็กเห็นได้เฉพาะ reason ภาษาไทย
+     เซิร์ฟเวอร์ของเรา raise exception เป็นไทยตามสัญญา — ข้อความที่ "ไม่มีอักษรไทยเลย"
+     คือของดิบจากชั้นล่าง (RLS/PostgREST/HTTP/เน็ตหลุด) ห้ามถึงจอ
+     ⇒ แทนด้วยประโยคไทยกลาง + รหัสไว้แจ้งปัญหา · ของดิบเก็บใน err.detail (ไม่ขึ้นจอ)
+     จุดที่ต้องจำแนกสาเหตุ (saveErr/missingRpc/สิทธิ์) อ่านจาก err.code หรือ err.detail แทน */
+  function thaiReason(m, code) {
+    if (/[ก-๙]/.test(m)) return m;
+    return 'ทำรายการไม่สำเร็จ (รหัส ' + (code || '?') + ') — ลองใหม่อีกครั้ง';
+  }
+  function netErr(e) {
+    const eN = new Error('เชื่อมต่อไม่สำเร็จ — ตรวจอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง');
+    eN.code = 'NETWORK'; eN.detail = String((e && e.message) || e); return eN;
+  }
+
   async function api(path, opt, _retried) {
     opt = opt || {};
     if (sess && !_retried) { try { await ensure(); } catch (e) {} }
@@ -59,8 +73,13 @@
       apikey: CFG.SB_ANON, 'Content-Type': 'application/json',
       Authorization: 'Bearer ' + ((sess && sess.access_token) || CFG.SB_ANON),
     }, opt.headers || {});
-    const r = await fetch(CFG.SB_URL + path, Object.assign({}, opt, { headers: h }));
-    const t = await r.text();
+    let r;
+    try { r = await fetch(CFG.SB_URL + path, Object.assign({}, opt, { headers: h })); }
+    catch (e) { throw netErr(e); }
+    /* r.text() ต้องมีการ์ดของตัวเอง — เน็ตหลุด "กลางลำ" fetch สำเร็จแต่อ่าน body พัง
+       (ผู้ตรวจหักล้าง V.1.6.26 พิสูจน์ด้วยเซิร์ฟเวอร์ตัดสายกลางคัน: TypeError 'terminated') */
+    let t;
+    try { t = await r.text(); } catch (e) { throw netErr(e); }
     let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {}
 
     if (!r.ok) {
@@ -70,7 +89,8 @@
         e2.status = 401; e2.code = 'SESSION_EXPIRED'; throw e2;
       }
       const m = (j && (j.message || j.msg || j.error_description || j.hint)) || ('HTTP ' + r.status);
-      const err = new Error(m); err.status = r.status; err.code = (j && j.code) || ''; throw err;
+      const err = new Error(thaiReason(m, (j && j.code) || r.status));
+      err.status = r.status; err.code = (j && j.code) || ''; err.detail = m; throw err;
     }
     return { data: j, headers: r.headers };
   }
@@ -99,10 +119,17 @@
     return true;
   }
   async function anonSignup() {
-    const r = await fetch(CFG.SB_URL + '/auth/v1/signup', {
-      method: 'POST', headers: { apikey: CFG.SB_ANON, 'Content-Type': 'application/json' }, body: '{}' });
+    let r;
+    try {
+      r = await fetch(CFG.SB_URL + '/auth/v1/signup', {
+        method: 'POST', headers: { apikey: CFG.SB_ANON, 'Content-Type': 'application/json' }, body: '{}' });
+    } catch (e) { throw netErr(e); }
     const j = await r.json().catch(() => null);
-    if (!r.ok || !j || !j.access_token) throw new Error((j && (j.msg || j.message)) || 'สร้างเซสชันไม่สำเร็จ');
+    if (!r.ok || !j || !j.access_token) {
+      /* ข้อความจาก auth (เช่น "Signups not allowed") เป็นอังกฤษเสมอ — ผ่าน thaiReason เหมือน api() */
+      const m = (j && (j.msg || j.message)) || 'สร้างเซสชันไม่สำเร็จ';
+      const err = new Error(thaiReason(m, r.status)); err.status = r.status; err.detail = m; throw err;
+    }
     setFromAuth(j); return j;
   }
   async function recoverTeacher(code) { // ย้ายห้องทั้งหมดของโค้ดนี้มายังตัวตนปัจจุบัน

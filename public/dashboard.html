@@ -121,21 +121,38 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
   /* ---------- อ่านข้อมูลด้วยคีย์ anon ล้วน ๆ — หน้านี้ไม่ต้องล็อกอิน ----------
      ใช้ fetch ตรง ไม่ผ่าน G.api เพื่อให้ชัดว่าไม่มีการแนบเซสชันครูมาเกี่ยวข้องเลย */
   async function rpc(name, body) {
-    const r = await fetch(C.SB_URL + '/rest/v1/rpc/' + name, {
-      method: 'POST',
-      headers: { apikey: C.SB_ANON, Authorization: 'Bearer ' + C.SB_ANON,
-                 'Content-Type': 'application/json' },
-      body: JSON.stringify(body || {}) });
-    const t = await r.text();
+    let r;
+    try {
+      r = await fetch(C.SB_URL + '/rest/v1/rpc/' + name, {
+        method: 'POST',
+        headers: { apikey: C.SB_ANON, Authorization: 'Bearer ' + C.SB_ANON,
+                   'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {}) });
+    } catch (eN) {
+      /* [N10] เน็ตหลุด = TypeError อังกฤษดิบ — ห้ามถึงจอเด็ก/ผู้ปกครอง */
+      const e = new Error('เชื่อมต่อไม่สำเร็จ — ตรวจอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง');
+      e.code = 'NETWORK'; e.detail = String((eN && eN.message) || eN); throw e;
+    }
+    let t;
+    try { t = await r.text(); }             /* เน็ตหลุดกลางลำ — โรคเดียวกับ fetch (ดู gp-core) */
+    catch (eN) {
+      const e = new Error('เชื่อมต่อไม่สำเร็จ — ตรวจอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง');
+      e.code = 'NETWORK'; e.detail = String((eN && eN.message) || eN); throw e;
+    }
     let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {}
     if (!r.ok) {
-      const e = new Error((j && (j.message || j.hint)) || ('HTTP ' + r.status));
-      e.code = j && j.code; throw e;
+      /* [N10] จอเห็นเฉพาะ reason ไทย — ข้อความไม่มีอักษรไทย = ของดิบชั้นล่าง เก็บใน detail แทน */
+      const m = (j && (j.message || j.hint)) || ('HTTP ' + r.status);
+      const e = new Error(/[ก-๙]/.test(m) ? m
+        : 'ทำรายการไม่สำเร็จ (รหัส ' + ((j && j.code) || r.status) + ') — ลองใหม่อีกครั้ง');
+      e.code = j && j.code; e.detail = m; throw e;
     }
     return j;
   }
 
-  const missingRpc = (e) => e && (e.code === 'PGRST202' || /Could not find the function/i.test(e.message || ''));
+  /* e.message ถูกแปลไทยแล้ว — แพตเทิร์นอังกฤษต้องดูจาก e.detail (ของดิบ) เป็นหลัก */
+  const missingRpc = (e) => e && (e.code === 'PGRST202'
+    || /Could not find the function/i.test(String((e.detail || '') + ' ' + (e.message || ''))));
 
   /* ---------- กราฟแท่ง (วาดเป็น SVG เอง ไม่มีไลบรารีนอก — CSP ไม่อนุญาต CDN) ----------
      รูปแบบตามคู่มือ: แท่งบาง · ปลายมน 4px · ช่องว่างระหว่างแท่ง 2px ·

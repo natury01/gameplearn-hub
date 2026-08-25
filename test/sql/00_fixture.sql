@@ -34,7 +34,8 @@ grant execute on function auth.uid() to anon, authenticated;
 
 -- ---------- ตารางหลัก (เท่าที่ไฟล์ 59/60 แตะ) ----------
 create table if not exists public.teachers (
-  id uuid primary key, email text, display_name text, is_anonymous boolean default false);
+  id uuid primary key, email text, display_name text, is_anonymous boolean default false,
+  role text default 'teacher');   -- [V.1.6.26 · P37] ฐานจริงมีคอลัมน์นี้ — is_admin() อ่านจากมัน
 
 create table if not exists public.schools (
   id uuid primary key default gen_random_uuid(), name text not null);
@@ -75,11 +76,12 @@ create table if not exists public.student_game_progress (
   progress_percent numeric, best_score numeric, attempts_count int default 0,
   primary key (student_id, game_id));
 
-create table if not exists public.app_admins (user_id uuid primary key);
-
+-- [V.1.6.26 · P37] เดิม fixture ใช้ตาราง app_admins ซึ่ง "ไม่มีจริงในฐาน production"
+-- ของจริง (ครูรัน pg_get_functiondef ส่งมา 25 ส.ค. — `SCHEMA_กู้คืนจากฐานจริง\is_admin.sql`):
+-- is_admin() อ่าน teachers.role = 'admin' · เทสต์ที่ต้องเป็นแอดมินให้ set role แทน insert ตารางอื่น
 create or replace function public.is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public.app_admins a where a.user_id = auth.uid())
+  select exists (select 1 from public.teachers t where t.id = auth.uid() and t.role = 'admin')
 $$;
 grant execute on function public.is_admin() to anon, authenticated;
 

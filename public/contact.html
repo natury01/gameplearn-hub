@@ -277,9 +277,19 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       await G.rpc('rpc_submit_feedback', payload);
       done();
     } catch (e) {
-      /* ยังไม่ได้ติดตั้ง rpc_submit_feedback → ไม่ทิ้งผู้ใช้ไว้กลางทาง
-         เตรียมอีเมลให้พร้อมส่ง โดยไม่ต้องพิมพ์ใหม่ */
-      fallback(payload, e);
+      if (e.code === 'NETWORK') {
+        /* [V.1.6.26] เน็ตหลุด ≠ ยังไม่ติดตั้งระบบ — อย่าชี้ครูไปรัน SQL ผิดทาง
+           (บทเรียนเดียวกับ saveErr หน้า admin: ข้อความ error ต้องบอกทางแก้ให้ตรงเหตุ) */
+        const box = $('ok');
+        box.className = 'card';
+        box.style.borderColor = 'var(--warning)';
+        box.textContent = 'เชื่อมต่อไม่สำเร็จ — ข้อความของคุณยังอยู่ครบในฟอร์ม '
+          + 'ตรวจอินเทอร์เน็ตแล้วกดส่งอีกครั้ง';
+      } else {
+        /* ยังไม่ได้ติดตั้ง rpc_submit_feedback → ไม่ทิ้งผู้ใช้ไว้กลางทาง
+           เตรียมอีเมลให้พร้อมส่ง โดยไม่ต้องพิมพ์ใหม่ */
+        fallback(payload, e);
+      }
     } finally {
       btn.disabled = false; btn.textContent = 'ส่งข้อความ';
     }

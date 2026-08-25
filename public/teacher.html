@@ -169,7 +169,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   /* คำสั่งลบ/ผูก ที่ยังไม่มีบนฐาน = PostgREST ตอบ PGRST202 · แยกให้ออกจาก error อื่น
      เพราะกรณีนี้ต้อง "บอกให้ครูไปรัน SQL" ไม่ใช่ "ลองใหม่อีกครั้ง" */
   const missingRpc = (e) => String(e.code) === 'PGRST202' || e.status === 404
-    || /could not find the function|does not exist/i.test(String(e.message || ''));
+    /* [N10] e.message ถูก gp-core แปลไทยแล้ว — แพตเทิร์นอังกฤษดูจาก e.detail (ของดิบ) ด้วย */
+    || /could not find the function|does not exist/i.test(String((e.detail || '') + ' ' + (e.message || '')));
 
   /* ผูกห้องที่ค้างอยู่ทั้งหมดเข้าบัญชีที่เพิ่งล็อกอิน — เรียกครั้งเดียวตอน boot
      กุญแจที่ฐานบอกว่าใช้ไม่ได้แล้ว (ผูกไปแล้ว/หมดอายุ) ถูกทิ้งไปเลย ไม่ต้องค้างกวนใจอีก
@@ -189,6 +190,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           showErr('มีห้องที่สร้างไว้ก่อนล็อกอินรออยู่ แต่ฐานข้อมูลยังไม่มีคำสั่งผูกห้อง — '
             + 'รัน 60_ROOM_CLAIM.sql บน Supabase แล้วเปิดหน้านี้ใหม่ · ห้องยังอยู่ครบ ไม่ได้หายไปไหน');
           return;                       /* ตัวอื่นก็จะพังเหมือนกัน ไม่ต้องยิงซ้ำ */
+        }
+        if (e.code === 'NETWORK') {     /* [V.1.6.26] เน็ตหลุด ≠ กุญแจเสีย — ทิ้งไป = ครูเสียห้องถาวร */
+          showErr('เชื่อมต่อไม่สำเร็จ — ห้องที่รอผูกยังอยู่ครบ จะลองผูกให้ใหม่เมื่อเปิดหน้านี้อีกครั้ง');
+          return;
         }
         claimDrop(c.token);             /* ผูกไปแล้ว หรือหมดอายุ — เก็บไว้ก็ไม่มีประโยชน์ */
       }
@@ -1830,7 +1835,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      ถ้าไม่ดักไว้ ครูจะเห็นข้อความภาษาอังกฤษของฐานข้อมูลแล้วไม่รู้ว่าต้องทำอะไรต่อ */
   function delErr(e) {
     const miss = String(e.code) === 'PGRST202' || e.status === 404
-      || /could not find the function|does not exist/i.test(String(e.message || ''));
+      /* [N10] เหมือน missingRpc — ของดิบอยู่ใน e.detail */
+      || /could not find the function|does not exist/i.test(String((e.detail || '') + ' ' + (e.message || '')));
     return miss
       ? 'ยังใช้ปุ่มลบไม่ได้ — ฐานข้อมูลยังไม่มีคำสั่งลบ · รัน 55_DELETE_ROOM_STUDENT.sql บน Supabase ก่อน'
       : 'ลบไม่สำเร็จ: ' + e.message;
@@ -2611,7 +2617,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
               await loadAll(); renderRoom(cid);
             } catch (e) {
               box.innerHTML = '<div class="card err" style="display:block">บันทึกไม่สำเร็จ — '
-                + (/permission|denied|42501/i.test(String(e.message)) ? 'ต้องเป็นครูเจ้าของห้องนี้' : 'ลองใหม่อีกครั้ง') + '</div>';
+                + (/permission|denied|42501/i.test(String(e.detail || e.message)) ? 'ต้องเป็นครูเจ้าของห้องนี้' : 'ลองใหม่อีกครั้ง') + '</div>';
             }
           };
         };

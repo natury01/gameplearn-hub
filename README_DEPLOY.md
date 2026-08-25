@@ -183,6 +183,14 @@ select * from events where created_at >= now() - interval '90 days';
 
 **⚠️ Purge Cache ก่อนตรวจเสมอ** ไม่งั้นจะได้ของเก่าจาก edge แล้วสรุปผิด (บทเรียน F11)
 
+**ทางลัด (V.1.6.26 · P33): สคริปต์เดียวจบ ตรวจครบทั้งเปิด/ปิด/เลขรุ่น — ตามลิงก์ redirect ให้เอง**
+
+```bash
+python3 test/verify_deployed.py V.1.6.26
+```
+
+หรือทำมือทีละข้อแบบเดิม:
+
 ```bash
 # ① ของที่ต้องถูกปิด — ต้องได้ index.html กลับมา
 for p in sql/60_ROOM_CLAIM.sql sql/83_VISIT_SOURCE.sql test/t_regress.mjs          test/sql/00_fixture.sql README_DEPLOY.md wrangler.jsonc ; do

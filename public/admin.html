@@ -504,12 +504,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      พอโทเคนหมดอายุ ครูก็ไปรัน SQL ซ้ำเปล่า ๆ ทั้งที่แค่ต้องเข้าสู่ระบบใหม่ */
   function saveErr(e, extra) {
     const m = String((e && e.message) || '');
-    if (e && (e.code === 'SESSION_EXPIRED' || e.status === 401) || /jwt|expired/i.test(m)) {
+    /* [N10] gp-core แปล e.message เป็นไทยแล้ว — การจำแนกสาเหตุด้วยแพตเทิร์นอังกฤษ
+       ต้องอ่านจาก e.detail (ของดิบ ไม่ขึ้นจอ) ไม่ใช่ e.message */
+    const raw = String((e && (e.detail || e.message)) || '');
+    if (e && (e.code === 'SESSION_EXPIRED' || e.status === 401) || /jwt|expired/i.test(raw)) {
       return 'เซสชันหมดอายุ (เปิดหน้านี้ค้างไว้นานเกินไป) — กดปุ่มออกจากระบบแล้วเข้าสู่ระบบใหม่ '
            + 'ค่าที่แก้ค้างไว้จะยังอยู่ในช่อง แต่ยังไม่ถูกบันทึก';
     }
-    if (/permission|denied|row-level|RLS|42501/i.test(m)) {
-      return 'ไม่มีสิทธิ์บันทึก: ' + m + ' — ให้รัน 22_ADMIN_SETUP.sql แล้วเข้าสู่ระบบด้วยอีเมลผู้ดูแล';
+    if (/permission|denied|row-level|RLS|42501/i.test(raw) || String(e && e.code) === '42501') {
+      return 'ไม่มีสิทธิ์บันทึก — ให้รัน 22_ADMIN_SETUP.sql แล้วเข้าสู่ระบบด้วยอีเมลผู้ดูแล';
     }
     return 'บันทึกไม่สำเร็จ: ' + m + (extra ? ' — ' + extra : '');
   }
@@ -605,19 +608,30 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const sess = G.session();
 
     try {
-      const r = await fetch(C.SB_URL + '/storage/v1/object/brand/' + path, {
-        method: 'POST',
-        headers: {
-          apikey: C.SB_ANON,
-          Authorization: 'Bearer ' + (sess && sess.access_token),
-          'Content-Type': file.type || 'application/octet-stream',
-          'x-upsert': 'true',
-        },
-        body: file,
-      });
+      let r;
+      try {
+        r = await fetch(C.SB_URL + '/storage/v1/object/brand/' + path, {
+          method: 'POST',
+          headers: {
+            apikey: C.SB_ANON,
+            Authorization: 'Bearer ' + (sess && sess.access_token),
+            'Content-Type': file.type || 'application/octet-stream',
+            'x-upsert': 'true',
+          },
+          body: file,
+        });
+      } catch (eN) {
+        console.error('[upload-brand]', eN);
+        throw new Error('เชื่อมต่อไม่สำเร็จ — ตรวจอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง');
+      }
       if (!r.ok) {
-        const t = await r.text();
-        throw new Error(r.status + ' ' + t.slice(0, 160));
+        /* [N10] body ดิบจาก storage เป็น JSON อังกฤษ — ลง console เท่านั้น ห้ามขึ้นจอ
+           r.text() มีการ์ด: อ่าน body ไม่ได้ (เน็ตหลุดกลางลำ) ก็ยังได้ข้อความไทย+รหัส */
+        let t = '';
+        try { t = await r.text(); } catch (eT) { t = ''; }
+        console.error('[upload-brand]', r.status, t);
+        const e = new Error('อัปโหลดไม่สำเร็จ (รหัส ' + r.status + ')');
+        e.status = r.status; e.detail = t.slice(0, 300); throw e;
       }
       const url = C.SB_URL + '/storage/v1/object/public/brand/' + path;
       await saveSetting(key, url);
@@ -1186,12 +1200,25 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const path = 'cover-' + id + '-' + Date.now() + '.' + ext;
     const sess = G.session();
     try {
-      const r = await fetch(C.SB_URL + '/storage/v1/object/brand/' + path, {
-        method: 'POST',
-        headers: { apikey: C.SB_ANON, Authorization: 'Bearer ' + (sess && sess.access_token),
-          'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true' },
-        body: file });
-      if (!r.ok) throw new Error(r.status + ' ' + (await r.text()).slice(0, 140));
+      let r;
+      try {
+        r = await fetch(C.SB_URL + '/storage/v1/object/brand/' + path, {
+          method: 'POST',
+          headers: { apikey: C.SB_ANON, Authorization: 'Bearer ' + (sess && sess.access_token),
+            'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true' },
+          body: file });
+      } catch (eN) {
+        console.error('[upload-cover]', eN);
+        throw new Error('เชื่อมต่อไม่สำเร็จ — ตรวจอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง');
+      }
+      if (!r.ok) {
+        /* [N10] เหมือนจุดอัปรูปแบรนด์ — ของดิบลง console เท่านั้น · r.text() มีการ์ด */
+        let t = '';
+        try { t = await r.text(); } catch (eT) { t = ''; }
+        console.error('[upload-cover]', r.status, t);
+        const e = new Error('อัปโหลดไม่สำเร็จ (รหัส ' + r.status + ')');
+        e.status = r.status; e.detail = t.slice(0, 300); throw e;
+      }
       const url = C.SB_URL + '/storage/v1/object/public/brand/' + path;
       await G.api('/rest/v1/games?id=eq.' + id, {
         method: 'PATCH', headers: { Prefer: 'return=minimal' },

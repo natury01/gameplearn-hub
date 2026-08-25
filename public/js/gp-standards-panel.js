@@ -109,11 +109,22 @@
   }
 
   function get(cfg, path) {
+    /* [N10 · ADR-010] คอมโพเนนต์นี้ใช้ร่วมกับเกมด้วย — ข้อความ error ที่หลุดจากตรงนี้
+       ขึ้นจอผ่านผู้เรียกทุกหน้า ⇒ ต้องเป็นไทยล้วน · ของดิบเก็บใน e.detail (ไม่ขึ้นจอ) */
     return fetch(cfg.sbUrl + path, {
       headers: { apikey: cfg.sbAnon, Authorization: 'Bearer ' + cfg.sbAnon },
+    }).catch(function (eN) {
+      var e = new Error('เชื่อมต่อไม่สำเร็จ — ตรวจอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง');
+      e.code = 'NETWORK'; e.detail = String((eN && eN.message) || eN); throw e;
     }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
+      if (!r.ok) {
+        var e = new Error('โหลดข้อมูลไม่สำเร็จ (รหัส ' + r.status + ') — ลองใหม่อีกครั้ง');
+        e.status = r.status; e.detail = 'HTTP ' + r.status; throw e;
+      }
+      return r.json().catch(function (eJ) {
+        var e = new Error('ข้อมูลที่ได้ไม่สมบูรณ์ — ลองใหม่อีกครั้ง');
+        e.detail = String((eJ && eJ.message) || eJ); throw e;
+      });
     });
   }
 

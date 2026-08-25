@@ -11,6 +11,24 @@
    ค่าเริ่มต้น: light + playful
    ตั้งค่ากลางได้จากหน้า Admin · ผู้ใช้กดสลับเองได้จากปุ่มบนหัวเว็บ
    ============================================================ */
+/* ═══════════ สีระดับสมรรถนะหลัก 3–6 ═══════════
+   ต้นแบบ: CLS_LV_CLR ของภาค 1 (kanadventure-repo_v79957/index.html:33320)
+   มติครู 25 ส.ค. 2569 — ต้องตรงกันทั้งเว็บกลาง · แดชบอร์ดภาค 1 · แดชบอร์ดภาค 2
+
+   ⛔ ห้ามเขียนสีระดับเป็นเลขฐานสิบหกที่อื่นในเว็บกลางอีก ให้อ้างโทเคนนี้เท่านั้น
+      (เหตุผล: teacher.html เคยมีจานสีระดับ 2 ชุดในไฟล์เดียว บรรทัด 889 กับ 2760
+       ห่างกัน 1,871 บรรทัด ไม่ตรงกับเกมทั้งคู่ และไม่ตรงกันเอง — ดู P-HUB-08)
+
+   --lv*     = สีจริงของภาค 1 เป๊ะ ใช้ตรงที่สีเป็น "สัญลักษณ์" (แถบ · จุดคำอธิบาย)
+   --lv*-on  = ใช้ตรงที่เป็น "ตัวอักษรขาวบนพื้นสี" เท่านั้น (.lvpill · .badge)
+               ระดับ 4 และ 5 เข้มขึ้นหนึ่งขั้นในเฉดเดิม เพื่อให้ผ่าน WCAG AA 4.5:1
+               ระดับ 3 และ 6 ผ่านอยู่แล้ว จึงเป็นค่าเดียวกับ --lv3/--lv6 ทุกประการ
+   ⚠️ ต้องนิยามใน :root เปล่า — นิยามครั้งแรกในบล็อกธีมจะทำธีมตามระบบไม่มีสีเลย */
+:root {
+  --lv3: #64748b;  --lv4: #d97706;  --lv5: #16a34a;  --lv6: #7c3aed;
+  --lv3-on: #64748b;  --lv4-on: #b45309;  --lv5-on: #15803d;  --lv6-on: #7c3aed;
+}
+
 :root {
   color-scheme: light;
   --page: #f9f9f7;
@@ -447,7 +465,15 @@ table.gol th {
 }
 table.gol td { padding: 9px 10px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
 table.gol tr:last-child td { border-bottom: 0; }
-table.gol td.num { font-variant-numeric: tabular-nums; text-align: right; }
+/* [V.1.6.27] หัวคอลัมน์ตัวเลขต้องชิดขวาตามตัวเลข — เดิมมีแต่ td.num ทำหัวกับเนื้อเหลื่อมกัน
+   (ครูทักจากจอจริง 25 ส.ค. — HUB_TO_CODE_งานหน้าจอครูสี่ข้อ ข้อ A) */
+table.gol td.num, table.gol th.num { font-variant-numeric: tabular-nums; text-align: right; }
+
+/* [V.1.6.27 · มติครู ①ข] แถบแท็บผู้ดูแล + ทางเข้าหน้าที่ไม่ใช่แท็บ
+   ⚠️ ปุ่มต้องอยู่นอก role="tablist" — เหตุผลอยู่ที่คอมเมนต์เหนือแถบแท็บใน admin.html */
+.tabsbar { display: flex; align-items: flex-end; justify-content: space-between;
+           gap: 10px; flex-wrap: wrap; margin: 20px 0 14px; }
+.tabsbar > .tabs { margin: 0; flex: 1 1 auto; }
 .table-scroll { overflow-x: auto; }
 
 /* ---------- badge/สถานะ ---------- */

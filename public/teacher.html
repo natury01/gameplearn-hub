@@ -886,7 +886,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   /* สีป้ายระดับ — ชุดเดิมตัวขาวอ่านไม่ออก (วัดได้ 1.9–3.7:1) ชุดนี้ผ่าน AA ทุกตัว (7.1–8.7:1)
      คงโทนเดิมไว้: เขียว=6 น้ำเงิน=5 ส้มน้ำตาล=4 เทา=3 แค่เข้มขึ้น */
-  const LV_COLOR = { 6:'#166534', 5:'#1e40af', 4:'#92400e', 3:'#475569' };
+  /* ต้นแบบ = CLS_LV_CLR ของภาค 1 · นิยามจริงอยู่ที่ css/gp.css :root — ห้ามใส่เลขสีตรงนี้
+     LV_COLOR    → พื้นแถบ/จุดคำอธิบาย (ไม่มีตัวอักษรทับ)
+     LV_COLOR_ON → พื้นที่มีตัวอักษรขาวทับ (.lvpill · .badge) เท่านั้น */
+  const LV_COLOR    = { 6:'var(--lv6)',    5:'var(--lv5)',    4:'var(--lv4)',    3:'var(--lv3)' };
+  const LV_COLOR_ON = { 6:'var(--lv6-on)', 5:'var(--lv5-on)', 4:'var(--lv4-on)', 3:'var(--lv3-on)' };
   const LV_NAME  = { 6:'เหนือความคาดหวัง', 5:'สามารถ', 4:'กำลังพัฒนา', 3:'เริ่มต้น' };
   const HOTS = [['ctc','คิดวิเคราะห์'], ['stm','คิดเป็นระบบ'], ['crt','คิดสร้างสรรค์'], ['prb','แก้ปัญหา']];
 
@@ -1070,7 +1074,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             const lb = (rs.find((r) => r.level_label) || {}).level_label;
             const byT = rs.some((r) => r.decided_by === 'teacher');
             return '<td>'
-              + (lv != null ? '<span class="lvpill" style="background:' + (LV_COLOR[lv] || '#475569')
+              + (lv != null ? '<span class="lvpill" style="background:' + (LV_COLOR_ON[lv] || 'var(--lv3-on)')
                   + ';color:#fff">' + lv + '</span> ' : '')
               + '<span class="small">' + G.esc(lb || (lv != null ? LV_NAME[lv] : '')) + '</span>'
               + (avg != null ? '<div class="muted small">' + avg.toFixed(1) + '</div>' : '')
@@ -1351,13 +1355,13 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       const c = rows.filter((r) => Number(r.level) === lv).length;
       if (!c) return '';
       const pct = (c / n) * 100;
-      return '<div style="width:' + pct.toFixed(2) + '%;background:' + LV_COLOR[lv] + '"'
+      return '<div style="width:' + pct.toFixed(2) + '%;background:' + (LV_COLOR[lv] || 'var(--lv3)') + '"'
         + ' title="ระดับ ' + lv + ' ' + LV_NAME[lv] + ' — ' + c + ' คน">'
         + (pct >= 9 ? c : '') + '</div>';
     }).join('');
     const legend = [6, 5, 4, 3].map(function (lv) {
       const c = rows.filter((r) => Number(r.level) === lv).length;
-      return '<span class="lvkey"><i style="background:' + LV_COLOR[lv] + '"></i>ระดับ ' + lv
+      return '<span class="lvkey"><i style="background:' + (LV_COLOR[lv] || 'var(--lv3)') + '"></i>ระดับ ' + lv
         + ' <b>' + c + '</b></span>';
     }).join('');
     const none = rows.filter((r) => r.level == null).length;
@@ -1486,7 +1490,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
             if (!r) return '<td class="muted">ยังไม่เริ่ม</td>';
             const lv = Number(r.level);
             const badge = isNaN(lv) ? '<span class="muted">ยังไม่สรุป</span>'
-              : '<span class="lvpill" style="background:' + (LV_COLOR[lv] || '#94a3b8') + '">'
+              : '<span class="lvpill" style="background:' + (LV_COLOR_ON[lv] || 'var(--lv3-on)') + '">'
                 + lv + '</span>';
             const tot = r.total == null ? '–' : Number(r.total).toFixed(0);
             return '<td>' + badge + ' <b>' + tot + '</b>'
@@ -2757,7 +2761,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         ห้ามแสดง 0 เพราะ 0 แปลว่า 'วัดแล้วได้ศูนย์' ซึ่งไม่จริงและทำครูเข้าใจผิด */
   function compDimCard(rows) {
     if (!rows.length) return '';
-    const lvColor = (lv) => lv >= 6 ? '#047857' : lv >= 5 ? '#0d9488' : lv >= 4 ? '#b45309' : '#b91c1c';
+    /* [V.1.6.27] จานสีชุดที่สองของไฟล์ถูกถอด (P-HUB-08) — ใช้โทเคนกลาง LV_COLOR_ON แทน
+       ของเดิมเทียบ >= แล้วคืนสีแดง #b91c1c ให้ทุกอย่างต่ำกว่า 4 ซึ่งไม่มีในจานของเกมและครูไม่เคยตกลง */
     return '<div class="grid cols-2">' + rows.map(function (r) {
       const has = r.score != null || r.level != null;
       /* [V.1.6.17] แถวที่ยังสรุประดับไม่ได้ ห้ามขึ้นป้าย "ระดับ –" ให้ดูเหมือนข้อมูลเสีย
@@ -2778,7 +2783,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + '<h3 style="margin:0 0 6px;font-size:15px;display:flex;align-items:center;gap:8px">'
         +   '<span style="flex:1">' + G.esc(r.comp_name || r.comp_code) + '</span>'
         +   (pend ? '<span class="badge">⏳ กำลังเก็บหลักฐาน</span>'
-             : has ? '<span class="badge" style="background:' + lvColor(r.level) + ';color:#fff">'
+             : has ? '<span class="badge" style="background:' + (LV_COLOR_ON[r.level] || 'var(--lv3-on)') + ';color:#fff">'
                  + 'ระดับ ' + G.esc(String(r.level))
                  + (r.level_label ? ' ' + G.esc(r.level_label) : '') + '</span>' : '')
         + '</h3>'

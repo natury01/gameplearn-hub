@@ -57,12 +57,19 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     <div class="sp"></div>
     <span class="who" id="who"></span>
     <button class="btn hidden" id="logout">ออกจากระบบ</button>
+    <!-- เมนูหลักชุดมาตรฐาน 6 รายการ + "⚙️ ผู้ดูแลระบบ" เป็นรายการแรก
+         หน้านี้เป็นหน้าเดียวในเว็บที่มี 7 รายการ — ตั้งใจ เพราะเข้าถึงได้จากแถบแท็บผู้ดูแลเท่านั้น
+         จึงต้องมีทางกลับ · ห้ามลอกรูปแบบนี้ไปหน้าอื่น
+         (ประวัติ: admin.html เคยมี 7 รายการโดยไม่ได้ตั้งใจ ขณะที่คอมเมนต์ของตัวเองเขียนว่า 6
+          อยู่ห่างกัน 9 บรรทัด และไม่มีใครเห็นจนครูทัก — ดู P-HUB-07) -->
     <nav class="navlinks" aria-label="เมนูหลัก">
       <a href="admin.html">⚙️ ผู้ดูแลระบบ</a>
-      <a href="teacher.html">🏫 ห้องเรียนของฉัน</a>
       <a href="index.html#games">🎮 เกม</a>
       <a href="dashboard.html">📊 ผลการเรียนรู้</a>
+      <a href="teacher.html">🏫 ห้องเรียนของฉัน</a>
       <a href="standards.html">📐 มาตรฐาน</a>
+      <a href="support.html">สนับสนุน</a>
+      <a href="contact.html">ติดต่อ</a>
     </nav>
   </header>
 

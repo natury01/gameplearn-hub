@@ -32,7 +32,6 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       <a class="btn btn-primary" id="new-room-btn" href="teacher.html#/rooms">🏫 สร้างห้องเรียน</a>
       <a href="index.html#games">🎮 เกม</a>
       <a href="dashboard.html">📊 ผลการเรียนรู้</a>
-      <a href="capacity.html">💾 ความจุฐานข้อมูล</a>
       <a href="teacher.html">🏫 ห้องเรียนของฉัน</a>
       <a href="standards.html">📐 มาตรฐาน</a>
       <a href="support.html">สนับสนุน</a>
@@ -61,14 +60,20 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   <div id="app" class="hidden">
     <h1 class="sr-only">จัดการระบบเกมเพลิน</h1>
 
-    <div class="tabs" role="tablist">
-      <button class="tab" role="tab" data-tab="brand"    aria-selected="true">🎨 แบรนด์และหน้าเว็บ</button>
-      <button class="tab" role="tab" data-tab="support"  aria-selected="false">💙 หน้าสนับสนุน</button>
-      <button class="tab" role="tab" data-tab="games"    aria-selected="false">🎮 ทะเบียนเกม</button>
-      <button class="tab" role="tab" data-tab="inbox"    aria-selected="false">💬 กล่องข้อความ <span id="inbox-badge"></span></button>
-      <button class="tab" role="tab" data-tab="rooms"    aria-selected="false">🏫 ห้องเรียนทั้งระบบ</button>
-      <button class="tab" role="tab" data-tab="stats"    aria-selected="false">📈 สถิติการใช้งาน</button>
-      <button class="tab" role="tab" data-tab="contact"  aria-selected="false">⚙️ ช่องทางติดต่อ</button>
+    <!-- [V.1.6.27 · มติครู ①ข] "ความจุฐานข้อมูล" เป็นหน้าเดี่ยว เข้าจากปุ่มท้ายแถบแท็บ
+         ⛔ ห้ามใส่ <a class="tab"> เข้าไปใน role="tablist" — (1) ผิด ARIA (2) ตัวจับคลิก
+         ข้างล่างอ่าน data-tab ได้ null แล้วซ่อนพาเนลทุกอัน = จอขาว (สเปก HUB 25 ส.ค.) -->
+    <div class="tabsbar">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="brand"    aria-selected="true">🎨 แบรนด์และหน้าเว็บ</button>
+        <button class="tab" role="tab" data-tab="support"  aria-selected="false">💙 หน้าสนับสนุน</button>
+        <button class="tab" role="tab" data-tab="games"    aria-selected="false">🎮 ทะเบียนเกม</button>
+        <button class="tab" role="tab" data-tab="inbox"    aria-selected="false">💬 กล่องข้อความ <span id="inbox-badge"></span></button>
+        <button class="tab" role="tab" data-tab="rooms"    aria-selected="false">🏫 ห้องเรียนทั้งระบบ</button>
+        <button class="tab" role="tab" data-tab="stats"    aria-selected="false">📈 สถิติการใช้งาน</button>
+        <button class="tab" role="tab" data-tab="contact"  aria-selected="false">⚙️ ช่องทางติดต่อ</button>
+      </div>
+      <a class="btn btn-sm" href="capacity.html">💾 ความจุฐานข้อมูล</a>
     </div>
 
     <div class="err-box" id="err" role="alert"></div>
@@ -1135,6 +1140,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const id = el.getAttribute('data-game'), field = el.getAttribute('data-field');
     let val;
     if (field === 'is_featured') val = el.checked;
+    /* ⚠️ สองกติกาในบล็อกนี้ตรงข้ามกันโดยตั้งใจ — อย่าก๊อปข้ามกัน
+       sort_order : ว่าง → 0    ถูก เพราะ 0 คือ "ลำดับแรก" = ค่าที่มีความหมายจริง
+       ที่เหลือ    : ว่าง → null ถูก เพราะ 0 คือ "ประเมินแล้วได้ศูนย์" คนละเรื่องกับ "ยังไม่ได้ประเมิน"
+       ของจริงที่เคยเกิด: หน้าครูภาค 1 แปลงช่องว่างเป็น 0 ⇒ ครูลืมกรอก = เด็กได้ 0 คะแนน
+       (KAN1_TO_HUB_2026-08-25_ถอดGeminiแล้ว.md ข้อ 4 · สเปกจาก HUB_TO_CODE_2026-08-25_สเปก3ข้อ.md ข้อ 3) */
     else if (field === 'sort_order') { val = parseInt(el.value, 10); if (isNaN(val)) val = 0; el.value = val; }
     else if (field === 'minimum_grade' || field === 'maximum_grade' || field === 'play_minutes') {
       val = parseInt(el.value, 10);

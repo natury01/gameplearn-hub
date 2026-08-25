@@ -511,8 +511,11 @@ ok "gp_int_bad: จำนวนเต็มผ่าน · ทศนิยม/�
 #    ตามป้าย -p2- ใน game_version · ทั้งบล็อกห่อ begin…rollback ไม่ทิ้งแถวให้เทสต์ถัดไป
 #    (โดยเฉพาะหมวด 12 ที่นับค่าเฉลี่ยหน้าสาธารณะ — แถว p2 หลุดไปจะทำตัวเลขเพี้ยนเงียบ ๆ)
 out=$($Q -c "begin;
-  insert into games (id, code, name) values
-    ('44444444-4444-4444-8444-44444444444b','kanchanaburi2050-p2','กาญจนบุรี 2050 ภาค 2')
+  -- [V.1.6.27] แถวภาค 2 ต้องตั้ง score_code+season_tag เหมือนฐานจริง — resolver ใน fixture
+  -- เป็นฉบับจริงแล้ว (เดิม mock จับ code||'-p2' เลยไม่ต้องตั้ง = เขียวหลอก)
+  insert into games (id, code, name, score_code, season_tag) values
+    ('44444444-4444-4444-8444-44444444444b','kanchanaburi2050-p2','กาญจนบุรี 2050 ภาค 2',
+     'kanchanaburi2050','-p2-')
     on conflict do nothing;
   $AS_B   -- [F2] ต้องส่งในฐานะครูเจ้าของห้อง — anon ส่งไม่ได้แล้ว
   select rpc_submit_report('kanchanaburi2050','V.8.63-p2-2569.127','$S1',
@@ -542,6 +545,166 @@ okc "แถวภาค 2 ยังเป็นค่าเดิม ไม่�
 # ⚠️ จุดบอดที่พิสูจน์ไม่ได้ด้วยเทสต์ (จดตาม 77_FIELD_CONTRACT): ภาค 2 ที่ "ลืมป้าย -p2-"
 #    แยกไม่ออกจากทราฟฟิกภาค 1 โดยนิยาม — ด่านกันอยู่ฝั่งเกม (ยาม build ของภาค 2 บังคับป้าย)
 #    ฐานทำได้แค่ปฏิเสธรุ่นว่าง ซึ่งทำอยู่แล้ว · ห้ามแก้ schema เพื่อเรื่องนี้ก่อนมี Impact Analysis
+
+echo ""
+echo "═══ 8b) 85 — F4 บนท่อจริง: ทุกท่อแยกภาค + สองท่อต้องตกลงกัน (มติครู 25 ส.ค. ทาง ก) ═══"
+# บทเรียนที่หมวดนี้เกิดมาเพื่อกัน: F4 เดิมพิสูจน์ rpc_submit_report (ท่อที่ถูก) แล้วสรุปแทน
+# rpc_submit_events (ท่อที่เกมใช้จริง ซึ่งไม่แยกภาค) — เขียว 7 วันขณะของจริงพัง
+# ⇒ หมวดนี้ยิง "ทั้งสองท่อ" ในเคสเดียวกัน แล้วยืนยันว่าชี้ game_id เดียวกัน (ข้อ C ของสเปก HUB)
+# ก่อนรัน 85: ตั้งแถวเกมสองภาคให้เหมือนฐานจริง — 85 มียามข้อมูล (pre-flight) ที่ต้องเห็น
+# แถวภาค 2 ที่ resolve ได้จริง ไม่งั้นปฏิเสธการติดตั้งทันที (ผู้ตรวจหักล้าง 25 ส.ค.)
+$Q -c "insert into games (id, code, name, score_code, season_tag) values
+  ('44444444-4444-4444-8444-44444444444b','kanchanaburi2050-p2','กาญจนบุรี 2050 ภาค 2',
+   'kanchanaburi2050','-p2-')
+  on conflict (id) do update set score_code=excluded.score_code, season_tag=excluded.season_tag;" >/dev/null
+out=$($PSQL -f $SQLDIR/85_RESOLVE_GAME_ALL_PIPES.sql 2>&1)
+if [ $? -eq 0 ]; then echo "  ✅ 85_RESOLVE_GAME_ALL_PIPES.sql รันผ่าน 0 error"; else echo "  ❌ 85 ล้ม"; echo "$out" | tail -8; bad=$((bad+1)); fi
+out=$($PSQL -f $SQLDIR/85_RESOLVE_GAME_ALL_PIPES.sql 2>&1)
+if [ $? -eq 0 ]; then echo "  ✅ รันซ้ำได้ (idempotent)"; else echo "  ❌ รันซ้ำแล้วล้ม"; echo "$out" | tail -8; bad=$((bad+1)); fi
+
+out=$($Q -c "begin;
+  insert into games (id, code, name) values
+    ('44444444-4444-4444-8444-44444444444b','kanchanaburi2050-p2','กาญจนบุรี 2050 ภาค 2')
+    on conflict do nothing;
+  -- ── ท่อ A: rpc_submit_report (ครูเจ้าของห้องส่ง — ยาม F2) · รุ่นภาค 2 ──
+  $AS_B
+  select rpc_submit_report('kanchanaburi2050','V.8.82-p2-2569.146','$S1',
+    '{\"score\":10,\"max_score\":160}'::jsonb, '[]'::jsonb);
+  reset role;
+  -- ── ท่อ B: rpc_submit_events (เด็กส่งจากในเกม — ท่อที่เดิมไม่แยกภาค) · รุ่นภาค 2 ──
+  $AS_ANON
+  select rpc_submit_events('BBB222','$S1','', 'kanchanaburi2050',
+    '{\"session_id\":\"t85\",\"game_version\":\"V.8.82-p2-2569.146\",\"score\":\"5\"}'::jsonb,
+    '[{\"stage_id\":\"1\",\"kind\":\"progress\",\"score\":\"5\"}]'::jsonb);
+  reset role;
+  select 'B_GAME=' || g.code from attempts a join games g on g.id=a.game_id
+    where a.student_id='$S1' and a.session_id='t85';
+  select 'EV_GAME=' || g.code from events e join games g on g.id=e.game_id
+    join attempts a on a.id=e.attempt_id where a.session_id='t85';
+  select 'AGREE=' || (
+    (select ar.game_id from achievement_results ar where ar.student_id='$S1' and ar.run_id='live'
+       and ar.game_version like '%-p2-%' limit 1)
+    = (select a.game_id from attempts a where a.student_id='$S1' and a.session_id='t85'));
+  -- ── ทางเข้าเก่า (ไม่มีป้าย -p2-) ต้องยังลงภาค 1 เหมือนเดิม ──
+  $AS_ANON
+  select rpc_submit_events('BBB222','$S1','', 'kanchanaburi2050',
+    '{\"session_id\":\"t85p1\",\"game_version\":\"V.7.99.57-IX2050-2569.89\"}'::jsonb, '[]'::jsonb);
+  reset role;
+  select 'P1_GAME=' || g.code from attempts a join games g on g.id=a.game_id
+    where a.student_id='$S1' and a.session_id='t85p1';
+  rollback;")
+okc "⭐⭐ ท่อจริง (submit_events) แยกภาคแล้ว — attempts ลงแถวภาค 2" "$out" "B_GAME=kanchanaburi2050-p2"
+okc "events ก็ลงภาค 2 (ตารางข้อมูลวิจัยหลัก)" "$out" "EV_GAME=kanchanaburi2050-p2"
+okc "⭐⭐⭐ ข้อ C ของสเปก: สองท่อชี้ game_id เดียวกัน (ตกลงกันแล้ว — ไม่ใช่แค่ต่างคนต่างทำงาน)" "$out" "AGREE=true"
+okc "ทางเข้าเก่า (รุ่นภาค 1) ยังลงภาค 1 เหมือนเดิม — ของที่ใช้อยู่ไม่พัง" "$out" "P1_GAME=kanchanaburi2050$"
+
+# ── ลายเซ็นเก่าต้องยังเรียกได้ (ผู้เรียกเดิมไม่ส่งพารามิเตอร์รุ่น) — พิสูจน์หลัง drop+สร้างใหม่ ──
+out=$($Q -c "begin;
+  $AS_ANON
+  select 'SURVEY_OK=' || (rpc_submit_survey('BBB222','$S1','', 'kanchanaburi2050','satisfaction',
+    '{\"q1\":5}'::jsonb, null, 4.5, 'ดีมาก') is not null);
+  reset role;
+  select 'SURVEY_GAME=' || coalesce(g.code,'(null)') from surveys s left join games g on g.id=s.game_id
+    where s.student_id='$S1' and s.kind='satisfaction';
+  rollback;")
+okc "ลายเซ็นเดิมของ rpc_submit_survey (9 อาร์กิวเมนต์ ไม่มีรุ่น) ยังเรียกได้" "$out" "SURVEY_OK=true"
+okc "และพฤติกรรมเดิมคงอยู่ — ไม่มีรุ่น = ลงภาค 1 ตาม code" "$out" "SURVEY_GAME=kanchanaburi2050$"
+
+# ── set_save: ส่งรุ่นภาค 2 → ชั้นสรุป (student_game_progress) ต้องลงแถวภาค 2 ──
+out=$($Q -c "begin;
+  insert into games (id, code, name) values
+    ('44444444-4444-4444-8444-44444444444b','kanchanaburi2050-p2','กาญจนบุรี 2050 ภาค 2')
+    on conflict do nothing;
+  $AS_ANON
+  select rpc_set_save('BBB222','$S1','', '{\"stages\":{\"1\":{}}}'::jsonb, 12, 0,
+                      'kanchanaburi2050', 'V.8.82-p2-2569.146');
+  reset role;
+  select 'SAVE_GAME=' || g.code from student_game_progress p join games g on g.id=p.game_id
+    where p.student_id='$S1' and g.code like '%-p2';
+  rollback;")
+okc "rpc_set_save ส่งรุ่นภาค 2 → แถวสรุปลงภาค 2 (ไม่ปนกับภาค 1 อีก)" "$out" "SAVE_GAME=kanchanaburi2050-p2"
+
+# ── ครอบท่อที่เหลือให้ครบ 9 ตัว (ผู้ตรวจหักล้าง 25 ส.ค.: เดิมพิสูจน์ทางเข้าเก่าแค่ survey) ──
+out=$($Q -c "begin;
+  -- competency (in-place): รุ่นภาค 2 → ตารางสมรรถนะลงภาค 2
+  select rpc_submit_competency('kanchanaburi2050','V.8.82-p2-2569.146','$S1',
+    '{\"a\":1,\"b\":1,\"c\":1,\"d\":1,\"total\":4}'::jsonb, 't85run') is not null;
+  select 'COMP_GAME=' || g.code from competency_results c join games g on g.id=c.game_id
+    where c.student_id='$S1' and c.run_id='t85run';
+  -- peer (in-place): raw.gameVersion ภาค 2 → attempts ของผู้ถูกประเมินลงภาค 2
+  $AS_ANON
+  select rpc_submit_peer('BBB222','$S1','', '$S2','kanchanaburi2050',
+    '{\"gameVersion\":\"V.8.82-p2-2569.146\",\"scores\":{}}'::jsonb) is not null;
+  reset role;
+  select 'PEER_GAME=' || g.code from attempts a join games g on g.id=a.game_id
+    where a.student_id='$S2' and g.code like '%-p2';
+  -- submit_events แบบไม่มีคีย์รุ่นเลย (กิ่ง fallback ของ gp_game_for) → ภาค 1 เหมือนเดิม
+  $AS_ANON
+  select rpc_submit_events('BBB222','$S1','', 'kanchanaburi2050',
+    '{\"session_id\":\"t85nov\"}'::jsonb, '[]'::jsonb);
+  reset role;
+  select 'NOV_GAME=' || g.code from attempts a join games g on g.id=a.game_id
+    where a.student_id='$S1' and a.session_id='t85nov';
+  -- item_scores ลายเซ็นเดิม 5 อาร์กิวเมนต์ (หลัง drop+สร้างใหม่)
+  $AS_ANON
+  select 'ITEMS_OK=' || (rpc_submit_item_scores('BBB222','$S1','', 'kanchanaburi2050',
+    '[]'::jsonb) is not null);
+  reset role;
+  -- set_save ลายเซ็นเดิม 7 อาร์กิวเมนต์ → ยังลงภาค 1
+  $AS_ANON
+  select rpc_set_save('BBB222','$S1','', '{\"stages\":{}}'::jsonb, 1, 0, 'kanchanaburi2050');
+  reset role;
+  select 'SAVE7=' || (count(*)) from student_game_progress p join games g on g.id=p.game_id
+    where p.student_id='$S1' and g.code='kanchanaburi2050';
+  -- kru_* ลายเซ็นเดิม: จับเฉพาะ undefined_function (ลายเซ็น/ default พัง) — error เนื้อหาไม่นับ
+  do \$x\$ begin perform rpc_kru_assess('$S1'::uuid, '{}'::jsonb);
+    exception when undefined_function then raise; when others then null; end \$x\$;
+  select 'KRU_ASSESS_LEGACY=ok';
+  do \$x\$ begin perform rpc_kru_save('$S1'::uuid, 'note', '{}'::jsonb);
+    exception when undefined_function then raise; when others then null; end \$x\$;
+  select 'KRU_SAVE_LEGACY=ok';
+  -- feedback: ลายเซ็นเดิม 2 อาร์กิวเมนต์ + แบบส่งรุ่นภาค 2 → game_id ลงภาค 2
+  select 'FB_OK=' || (rpc_submit_feedback('idea','ขอบคุณครับ ระบบใช้งานดีมากเลยครับ') is not null);
+  select rpc_submit_feedback('bug','ทดสอบยามแยกภาคของท่อฟีดแบ็ก','kanchanaburi2050',
+    null, null, '{}'::jsonb, 'V.8.82-p2-2569.146') is not null;
+  select 'FB_GAME=' || g.code from feedback f join games g on g.id=f.game_id
+    where f.game_id is not null;
+  -- resolver จริงต้องปฏิเสธรุ่นว่างเมื่อรหัสใช้ร่วมสองภาค (กันใครถอดกิ่งกันใน gp_game_for)
+  do \$x\$ begin perform public.gp_resolve_game('kanchanaburi2050',''); raise exception 'NO_RAISE';
+    exception when others then if sqlerrm = 'NO_RAISE' then raise; end if; end \$x\$;
+  select 'RESOLVE_EMPTY_RAISES=ok';
+  rollback;")
+okc "competency (in-place) รุ่นภาค 2 → ลงภาค 2" "$out" "COMP_GAME=kanchanaburi2050-p2"
+okc "peer (in-place) raw.gameVersion ภาค 2 → ลงภาค 2" "$out" "PEER_GAME=kanchanaburi2050-p2"
+okc "ไม่มีคีย์รุ่นเลย = กิ่ง fallback → ภาค 1 เหมือนเดิม" "$out" "NOV_GAME=kanchanaburi2050$"
+okc "item_scores ลายเซ็นเดิม 5 อาร์กิวเมนต์ยังเรียกได้" "$out" "ITEMS_OK=true"
+okc "set_save ลายเซ็นเดิม 7 อาร์กิวเมนต์ → แถวสรุปยังลงภาค 1" "$out" "SAVE7=1"
+okc "kru_assess ลายเซ็นเดิมยังเรียกได้ (default รุ่นทำงาน)" "$out" "KRU_ASSESS_LEGACY=ok"
+okc "kru_save ลายเซ็นเดิมยังเรียกได้" "$out" "KRU_SAVE_LEGACY=ok"
+okc "feedback ลายเซ็นเดิม 2 อาร์กิวเมนต์ยังเรียกได้" "$out" "FB_OK=true"
+okc "feedback ส่งรุ่นภาค 2 → game_id ลงภาค 2 (ท่อที่ 9 ที่เคยหลุดยาม)" "$out" "FB_GAME=kanchanaburi2050-p2"
+okc "resolver จริงปฏิเสธรุ่นว่างเมื่อรหัสใช้ร่วมกัน (fixture ใช้ตัวจริง ไม่ใช่ mock แล้ว)" "$out" "RESOLVE_EMPTY_RAISES=ok"
+
+# ── สิทธิ์เรียกครบทุกลายเซ็นใหม่ (จับทั้ง grant หายและ signature พิมพ์ผิด — ลายเซ็นไม่มีจริง = error) ──
+n=$($Q -c "select bool_and(has_function_privilege('anon', f, 'execute'))::text from unnest(array[
+  'public.gp_game_for(text,text)',
+  'public.rpc_submit_survey(text,uuid,text,text,text,jsonb,jsonb,numeric,text,text)',
+  'public.rpc_submit_item_scores(text,uuid,text,text,jsonb,text,text)',
+  'public.rpc_kru_assess(uuid,jsonb,text,text)',
+  'public.rpc_kru_save(uuid,text,jsonb,text,text)',
+  'public.rpc_set_save(text,uuid,text,jsonb,numeric,numeric,text,text)',
+  'public.rpc_submit_feedback(text,text,text,text,text,jsonb,text)']) f;")
+ok "สิทธิ์ anon ครบทั้ง 7 ลายเซ็นใหม่ (ยาม grant ที่ฐานจำลองเดิมมองไม่เห็น)" "$n" "true"
+
+# ── ยามทะเบียน (สเปกข้อ 2): ฟังก์ชันเขียนตารางผูก game_id ต้องแยกภาค — ห้ามมี ❌ เหลือ ──
+n=$($Q -c "with exempt(fn) as (values ('rpc_split_group'),('rpc_split_named')),
+  writers as (select p.proname, prosrc from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
+    where ns.nspname='public' and p.prokind in ('f','p')
+      and prosrc ~* 'insert\\s+into\\s+(public\\.)?(attempts|events|surveys|feedback|competency_results|competency_dim_results|achievement_results|student_item_scores|student_game_progress|game_media|game_framework_items|standards_publish_log)\\M')
+  select count(*) from writers w left join exempt e on e.fn=w.proname
+   where e.fn is null and w.prosrc !~* 'gp_resolve_game|gp_game_for';")
+ok "⭐ ยามทะเบียน: ไม่มีฟังก์ชันเขียนตารางเกมที่ยังไม่แยกภาค (นอกทะเบียนยกเว้นที่เซ็นชื่อ)" "$n" "0"
+
 echo ""
 echo "═══ 9) 66 — ใครเป็นเจ้าของผังตัวชี้วัด (คำถามของภาค 2) ═══"
 out=$($PSQL -f $SQLDIR/66_STANDARDS_OWNERSHIP.sql 2>&1)
@@ -1019,7 +1182,8 @@ echo ""
 # ยามพื้น: ถ้าจำนวนข้อลดฮวบ แปลว่ามีหมวดหนึ่ง "ไม่ได้รัน" (เช่นไฟล์ SQL หาย แล้วกิ่งนั้นถูกข้าม)
 # ซึ่งจะไม่มีข้อตกให้เห็นเลย — เป็นรูปแบบ "ตายเงียบ" ที่ STD-006 ข้อ 1 ตั้งมาเพื่อกัน
 # ฐาน ณ V.1.6.7 = 184 ข้อ (ผ่าน ok/okc) · อีกราว 26 ข้อเป็น echo ตรงในหมวด 0 ไม่ถูกนับ
-FLOOR=212   # [V.1.6.18] +13 ข้อจากหมวด 13 (สถิติการเข้าถึงเกม) · ของจริง 213 เผื่อ 1 แบบเดิม
+FLOOR=231   # [V.1.6.27] +19 ข้อจากหมวด 8b (F4 ท่อจริง 9 ตัว + ยาม + สิทธิ์) · ของจริง 232 เผื่อ 1 แบบเดิม
+            # (ผู้ตรวจหักล้าง 25 ส.ค. จับได้ว่าค้าง 212 ทั้งที่ของจริง 221 — หมวดหายทั้งหมวดยามไม่ฟ้อง)
 if [ "$_nchk" -lt "$FLOOR" ]; then
   echo "❌ นับหัวได้แค่ $_nchk ข้อ (ฐานที่ควรได้ ≥ $FLOOR) — สงสัยมีหมวดที่ไม่ได้รัน"
   echo "   อ่านผลข้างบนว่าหมวดไหนหายไป · ถ้าตั้งใจตัดข้อออกจริง ให้ลด FLOOR พร้อมบันทึกเหตุผล"

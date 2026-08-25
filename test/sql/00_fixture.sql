@@ -62,7 +62,10 @@ create table if not exists public.students (
   is_active      boolean not null default true);
 
 create table if not exists public.games (
-  id uuid primary key default gen_random_uuid(), code text unique, name text, status text default 'published');
+  id uuid primary key default gen_random_uuid(), code text unique, name text, status text default 'published',
+  -- [V.1.6.27 · F4] สองคอลัมน์นี้คือกลไกแยกภาคของ resolver จริง — fixture ต้องมีให้ครบ
+  -- ไม่งั้นเทสต์พิสูจน์กับ resolver ปลอมแล้วเขียวหลอก (ผู้ตรวจหักล้าง 25 ส.ค. จับได้)
+  score_code text, season_tag text);
 
 create table if not exists public.classroom_games (
   classroom_id uuid references public.classrooms(id) on delete cascade,
@@ -172,13 +175,174 @@ language sql immutable as $$
            else upper(btrim(coalesce(p,''))) end
 $$;
 
--- จาก 43: หาเกมจากรหัส+รุ่น · ป้ายรุ่นที่มี -p2- คือภาค 2 (ใช้ score_code เดียวกันโดยตั้งใจ)
-create or replace function public.gp_resolve_game(p_code text, p_version text)
-returns uuid language sql stable security definer set search_path = public as $$
-  select g.id from public.games g
-   where g.code = case when p_version like '%-p2-%' then p_code || '-p2' else p_code end
-   limit 1
+-- [V.1.6.27 · F4] gp_resolve_game = **ฉบับจริงจากฐาน คำต่อคำ** (SCHEMA_DUMP_2026-08-25.sql:1001)
+-- เดิมเป็น mock จับคู่ code||'-p2' ตรง ๆ — คนละอัลกอริทึมกับของจริง (score_code/season_tag)
+-- ⇒ เทสต์เคยพิสูจน์ผู้เรียกแต่ไม่เคยพิสูจน์ resolver (ผู้ตรวจหักล้าง 25 ส.ค. จับได้)
+CREATE OR REPLACE FUNCTION public.gp_resolve_game(p_code text, p_version text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ STABLE
+AS $function$
+declare
+  v_id uuid;
+  v_rows int;
+begin
+  -- "ตระกูล" ของรหัสนี้ = ทุกแถวที่รหัสแคตตาล็อกหรือรหัสส่งคะแนนตรงกัน
+  -- ⚠️ ห้ามลัดด้วย "code ตรงเป๊ะชนะทันที" — ของกาญจนบุรี รหัสแคตตาล็อกของภาค 1
+  --    เป็นรหัสส่งคะแนนของภาค 2 ด้วย ถ้าลัด ภาค 2 ที่ลืมป้ายภาคจะเขียนทับภาค 1 เงียบ ๆ
+  select count(*) into v_rows from public.games
+   where code = p_code or score_code = p_code;
+  if v_rows = 0 then return null; end if;
+
+  -- 1) รหัสนี้เป็นของเกมเดียว = ไม่มีอะไรให้สับสน (ส่งรุ่นมาหรือไม่ก็ได้)
+  if v_rows = 1 then
+    select id into v_id from public.games where code = p_code or score_code = p_code;
+    return v_id;
+  end if;
+
+  -- 2) หลายภาคใช้รหัสร่วมกัน → ต้องมีรุ่นเสมอ ไม่งั้นบอกไม่ได้ว่าภาคไหน
+  if coalesce(btrim(p_version), '') = '' then
+    raise exception 'รหัส % ใช้ร่วมกัน % ภาค — ต้องส่ง game_version มาด้วยเพื่อระบุภาค (ภาคหลังต้องมีป้ายภาคในรุ่น เช่น -p2-)',
+      p_code, v_rows;
+  end if;
+
+  -- 3) ป้ายภาคในรุ่นตรงกับแถวไหน แถวนั้นชนะ
+  select id into v_id
+  from public.games
+  where (code = p_code or score_code = p_code)
+    and season_tag is not null
+    and p_version like '%' || season_tag || '%'
+  limit 1;
+  if v_id is not null then return v_id; end if;
+
+  -- 4) รุ่นไม่มีป้ายภาค → ภาคฐาน (ภาค 1 ของกาญจนบุรีเป็นแบบนี้)
+  select id into v_id
+  from public.games
+  where (code = p_code or score_code = p_code) and season_tag is null
+  limit 1;
+  if v_id is null then
+    raise exception 'รหัส % ไม่มีภาคฐาน และรุ่น % ไม่ตรงป้ายภาคใดเลย — ตรวจ season_tag ในตาราง games',
+      p_code, p_version;
+  end if;
+  return v_id;
+end $function$;
+
+-- ============================================================
+-- [V.1.6.27 · F4 ทาง ก] ของที่ไฟล์ 85 (ท่อส่งผลทุกท่อ) ต้องใช้ — โครงตามฐานจริง
+-- (คอลัมน์คัดจาก SCHEMA_DUMP_2026-08-25.sql เฉพาะที่ท่อเหล่านี้แตะ)
+-- ============================================================
+
+-- gp_level_of — ตัวตัดระดับสมรรถนะที่ rpc_submit_competency เรียก (ฉบับจริงจาก dump:933)
+CREATE OR REPLACE FUNCTION public.gp_level_of(p_total numeric, p_eligible boolean, p_ctc numeric, p_stm numeric, p_crt numeric, p_prb numeric)
+ RETURNS integer
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$
+  select case
+    when p_total is null then null
+    when p_total >= 80 then
+      case when coalesce(p_eligible, false)
+            and least(coalesce(p_ctc, -1), coalesce(p_stm, -1),
+                      coalesce(p_crt, -1), coalesce(p_prb, -1)) >= 65
+           then 6 else 5 end
+    when p_total >= 65 then 5
+    when p_total >= 50 then 4
+    else 3
+  end
+$function$;
+
+-- feedback — ท่อ rpc_submit_feedback (85 แก้ให้แยกภาคด้วย · ผู้ตรวจหักล้างพบว่าหลุดยาม)
+create table if not exists public.feedback (
+  id uuid primary key default gen_random_uuid(),
+  kind text, message text, game_id uuid references public.games(id),
+  name text, contact text, meta jsonb default '{}'::jsonb,
+  created_at timestamptz default now());
+
+-- ตารางของ fixture เดิมเป็นฉบับย่อ — เติมคอลัมน์ที่ท่อส่งจริง (85) ใช้ให้ครบตามฐานจริง
+alter table public.students add column if not exists save_blob jsonb;
+alter table public.students add column if not exists save_updated_at timestamptz;
+alter table public.students add column if not exists collected_score numeric;
+alter table public.students add column if not exists boss_score numeric;
+alter table public.student_game_progress add column if not exists current_activity_id text;
+alter table public.student_game_progress add column if not exists total_play_seconds integer not null default 0;
+alter table public.student_game_progress add column if not exists summary_metrics jsonb not null default '{}'::jsonb;
+alter table public.student_game_progress add column if not exists last_played_at timestamptz;
+alter table public.student_game_progress add column if not exists updated_at timestamptz not null default now();
+
+create table if not exists public.attempts (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.students(id) on delete cascade,
+  game_id uuid not null references public.games(id) on delete cascade,
+  session_id text, attempt_no integer, is_first boolean, game_version text,
+  started_at timestamptz, ended_at timestamptz, created_at timestamptz default now());
+
+create table if not exists public.events (
+  id bigint generated by default as identity primary key,
+  attempt_id uuid references public.attempts(id) on delete cascade,
+  student_id uuid not null references public.students(id) on delete cascade,
+  game_id uuid not null references public.games(id) on delete cascade,
+  stage_id text, kind text, question_id text, correct boolean,
+  credit numeric, score numeric, raw jsonb, created_at timestamptz default now());
+
+create table if not exists public.surveys (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid references public.students(id) on delete cascade,
+  game_id uuid references public.games(id) on delete cascade,
+  kind text not null, payload jsonb, dims jsonb, overall numeric,
+  interpretation text, created_at timestamptz default now());
+
+create table if not exists public.competency_results (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.students(id) on delete cascade,
+  game_id uuid not null references public.games(id) on delete cascade,
+  run_id text, a numeric, b numeric, c numeric, d numeric, total numeric,
+  ctc numeric, stm numeric, crt numeric, prb numeric, level integer,
+  data_status text, research_eligible boolean, detail jsonb,
+  computed_at timestamptz default now(), game_version text,
+  unique (student_id, game_id, run_id));
+
+create table if not exists public.student_item_scores (
+  student_id uuid not null references public.students(id) on delete cascade,
+  game_id uuid not null references public.games(id) on delete cascade,
+  item_id uuid not null references public.framework_items(id) on delete cascade,
+  run_id text not null default 'live', score numeric, max_score numeric,
+  level integer, level_label text, evidence jsonb not null default '{}'::jsonb,
+  computed_at timestamptz not null default now(),
+  primary key (student_id, game_id, item_id, run_id));
+
+-- _student_ok — คัดจากฐานจริงคำต่อคำ (ยามยืนยันตัวเด็กด้วย โค้ดห้อง+PIN)
+create or replace function public._student_ok(p_student uuid, p_join_key text, p_pin text)
+returns boolean language plpgsql stable security definer set search_path to 'public' as $$
+declare v record;
+begin
+  select st.join_pin, c.join_pin_required into v
+  from students st join classrooms c on c.id=st.classroom_id
+  where st.id=p_student and upper(c.join_key)=upper(p_join_key) and c.is_active;
+  if not found then return false; end if;
+  if coalesce(v.join_pin_required,false) and coalesce(v.join_pin,'') <> '' then
+    return v.join_pin = coalesce(p_pin,'');
+  end if;
+  return true;
+end; $$;
+
+-- auth.jwt() — ฐานจริงมีจาก Supabase · จำลองให้คืน {} (ไม่มีอีเมล)
+-- ⚠️ ต้องมาก่อน _is_app_admin — ฟังก์ชัน sql ตรวจตัวที่อ้างถึงตั้งแต่ตอนสร้าง
+create or replace function auth.jwt() returns jsonb
+language sql stable as $$ select coalesce(nullif(current_setting('test.jwt', true), ''), '{}')::jsonb $$;
+
+-- _is_app_admin + app_admins — ประตูผู้ดูแลชุดที่สองตามฐานจริง (rpc_kru_* ใช้)
+create table if not exists public.app_admins (
+  id uuid primary key default gen_random_uuid(), user_id uuid, email text,
+  note text default '', created_at timestamptz default now());
+create or replace function public._is_app_admin()
+returns boolean language sql stable security definer set search_path to 'public' as $$
+  select exists(
+    select 1 from app_admins a
+    where a.user_id = auth.uid()
+       or (a.email is not null and lower(a.email) = lower(coalesce(auth.jwt() ->> 'email', '')))
+  );
 $$;
+grant execute on function public._is_app_admin() to anon, authenticated;
 
 
 -- ============================================================

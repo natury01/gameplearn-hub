@@ -239,9 +239,12 @@ begin
   --   ขัดกับเหตุผลที่ไฟล์นี้เขียนไว้เองว่า "เครื่อง Nano มี RAM 0.5 GB และหน้านี้ถูกเปิดบ่อย"
   --   (และ rpc_set_platform_plan เรียก rpc_db_capacity() ซ้ำ ⇒ กดบันทึกครั้งเดียว = สแกนสองรอบ)
   --   เปลี่ยนเป็นค่าประมาณจากสถิติ ให้เข้าชุดกับ est_rows ที่ไฟล์นี้ใช้อยู่แล้วในตารางรายตาราง
-  select coalesce(reltuples, 0)::bigint into v_ev_rows
-    from pg_class where oid = 'public.events'::regclass;
-  if v_ev_rows < 0 then v_ev_rows := 0; end if;
+  -- [N16 · V.1.6.27] แหล่งเดียวกับตารางรายตาราง (n_live_tup) — เดิมไทล์ใช้ reltuples
+  --   แต่ตารางล่างใช้ n_live_tup ⇒ จอเดียวกันโชว์จำนวนแถว events สองค่า (ต่าง ~7%)
+  --   และไบต์/แถวเพี้ยนตาม ([PLAN] จับได้ 25 ส.ค. — PLAN_TO_CODE_แถวสองค่า)
+  select coalesce(n_live_tup, 0)::bigint into v_ev_rows
+    from pg_stat_user_tables where schemaname = 'public' and relname = 'events';
+  if v_ev_rows is null or v_ev_rows < 0 then v_ev_rows := 0; end if;
 
   if v_ev_rows > 0 then
     -- [แก้ 25 ส.ค.] เพิ่มเงื่อนไข v_ev_bytes > 0

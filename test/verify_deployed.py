@@ -14,6 +14,11 @@
 import sys
 import urllib.request
 
+# คอนโซล Windows ไทยเป็น cp874 — พิมพ์ ✅/❌ แล้วล้มทั้งสคริปต์ (เจอจริง 25 ส.ค. รอบแรกที่ใช้)
+for _s in (sys.stdout, sys.stderr):
+    if hasattr(_s, 'reconfigure'):
+        _s.reconfigure(encoding='utf-8', errors='replace')
+
 BASE = 'https://gameplearn.com'
 
 # (พาธ, คำที่ต้องเจอ "ในเนื้อหน้า") — คำเฉพาะของหน้านั้น ไม่ใช่ doctype ที่ทุกหน้ามี

@@ -52,6 +52,7 @@
 !/standards.html
 !/support.html
 !/contact.html
+!/capacity.html
 
 # ของประกอบหน้าเว็บ — เปิดเฉพาะนามสกุลที่เสิร์ฟจริง ชั้นเดียว
 #   เปิดทั้งโฟลเดอร์ไม่ได้ เพราะตัวตรวจอิสระพิสูจน์แล้วว่า js/vendor/notes.sql

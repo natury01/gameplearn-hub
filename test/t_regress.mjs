@@ -1,7 +1,7 @@
 /* ชุดทดสอบ 3 — กันงานรอบนี้ทำของเดิมพัง
    ตรวจทุกหน้าที่ 320px (จอเล็กสุดที่ยังต้องรองรับ) และ 1280px:
    ไม่มีสคริปต์พัง · ไม่ล้นแนวนอน · ป้ายรุ่นตรง · ปุ่ม/ลิงก์กดได้จริง */
-import { chromium, serve, stub, login, reporter, realErrors, launchOpts, ROOT as HUBROOT } from './harness.mjs';
+import { chromium, serve, stub, login, reporter, realErrors, launchOpts, ROOT as HUBROOT, REPO } from './harness.mjs';
 import * as F from './fixtures.mjs';
 import fs from 'fs';
 
@@ -168,12 +168,12 @@ console.log('\n═══ 4) ตรวจจากซอร์ส — เคร�
     /data-field="current_version"/.test(src.admin)
     && /current_version&order/.test(src.admin));
   ok('README_DEPLOY มีพิธีออกรุ่น (purge → ตรวจเลขรุ่น → current_version)',
-    /Purge Cache/.test(fs.readFileSync(ROOT + '/README_DEPLOY.md', 'utf8')));
+    /Purge Cache/.test(fs.readFileSync(REPO + '/README_DEPLOY.md', 'utf8')));
   ok('มีไฟล์ SQL ที่ตอบคำขอของภาค 1 (skipped ของผังมาตรฐาน) มาในชุดด้วย',
-    fs.existsSync(ROOT + '/sql/61_STANDARDS_SKIPPED.sql'));
+    fs.existsSync(REPO + '/sql/61_STANDARDS_SKIPPED.sql'));
   ok('ลำดับ SQL ใน README_DEPLOY มีไฟล์ใหม่ครบ',
-    /59_ROOM_BROWSE\.sql/.test(fs.readFileSync(ROOT + '/README_DEPLOY.md', 'utf8'))
-    && /60_ROOM_CLAIM\.sql/.test(fs.readFileSync(ROOT + '/README_DEPLOY.md', 'utf8')));
+    /59_ROOM_BROWSE\.sql/.test(fs.readFileSync(REPO + '/README_DEPLOY.md', 'utf8'))
+    && /60_ROOM_CLAIM\.sql/.test(fs.readFileSync(REPO + '/README_DEPLOY.md', 'utf8')));
   /* ชื่อย่อที่ตัดด้วย ฯ ห้ามกลับมาในไฟล์ที่ครูอ่านอีก — ตรวจจากซอร์สกันเผลอใส่กลับ
      (ยกเว้นช่องที่สามของ COMP6 ในหน้าครู ซึ่งเป็นป้ายรอบเรดาร์ กราฟิกใส่ชื่อเต็มไม่ลง) */
   const banned = ['วิทยาศาสตร์ฯ', 'สังคมศึกษาฯ', 'สุขศึกษาฯ'];
@@ -253,10 +253,10 @@ console.log('\n═══ 5) ไฟล์ SQL — ห้ามมี $$ อยู
     }
     return hits;
   };
-  const files = fs.readdirSync(ROOT + '/sql').filter((f) => f.endsWith('.sql')).sort();
+  const files = fs.readdirSync(REPO + '/sql').filter((f) => f.endsWith('.sql')).sort();
   ok('มีไฟล์ SQL ให้ตรวจจริง (กันเคสสแกนโฟลเดอร์ว่างแล้วเขียวหลอก)', files.length >= 4, files);
   for (const f of files) {
-    const hits = scan(fs.readFileSync(ROOT + '/sql/' + f, 'utf8'));
+    const hits = scan(fs.readFileSync(REPO + '/sql/' + f, 'utf8'));
     ok('sql/' + f + ' — ไม่มี $$ อยู่ในสตริง', hits.length === 0, hits);
   }
   /* พิสูจน์ว่าตัวสแกนจับได้จริง ไม่ใช่เขียวเพราะไม่ได้ตรวจอะไร (ยิงใส่ของที่รู้ว่าผิด) */

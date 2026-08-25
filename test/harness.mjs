@@ -17,7 +17,10 @@ import * as F from './fixtures.mjs';
 const _here = path.dirname(fileURLToPath(import.meta.url));
 function _findRoot() {
   const tried = [];
-  for (const c of [process.env.HUB_ROOT, path.resolve(_here, '..'), path.resolve(_here, '..', 'hub')]) {
+  /* [V.1.6.25] เพิ่ม '../public' — ผังใหม่ย้ายไฟล์เว็บลง public/
+     คงตัวเลือกเดิมไว้ด้วย เพื่อให้ชุดทดสอบรันกับซิปรุ่นเก่าได้เหมือนเดิม */
+  for (const c of [process.env.HUB_ROOT, path.resolve(_here, '..', 'public'),
+                   path.resolve(_here, '..'), path.resolve(_here, '..', 'hub')]) {
     if (!c) continue;
     tried.push(c);
     if (fs.existsSync(path.join(c, 'index.html')) && fs.existsSync(path.join(c, 'js', 'config.js'))) return c;
@@ -28,6 +31,11 @@ function _findRoot() {
   process.exit(1);
 }
 export const ROOT = _findRoot();
+/* [V.1.6.25] ผังใหม่ย้ายไฟล์เว็บลง public/ ⇒ "โฟลเดอร์เว็บ" กับ "รากรีโป" ไม่ใช่ที่เดียวกันแล้ว
+   ROOT = โฟลเดอร์เว็บ (ที่เสิร์ฟ) · REPO = รากรีโป (ที่ sql/ · test/ · README_DEPLOY.md อยู่)
+   ชุดที่อ่านไฟล์ฝั่งพัฒนา ต้องใช้ REPO — ใช้ ROOT จะพังทันทีที่ผังเป็น public/
+   (ซึ่งถูกแล้ว: ไฟล์พวกนั้นต้องไม่อยู่ในโฟลเดอร์เว็บ) · ผังเก่า REPO === ROOT ไม่กระทบ */
+export const REPO = path.basename(ROOT) === 'public' ? path.dirname(ROOT) : ROOT;
 
 /* เบราว์เซอร์: ① env GP_CHROMIUM ชี้เอง ② path ในเครื่องแชต (ถ้ายังมี — เร็วสุด)
    ③ ปล่อยให้ playwright หาเอง (เครื่องครู: npx playwright install chromium ครั้งเดียว) */

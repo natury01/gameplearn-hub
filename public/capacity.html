@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ความจุฐานข้อมูล — เกมเพลิน (GamePlearn)</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#2a78d6">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>/* ตั้งธีมก่อนวาดหน้า กันจอกะพริบ · คีย์ gp_theme จองไว้ให้แพลตฟอร์มอยู่แล้ว (ไม่ได้เพิ่มคีย์ใหม่) */
+try{var _t=JSON.parse(localStorage.getItem('gp_theme')||'{}');
+var d=document.documentElement;d.dataset.theme=_t.m||_t.dm||'light';d.dataset.skin=_t.s||_t.ds||'playful';}
+catch(e){document.documentElement.dataset.theme='light';}</script>
+<link rel="stylesheet" href="css/gp.css">
+<style>
+  /* สไตล์เฉพาะหน้านี้ — ที่เหลือใช้ css/gp.css ของเว็บกลาง ไม่มี dependency ภายนอก */
+  .cap-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin:14px 0}
+  /* [แก้ 25 ส.ค.] กันล้นแนวนอนเมื่อฐานคืนชื่อตาราง/ชื่อแผนยาวผิดปกติ
+     วัดจริงที่จอ 320px ได้ล้น 2,104px ขณะที่เกณฑ์ t_regress คือไม่เกิน 1px */
+  #usetext,table.cap td,.cap-op,.cap-tile{overflow-wrap:anywhere}
+  .cap-tile{border:1px solid var(--grid);border-radius:12px;padding:12px 14px;background:var(--surface)}
+  .cap-tile .lab{font-size:12.5px;opacity:.72;margin-bottom:4px}
+  .cap-tile .val{font-size:26px;font-weight:800;line-height:1.15}
+  .cap-tile .sub{font-size:12px;opacity:.66;margin-top:4px}
+  .cap-bar{height:12px;border-radius:999px;background:var(--grid);overflow:hidden;margin:8px 0 4px}
+  .cap-bar > i{display:block;height:100%;border-radius:999px;transition:width .35s}
+  .ok   > i{background:#16a34a}
+  .warn > i{background:#d97706}
+  .bad  > i{background:#dc2626}
+  .cap-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table.cap{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+  table.cap th,table.cap td{border-bottom:1px solid var(--grid);padding:7px 9px;text-align:left;vertical-align:top}
+  table.cap th{font-weight:700;opacity:.8;white-space:nowrap}
+  table.cap td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .flag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:700}
+  .flag-ok{background:#dcfce7;color:#166534}
+  .flag-warn{background:#fef3c7;color:#92400e}
+  .flag-bad{background:#fee2e2;color:#991b1b}
+  .cap-note{border:1px solid #fde68a;background:#fffbeb;color:#78350f;border-radius:10px;padding:9px 12px;margin:10px 0;font-size:13px}
+  html[data-theme="dark"] .cap-note{background:#2b2213;border-color:#7c5e1e;color:#fde68a}
+  .cap-op{border-left:3px solid #2a78d6;padding:8px 12px;margin:8px 0;font-size:13.5px;background:color-mix(in srgb, var(--accent) 8%, var(--surface));border-radius:0 8px 8px 0}
+  .cap-op b{display:block;margin-bottom:2px}
+  .plan-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .plan-row label{font-size:12.5px;opacity:.8;display:block;margin-bottom:3px}
+  .plan-row input,.plan-row select{padding:7px 9px;border:1px solid var(--grid);border-radius:9px;font:inherit;background:var(--surface);color:var(--ink)}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#content">ข้ามไปเนื้อหาหลัก</a>
+<div class="wrap">
+
+  <header class="topbar topbar-app" role="banner">
+    <a class="brand" href="./" style="color:inherit;text-decoration:none">
+      <span class="logo">ก</span>
+      <span class="bname"><span class="th" id="brand-th">เกมเพลิน</span><span class="en">GamePlearn · ความจุฐานข้อมูล</span></span>
+    </a>
+    <div class="sp"></div>
+    <span class="who" id="who"></span>
+    <button class="btn hidden" id="logout">ออกจากระบบ</button>
+    <nav class="navlinks" aria-label="เมนูหลัก">
+      <a href="admin.html">⚙️ ผู้ดูแลระบบ</a>
+      <a href="teacher.html">🏫 ห้องเรียนของฉัน</a>
+      <a href="index.html#games">🎮 เกม</a>
+      <a href="dashboard.html">📊 ผลการเรียนรู้</a>
+      <a href="standards.html">📐 มาตรฐาน</a>
+    </nav>
+  </header>
+
+  <main id="content">
+
+    <!-- ========== ยังไม่ได้เข้าสู่ระบบ ========== -->
+    <div id="gate" class="card" style="max-width:520px;margin:40px auto;text-align:center">
+      <div style="font-size:44px">🗄️</div>
+      <h1 style="font-size:21px;margin:8px 0 6px">ความจุฐานข้อมูล</h1>
+      <div class="muted small" style="margin-bottom:18px">
+        หน้าสำหรับผู้ดูแลระบบ — เข้าสู่ระบบด้วยบัญชี Google ที่ลงทะเบียนเป็นผู้ดูแลไว้
+      </div>
+      <div class="err-box" id="gate-err" role="alert" style="margin-bottom:14px;text-align:left"></div>
+      <button class="btn btn-primary btn-lg" id="login">เข้าสู่ระบบด้วย Google</button>
+    </div>
+
+    <!-- ========== หน้าหลัก ========== -->
+    <div id="app" class="hidden">
+      <h1 style="font-size:22px;margin:6px 0 2px">ความจุฐานข้อมูล</h1>
+      <div class="muted small" id="asof">กำลังอ่านข้อมูล…</div>
+      <div class="err-box" id="err" role="alert" style="margin:12px 0"></div>
+
+      <!-- แถบพื้นที่ที่ใช้ -->
+      <section class="card" style="margin-top:14px">
+        <h2 style="font-size:16px;margin:0 0 8px">พื้นที่ที่ใช้ไป</h2>
+        <div class="cap-bar ok" id="usebar"><i style="width:0%"></i></div>
+        <div class="small muted" id="usetext">—</div>
+        <div id="warn-assumed"></div>
+        <div class="cap-grid" id="tiles"></div>
+      </section>
+
+      <!-- โอกาสลดขนาด -->
+      <section class="card" style="margin-top:14px">
+        <h2 style="font-size:16px;margin:0 0 8px">โอกาสลดขนาด</h2>
+        <div class="muted small" style="margin-bottom:8px">
+          ระบบหาให้จากตัวเลขจริง — เรียงจากที่ได้พื้นที่คืนมากที่สุด
+        </div>
+        <div id="ops"></div>
+      </section>
+
+      <!-- ขนาดรายตาราง -->
+      <section class="card" style="margin-top:14px">
+        <h2 style="font-size:16px;margin:0 0 8px">ขนาดรายตาราง</h2>
+        <div class="cap-scroll">
+          <table class="cap" id="tbl-tables">
+            <thead><tr>
+              <th>ตาราง</th><th class="n">รวม</th><th class="n">ข้อมูล</th>
+              <th class="n">ดัชนี</th><th class="n">ดัชนี %</th><th class="n">แถว</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- index ที่ยังไม่เคยถูกใช้ -->
+      <section class="card" style="margin-top:14px">
+        <h2 style="font-size:16px;margin:0 0 8px">ดัชนีที่ยังไม่เคยถูกใช้</h2>
+        <div id="idx-warn"></div>
+        <div class="cap-scroll">
+          <table class="cap" id="tbl-idx">
+            <thead><tr><th>ตาราง</th><th>ดัชนี</th><th class="n">ขนาด</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- แผนที่ใช้อยู่ -->
+      <section class="card" style="margin-top:14px">
+        <h2 style="font-size:16px;margin:0 0 8px">แผนที่ใช้อยู่</h2>
+        <div class="cap-note">
+          แผนที่ Supabase คิดเงินจริง <b>อ่านจากในฐานข้อมูลไม่ได้</b> —
+          หน้านี้จึงคำนวณจากค่าที่ผู้ดูแลกรอกไว้ตรงนี้ ไม่ได้ตรวจเอง
+          ถ้าเปลี่ยนแผนกับ Supabase แล้ว ต้องมาแก้ตรงนี้ด้วย ไม่งั้นเพดานที่แสดงจะผิด
+        </div>
+        <div class="plan-row">
+          <div>
+            <label for="plan">แผน</label>
+            <select id="plan">
+              <option value="free">Free — 500 MB</option>
+              <option value="pro">Pro — 8 GB</option>
+              <option value="team">Team — 8 GB</option>
+              <option value="custom">กำหนดเอง</option>
+            </select>
+          </div>
+          <div>
+            <label for="quota">โควตาฐานข้อมูล (MB)</label>
+            <input id="quota" type="number" min="1" step="1" style="width:130px">
+          </div>
+          <div>
+            <label for="epp">events ต่อผู้เล่น 1 คน</label>
+            <input id="epp" type="number" min="1" step="1" style="width:130px">
+          </div>
+          <button class="btn btn-primary" id="save">บันทึกและคำนวณใหม่</button>
+          <button class="btn" id="reload">อ่านค่าใหม่</button>
+        </div>
+        <div class="small muted" style="margin-top:8px" id="planmeta"></div>
+        <div class="panel-note" style="margin-top:10px">
+          ค่า <b>events ต่อผู้เล่น 1 คน</b> คือตัวคูณที่กำหนดเพดานทั้งหมด
+          ค่า 1,578 มาจากการเทียบผู้เล่นจริงสองจุดเวลา ไม่ใช่ค่าเฉลี่ยรวมของทุกบัญชี
+          (บัญชีทดสอบดึงค่าเฉลี่ยลงมาโดยไม่ได้กินที่จริง) — ที่มาอยู่ในเอกสาร
+          <code>94_PRELAUNCH_CAPACITY.md</code> หัวข้อ 3
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/gp-core.js"></script>
+<script src="js/gp-brand.js"></script>
+<script>
+(function () {
+  const C = window.GP_CONFIG, G = window.GP;
+  const $ = (id) => document.getElementById(id);
+  const MB = 1048576;
+
+  $('brand-th').textContent = C.BRAND_TH;
+
+  let snap = null;   // ก้อน jsonb ล่าสุดจาก rpc_db_capacity()
+
+  /* ---------- ตัวช่วยแสดงผล ---------- */
+  /* วัดไม่ได้ = "—" ไม่ใช่ 0 · ศูนย์กับวัดไม่ได้อ่านแล้วคนละเรื่องกัน */
+  const dash = (v) => (v === null || v === undefined || v === '') ? '—' : v;
+
+  function bytes(n) {
+    if (n === null || n === undefined) return '—';
+    n = Number(n);
+    if (!isFinite(n)) return '—';
+    if (n < 1024) return n + ' B';
+    if (n < MB) return (n / 1024).toFixed(1) + ' KB';
+    if (n < 1073741824) return (n / MB).toFixed(1) + ' MB';
+    return (n / 1073741824).toFixed(2) + ' GB';
+  }
+  function num(n, d) {
+    if (n === null || n === undefined) return '—';
+    return Number(n).toLocaleString('th-TH', { maximumFractionDigits: d === undefined ? 0 : d });
+  }
+  function thaiDate(iso) {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString('th-TH',
+        { dateStyle: 'medium', timeStyle: 'short' });
+    } catch (e) { return iso; }
+  }
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function showErr(m) { const b = $('err'); b.textContent = m || ''; b.classList.toggle('on', !!m); }
+  function gateErr(m) { const b = $('gate-err'); b.textContent = m || ''; b.classList.toggle('on', !!m); }
+
+  /* ---------- เข้าสู่ระบบ (ด่านเดียวกับ admin.html) ---------- */
+  $('login').addEventListener('click', () => G.loginGoogle('/capacity.html'));
+  $('logout').addEventListener('click', () => { G.logout(); location.reload(); });
+
+  async function boot() {
+    G.captureOAuthReturn();
+    G.loadSess();
+    if (!(await G.ensure())) return;
+
+    const uid = G.session() && G.session().user_id;
+    if (!uid) return;
+
+    let me;
+    try {
+      const rows = await G.get('/rest/v1/teachers?id=eq.' + uid + '&select=email,display_name,role');
+      me = rows && rows[0];
+    } catch (e) { gateErr('ตรวจสิทธิ์ไม่สำเร็จ: ' + e.message); return; }
+
+    if (!me) { gateErr('ไม่พบบัญชีนี้ในระบบ — ลองเข้าห้องเรียนของฉันหนึ่งครั้งก่อน แล้วกลับมาใหม่'); return; }
+    if (me.role !== 'admin') {
+      gateErr('บัญชี ' + (me.email || '') + ' ยังไม่มีสิทธิ์ผู้ดูแลระบบ');
+      return;
+    }
+
+    $('who').textContent = me.email || me.display_name || 'ผู้ดูแล';
+    $('gate').classList.add('hidden');
+    $('logout').classList.remove('hidden');
+    $('app').classList.remove('hidden');
+    await load();
+  }
+
+  /* ---------- อ่านข้อมูล ---------- */
+  async function load() {
+    showErr('');
+    $('asof').textContent = 'กำลังอ่านข้อมูล…';
+    try {
+      snap = await G.rpc('rpc_db_capacity');
+      render();
+    } catch (e) {
+      $('asof').textContent = '';
+      showErr(e.code === 'SESSION_EXPIRED'
+        ? 'เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่'
+        : ('อ่านข้อมูลไม่สำเร็จ: ' + e.message));
+    }
+  }
+
+  /* ---------- วาดผล ---------- */
+  function render() {
+    if (!snap) return;
+    const plan = snap.plan || {}, db = snap.database || {},
+          ev = snap.events || {}, cl = snap.ceiling || {},
+          gr = snap.growth || {}, ct = snap.counts || {};
+
+    $('asof').textContent = 'อ่านสดเมื่อ ' + thaiDate(snap.as_of);
+
+    /* แถบพื้นที่ */
+    const used = db.size_bytes !== null && db.size_bytes !== undefined
+      ? Number(db.size_bytes)
+      : Number(db.other_bytes || 0) + Number(ev.total_bytes || 0);
+    const quota = Number(plan.db_quota_bytes || 0);
+    const pct = quota > 0 ? Math.min(100, (used / quota) * 100) : 0;
+
+    const bar = $('usebar');
+    bar.className = 'cap-bar ' + (pct >= 85 ? 'bad' : pct >= 70 ? 'warn' : 'ok');
+    bar.firstElementChild.style.width = pct.toFixed(1) + '%';
+    $('usetext').textContent = bytes(used) + ' จาก ' + bytes(quota)
+      + ' (' + pct.toFixed(1) + '%) · แผน ' + (plan.name || '—');
+
+    /* เตือนถ้าขนาดฐานเป็นค่าสมมติ ไม่ใช่ค่าที่วัดได้ */
+    $('warn-assumed').innerHTML = (db.size_source === 'assumed')
+      ? '<div class="cap-note">⚠️ <b>อ่านขนาดฐานข้อมูลจริงไม่ได้</b> (สิทธิ์ไม่พอ) '
+        + 'ตัวเลขนี้ใช้สมมติฐานว่าส่วนที่ไม่ใช่ตาราง events กินราว 50 MB '
+        + 'ถ้าของจริงต่างจากนี้มาก เพดานที่แสดงจะเลื่อนตาม</div>'
+      : '';
+
+    /* ไทล์ตัวเลขหลัก */
+    const ceilPlayers = cl.players;
+    const tiles = [
+      ['เพดานจำนวนผู้เล่น', ceilPlayers === null || ceilPlayers === undefined ? '—' : num(ceilPlayers),
+        'ที่ ' + num(plan.events_per_player) + ' events ต่อคน'],
+      ['ไบต์ต่อ 1 event', dash(ev.bytes_per_event === null ? null : num(ev.bytes_per_event, 1)),
+        'ตัวเลขที่กำหนดเพดานทั้งหมด'],
+      ['ขนาดต่อผู้เล่น 1 คน', bytes(cl.bytes_per_player), ''],
+      ['แถวใน events', num(ev.rows),
+        'นักเรียน ' + num(ct.students) + ' · ครั้งเล่น ' + num(ct.attempts)],
+      ['สัดส่วน raw', ev.raw_pct === null || ev.raw_pct === undefined ? '—' : ev.raw_pct + '%',
+        'เฉลี่ย ' + dash(ev.raw_avg_bytes) + ' B ต่อแถว (สุ่มตัวอย่าง)'],
+      ['โตวันละ', gr.events_per_day === null || gr.events_per_day === undefined
+        ? '—' : num(gr.events_per_day, 1) + ' แถว',
+        gr.time_column ? ('นับจากคอลัมน์ ' + gr.time_column) : 'หาคอลัมน์เวลาในตารางไม่เจอ'],
+      ['อีกกี่วันจะเต็ม', gr.days_until_full === null || gr.days_until_full === undefined
+        ? '—' : num(gr.days_until_full) + ' วัน',
+        gr.days_until_full === null || gr.days_until_full === undefined
+          ? 'ต้องรู้อัตราการโตก่อน' : 'ถ้ารูปแบบการใช้งานไม่เปลี่ยน'],
+    ];
+    $('tiles').innerHTML = tiles.map((t) =>
+      '<div class="cap-tile"><div class="lab">' + esc(t[0]) + '</div>'
+      + '<div class="val">' + esc(t[1]) + '</div>'
+      + (t[2] ? '<div class="sub">' + esc(t[2]) + '</div>' : '') + '</div>').join('');
+
+    renderOps();
+    renderTables();
+    renderIdx();
+    renderPlan();
+  }
+
+  /* ---------- โอกาสลดขนาด (คำนวณจากตัวเลขจริงล้วน) ---------- */
+  function renderOps() {
+    const ops = [];
+    const ev = snap.events || {}, plan = snap.plan || {};
+    const idx = snap.unused_indexes || [], bloat = snap.bloat || [];
+
+    const idxBytes = idx.reduce((s, r) => s + Number(r.bytes || 0), 0);
+    if (idxBytes > 0) {
+      ops.push([idxBytes,
+        'ลบดัชนีที่ยังไม่เคยถูกใช้ — คืนได้ราว ' + bytes(idxBytes),
+        'ความเสี่ยงต่ำที่สุดในบรรดาทางเลือกทั้งหมด เพราะสร้างกลับได้ตลอดเวลา '
+        + 'แต่ต้องดูวันที่ล้างสถิติก่อน (ตารางด้านล่าง)']);
+    }
+
+    const deadRows = bloat.reduce((s, r) => s + Number(r.dead || 0), 0);
+    if (deadRows > 1000 && ev.bytes_per_event) {
+      ops.push([deadRows * Number(ev.bytes_per_event),
+        'VACUUM เก็บแถวตาย ' + num(deadRows) + ' แถว — คืนได้ราว '
+          + bytes(deadRows * Number(ev.bytes_per_event)),
+        'ไม่ต้องแก้โค้ดหรือสคีมาเลย เป็นพื้นที่ที่ได้คืนฟรี']);
+    }
+
+    if (ev.raw_pct && ev.total_bytes) {
+      const half = Number(ev.total_bytes) * (Number(ev.raw_pct) / 100) / 2;
+      ops.push([half,
+        'ลดขนาด raw ลงครึ่ง — คืนได้ราว ' + bytes(half),
+        'raw คิดเป็น ' + ev.raw_pct + '% ของตาราง · ย้ายคีย์ที่มีทุกแถวออกไปเป็นคอลัมน์จริง '
+        + '(jsonb เก็บชื่อคีย์ซ้ำใหม่ทุกแถว คอลัมน์จริงเก็บครั้งเดียว) — ต้องแก้ทั้งเกมและ RPC']);
+    }
+
+    if (ev.total_bytes) {
+      ops.push([Number(ev.total_bytes) * 0.85,
+        'จบเทอมแล้ว archive ไป Storage — คืนได้เกือบทั้งก้อน',
+        'Supabase Storage เป็นโควตาคนละก้อนกับฐานข้อมูล (แผนฟรีให้ 1 GB แยกต่างหาก) · '
+        + 'events บีบเป็น CSV gzip เหลือราว 1 ใน 8 ⇒ เก็บข้อมูลวิจัยครบทุกแถวโดยไม่กินโควตาฐาน']);
+    }
+
+    ops.sort((a, b) => b[0] - a[0]);
+
+    $('ops').innerHTML =
+      '<div class="cap-note">🔴 <b>ลำดับสำคัญกว่าตัวเลือก</b> — ทุกข้อข้างล่างคือการผ่าตัดบนฐานข้อมูล'
+      + 'ที่ถือข้อมูลวิจัยจริง ทำ <code>db dump</code> เก็บสำเนานอกระบบก่อนเสมอ '
+      + 'แผนฟรีไม่มี backup อัตโนมัติ (กฎล็อกข้อ 7)</div>'
+      + (ops.length
+          ? ops.map((o) => '<div class="cap-op"><b>' + esc(o[1]) + '</b>' + esc(o[2]) + '</div>').join('')
+          : '<div class="muted small">ยังไม่พบโอกาสลดขนาดที่ชัดเจนจากตัวเลขตอนนี้</div>');
+  }
+
+  function renderTables() {
+    const rows = snap.tables || [];
+    $('tbl-tables').querySelector('tbody').innerHTML = rows.map((r) => {
+      const tot = Number(r.total_bytes || 0), ix = Number(r.index_bytes || 0);
+      const p = tot > 0 ? (100 * ix / tot) : 0;
+      return '<tr><td>' + esc(r.name) + '</td>'
+        + '<td class="n">' + bytes(r.total_bytes) + '</td>'
+        + '<td class="n">' + bytes(r.heap_bytes) + '</td>'
+        + '<td class="n">' + bytes(r.index_bytes) + '</td>'
+        + '<td class="n">' + (tot > 0 ? p.toFixed(0) + '%' : '—') + '</td>'
+        + '<td class="n">' + num(r.est_rows) + '</td></tr>';
+    }).join('') || '<tr><td colspan="6" class="muted">ไม่มีข้อมูล</td></tr>';
+  }
+
+  function renderIdx() {
+    const rows = snap.unused_indexes || [];
+    const reset = snap.stats_reset;
+    let warn = '';
+    /* [แก้ 25 ส.ค.] เดิมมีเฉพาะกรณี reset มีค่า — บนฐานที่ไม่เคยล้างสถิติ
+       pg_stat_database.stats_reset เป็น null ⇒ warn = '' ⇒ ตารางนี้ขึ้นลอย ๆ
+       ขณะที่กล่อง "โอกาสลดขนาด" ข้างบนบอกให้ "ดูวันที่ล้างสถิติก่อน (ตารางด้านล่าง)"
+       = ชี้ไปหาข้อมูลที่หน้าไม่ได้แสดง บนหน้าที่ชวนให้ไปลบดัชนีของตาราง events */
+    if (!reset && rows.length) {
+      warn = '<div class="cap-note">⚠️ <b>ไม่รู้ว่าสถิติเริ่มนับตั้งแต่เมื่อไร</b> — '
+        + 'ฐานข้อมูลนี้ไม่เคยถูกล้างสถิติ หรืออ่านวันที่ไม่ได้ ⇒ คำว่า "ยังไม่เคยถูกใช้" '
+        + 'ในตารางนี้<b>ยังใช้ตัดสินใจลบไม่ได้</b> เพราะไม่รู้ว่านับมานานพอหรือยัง '
+        + 'ดัชนีที่ใช้เฉพาะตอนสิ้นเทอมจะดูเหมือนไม่ถูกใช้ทั้งที่จำเป็น</div>';
+    }
+    if (reset) {
+      const days = (Date.now() - new Date(reset).getTime()) / 86400000;
+      if (isFinite(days) && days < 14) {
+        warn = '<div class="cap-note">⚠️ <b>สถิติเพิ่งถูกล้างเมื่อ ' + esc(thaiDate(reset)) + '</b> '
+          + '(' + Math.max(0, Math.round(days)) + ' วันก่อน) — คำว่า "ยังไม่เคยถูกใช้" ในตารางนี้'
+          + 'จึงหมายถึงช่วงสั้น ๆ นั้นเท่านั้น <b>ยังลบอะไรไม่ได้</b> '
+          + 'ดัชนีที่ใช้เฉพาะตอนสิ้นเทอมจะดูเหมือนไม่ถูกใช้ทั้งที่จำเป็น</div>';
+      } else {
+        warn = '<div class="muted small" style="margin-bottom:8px">'
+          + 'นับตั้งแต่ล้างสถิติเมื่อ ' + esc(thaiDate(reset)) + ' · '
+          + 'ดัชนีที่เป็นกุญแจหลักหรือบังคับไม่ซ้ำถูกกรองออกแล้ว (ห้ามลบอยู่แล้ว)</div>';
+      }
+    }
+    $('idx-warn').innerHTML = warn;
+    $('tbl-idx').querySelector('tbody').innerHTML = rows.map((r) =>
+      '<tr><td>' + esc(r.table) + '</td><td>' + esc(r.index) + '</td>'
+      + '<td class="n">' + bytes(r.bytes) + '</td></tr>').join('')
+      || '<tr><td colspan="3" class="muted">ไม่พบดัชนีที่เข้าข่าย — ดีแล้ว</td></tr>';
+  }
+
+  /* ---------- แผน ---------- */
+  const PRESET = { free: 500, pro: 8192, team: 8192 };
+
+  function renderPlan() {
+    const p = snap.plan || {};
+    $('plan').value = PRESET[p.name] ? p.name : 'custom';
+    /* [แก้ 25 ส.ค.] จำค่าจริงไว้ด้วย — ช่องกรอกแสดงเป็น MB ที่ปัดแล้ว
+       ถ้าครูเปิดหน้าแล้วกด "บันทึก" โดยไม่แก้อะไร ค่าที่ส่งกลับจะเป็นค่าที่ปัด
+       ⇒ เขียนทับโควตาเดิมเงียบ ๆ ทั้งที่ไม่มีใครตั้งใจเปลี่ยน */
+    $('quota').dataset.exact = String(p.db_quota_bytes || '');
+    $('quota').value = Math.round(Number(p.db_quota_bytes || 0) / MB);
+    $('epp').value = p.events_per_player || '';
+    $('planmeta').textContent = p.updated_at
+      ? ('แก้ล่าสุด ' + thaiDate(p.updated_at) + (p.updated_by ? ' โดย ' + p.updated_by : ''))
+      : '';
+  }
+
+  $('plan').addEventListener('change', () => {
+    const v = $('plan').value;
+    if (PRESET[v]) $('quota').value = PRESET[v];
+  });
+
+  $('reload').addEventListener('click', load);
+
+  $('save').addEventListener('click', async () => {
+    showErr('');
+    const q = parseInt($('quota').value, 10), e = parseInt($('epp').value, 10);
+    if (!(q > 0)) { showErr('โควตาฐานข้อมูลต้องมากกว่า 0'); return; }
+    if (!(e > 0)) { showErr('จำนวน events ต่อผู้เล่นต้องมากกว่า 0'); return; }
+    $('save').disabled = true;
+    try {
+      /* RPC คืนชุดตัวเลขใหม่กลับมาในคำขอเดียว — ไม่ต้องยิงซ้ำ ไม่ต้องรีเฟรชหน้า */
+      snap = await G.rpc('rpc_set_platform_plan', {
+        p_plan: $('plan').value,
+        /* ส่งค่าเดิมกลับไปถ้าครูไม่ได้แก้ช่องนี้ — กันการปัดค่าแล้วเขียนทับ */
+        p_db_quota_bytes: (String(Math.round(Number($('quota').dataset.exact || 0) / MB))
+                            === String(q) && $('quota').dataset.exact)
+          ? Number($('quota').dataset.exact) : q * MB,
+        p_events_per_player: e,
+      });
+      render();
+    } catch (err) {
+      showErr('บันทึกไม่สำเร็จ: ' + err.message);
+    } finally {
+      $('save').disabled = false;
+    }
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>

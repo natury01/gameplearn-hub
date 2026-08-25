@@ -8,6 +8,25 @@ Static site ล้วน ไม่ต้อง build — deploy บน **Cloudfl
 **Game On. Learn Beyond.** — เริ่มเกม แล้วก้าวไปไกลกว่าการเรียนรู้เดิม
 (สโลแกนสำรอง: **Play. Learn. Level Up.** — ทุกเกม คืออีกขั้นของการเรียนรู้ · สลับได้ที่ `js/config.js` → `SLOGAN_MODE`)
 
+
+## ผังไฟล์ (ตั้งแต่ V.1.6.25)
+
+```
+gameplearn-hub/            ← รากรีโป · Cloudflare Root directory = /
+├── wrangler.jsonc         ★ ต้องอัป — บอก Cloudflare ว่าอัปเฉพาะ public/
+├── public/                ★ ★ **โฟลเดอร์เดียวที่ขึ้นเว็บ**
+│   ├── index.html  teacher.html  admin.html  dashboard.html
+│   ├── standards.html  support.html  contact.html  capacity.html
+│   ├── js/   (6 ไฟล์)      css/gp.css
+│   ├── favicon.svg        robots.txt
+│   └── _headers           ★ ต้องอยู่ในนี้ Cloudflare จึงจะอ่าน (F11)
+├── sql/                   ไฟล์ SQL ที่ครูรันบน Supabase — **ไม่ขึ้นเว็บ**
+├── test/                  ชุดทดสอบ — **ไม่ขึ้นเว็บ**
+└── README.md  README_DEPLOY.md   — **ไม่ขึ้นเว็บ**
+```
+
+**กฎเดียวที่ต้องจำ: อะไรที่คนนอกควรเห็น วางใน `public/` · อะไรที่ไม่ควรเห็น วางนอก `public/`**
+ไม่มีบัญชีให้ลืมอัป ไม่มีไฟล์ซ่อนให้ตกหล่น
 ## ไฟล์ในโปรเจกต์
 
 ```text
@@ -77,9 +96,13 @@ gameplearn-hub/
 
 ## ขั้นตอน Deploy (~15 นาที)
 
-1. **สร้าง GitHub repo** ชื่อ `gameplearn-hub` → อัปโหลดไฟล์ทั้งโฟลเดอร์นี้ **รวม `wrangler.jsonc` · `_headers` · `.assetsignore`** (คงโครง `js/` และ `css/`)
-   > ⚠️ **`.assetsignore` เป็นไฟล์ซ่อน (ขึ้นต้นด้วยจุด)** — เครื่องมืออัปโหลดหลายตัว และ `git add .` บางกรณีข้ามไฟล์แบบนี้ **ตรวจให้เห็นกับตาว่าขึ้นไปจริง**
-   > ไม่มีไฟล์นี้ = ซอร์ส SQL ทั้ง 10 ไฟล์และชุดทดสอบ 15 ไฟล์กลับไปเปิดให้คนนอกอ่านทันที (เหตุการณ์จริง 24 ส.ค. 2569 — งาน N15)
+1. **สร้าง GitHub repo** ชื่อ `gameplearn-hub` → อัปโหลดไฟล์ทั้งโฟลเดอร์นี้ **คงโครงเดิมทุกอย่าง** (`public/` · `sql/` · `test/` · `wrangler.jsonc`)
+   > ✅ **ตั้งแต่ V.1.6.25 ไม่ต้องกังวลเรื่องไฟล์ซ่อนอีกแล้ว**
+   > ของเดิมใช้ `.assetsignore` (ขึ้นต้นด้วยจุด) ซึ่งเครื่องมืออัปข้ามไป **2 รุ่นติดกัน**
+   > — V.1.6.23 ทำให้ซอร์ส SQL เปิดสาธารณะต่อ · V.1.6.24 ทำให้หน้า `capacity.html` ไม่ขึ้น
+   > ตอนนี้ย้ายไปปิดที่โครงสร้างแทน: **`wrangler.jsonc` ชี้ `"directory": "./public"`**
+   > ⇒ เฉพาะไฟล์ใน `public/` เท่านั้นที่ขึ้นเว็บ · `sql/` `test/` `README*` **เสิร์ฟไม่ได้โดยโครงสร้าง**
+   > ⚠️ **เพิ่มหน้าเว็บใหม่ = วางใน `public/`** ไม่ใช่ที่รากรีโป (ชุด `t_assets` คุมอยู่ จะแดงถ้าวางผิด)
 2. **Cloudflare** → Workers & Pages → Create → **Workers** → Import a repository → เลือก repo
    - Build command: **เว้นว่าง** (เว็บนี้ไม่มี build step และไม่มี `package.json`)
    - Deploy → ได้ URL ชั่วคราวของ Worker

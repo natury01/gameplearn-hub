@@ -4,7 +4,7 @@
    กติกา "เกมเป็นเจ้าของ 'วัดอะไร' · ผู้ดูแลเป็นเจ้าของ 'คำที่ครูอ่าน'" ประกาศไว้ตั้งแต่ไฟล์ 66
    ฐานกันไม่ให้เกมทับข้อความได้แล้ว และทั้งสองภาคทำท่อ `kept_manual` รอไว้แล้ว
    **แต่ไม่มีใครได้ใช้เลย เพราะไม่มีที่ให้ผู้ดูแลแก้** — ชุดนี้คุมชิ้นส่วนที่ขาดไปนั้น */
-import { chromium, serve, stub, login, reporter, realErrors, launchOpts, ROOT as HUBROOT } from './harness.mjs';
+import { chromium, serve, stub, login, reporter, realErrors, launchOpts, ROOT as HUBROOT, REPO } from './harness.mjs';
 import * as F from './fixtures.mjs';
 import fs from 'fs';
 
@@ -198,7 +198,8 @@ console.log('\n═══ 8) ประโยคใน admin.html ต้องต�
 {
   const ROOT = HUBROOT;
   const js  = fs.readFileSync(ROOT + '/admin.html', 'utf8');
-  const sql = fs.readFileSync(ROOT + '/sql/71_STANDARDS_ADMIN_EDIT.sql', 'utf8');
+  /* [V.1.6.25] sql/ อยู่รากรีโป ไม่ใช่โฟลเดอร์เว็บ — ใช้ REPO */
+  const sql = fs.readFileSync(REPO + '/sql/71_STANDARDS_ADMIN_EDIT.sql', 'utf8');
   const jsHead  = /'ช่อง ' \+ labels\.join\(' · '\) \+ ' ใช้ข้อความของผู้ดูแลเว็บกลาง'/.test(js);
   const sqlHead = /'ช่อง ' \|\| array_to_string\(v_keep, ' · '\)\s*\|\| ' ใช้ข้อความของผู้ดูแลเว็บกลาง'/.test(sql);
   ok('admin.html สร้างประโยคด้วยถ้อยคำชุดนี้', jsHead, js.match(/'ช่อง '[^\n]*/g));

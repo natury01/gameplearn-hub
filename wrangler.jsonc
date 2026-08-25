@@ -8,9 +8,14 @@
   "compatibility_date": "2026-08-01",
 
   // เว็บนี้เป็น static ล้วน ไม่มีโค้ดฝั่งเซิร์ฟเวอร์ จึงไม่ต้องมี "main"
-  // directory "./" = ไฟล์เว็บอยู่ที่ root ของ repo (index.html, teacher.html, js/, css/)
+  // [V.1.6.25] directory "./public" = **เฉพาะไฟล์ใน public/ เท่านั้นที่ขึ้นเว็บ**
+  //   ของเดิมเป็น "./" = ยิงทั้ง repo ขึ้นเว็บ รวม sql/ 11 ไฟล์และ test/ 16 ไฟล์
+  //   เคยแก้ด้วย .assetsignore แต่ไฟล์ซ่อนตกหล่นตอนอัป **2 รุ่นติดกัน**
+  //   (V.1.6.23 ⇒ SQL เปิดต่ออีกรอบ · V.1.6.24 ⇒ หน้า capacity.html ไม่ขึ้น)
+  //   ⇒ ย้ายมาปิดที่โครงสร้างแทน: ของที่อยู่นอก public/ เสิร์ฟไม่ได้เลย ไม่ต้องมีใครจำ
+  //   ⚠️ เพิ่มหน้าใหม่ = วางใน public/ ไม่ใช่ที่รากรีโป (ชุด t_assets คุมอยู่)
   "assets": {
-    "directory": "./",
+    "directory": "./public",
     // ไม่พบไฟล์ → ส่ง index.html (กัน 404 ตอนกดลิงก์ hash route ของหน้า teacher)
     "not_found_handling": "single-page-application"
   }

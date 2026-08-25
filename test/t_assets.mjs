@@ -15,6 +15,12 @@
           ยามยังเขียว ทั้งที่ SQL หลุดขึ้นเว็บครบ 10 ไฟล์
      ชุดนี้จึงคุม **สองทิศ** และอยู่ใน run-all.sh ให้รันทุกครั้ง
 
+   ⚠️ 25 ส.ค. — ชุดนี้เองก็เคยมีทิศที่มองไม่เห็น (หมวด ⑤ข)
+      "เพิ่มหน้าใหม่แล้วลืมเปิดใน .assetsignore" เคยได้เขียว 58/58
+      เพราะข้อ ⑤ เดิมเทียบแค่ **จำนวน** ⇒ หน้าที่ยังไม่เปิดไม่ถูกนับ
+      แก้แล้วโดยเปลี่ยนเป็น **ไล่ของจริงทีละไฟล์**
+      บทเรียน: ยามที่เทียบกับรายการที่พิมพ์ไว้ในโค้ด ยังเป็นยามเขียวหลอกได้เสมอ
+
    ⚠️ ชุดนี้ไม่พึ่ง wrangler — โรงเรียน/เครื่องครูไม่ได้ติดตั้ง
       จึงอ่าน .assetsignore แล้วตัดสินเองด้วยตัวจับที่รองรับเฉพาะไวยากรณ์ที่เราใช้จริง
       และมี "เทสต์ของเทสต์" ท้ายไฟล์ พิสูจน์ว่าตัวจับนี้แดงได้จริงเมื่อกฎหาย
@@ -91,7 +97,7 @@ ok('⭐ ต้องเป็นบัญชีขาว — ขึ้นต้�
 console.log('\n— ② ทิศ 1: ของที่เว็บต้องใช้ ห้ามหาย —');
 const MUST_KEEP = [
   'index.html', 'teacher.html', 'admin.html', 'dashboard.html',
-  'standards.html', 'support.html', 'contact.html',
+  'standards.html', 'support.html', 'contact.html', 'capacity.html',
   'js/config.js', 'js/gp-core.js', 'js/gp-brand.js', 'js/gp-catalog.js',
   'js/gp-standards-panel.js', 'js/gp-tour.js',
   'css/gp.css', 'favicon.svg', 'robots.txt',
@@ -106,6 +112,7 @@ ok('⭐ robots.txt ต้องขึ้นเว็บเสมอ (ไม่�
 console.log('\n— ③ ทิศ 2: ของที่ห้ามหลุด —');
 const MUST_CLOSE = [
   'sql/60_ROOM_CLAIM.sql', 'sql/83_VISIT_SOURCE.sql', 'sql/82_REPORT_SENDER_PROOF.sql',
+  'sql/84_DB_CAPACITY.sql',
   'test/t_regress.mjs', 'test/harness.mjs', 'test/run-all.sh',
   'test/sql/00_fixture.sql', 'test/sql/t_sql.sh', 'test/TESTS_REGISTRY.md',
   'wrangler.jsonc', 'README.md', 'README_DEPLOY.md',
@@ -134,10 +141,34 @@ const leaked = all.filter((p) => RISKY.test(p.split('/').pop()) && servedBy(rule
 ok('⭐⭐ ไม่มีไฟล์นามสกุลเสี่ยงหลุดขึ้นเว็บแม้แต่ไฟล์เดียว',
   leaked.length === 0, leaked.join(' · '));
 const servedNow = all.filter((p) => servedBy(rules, p));
-ok('จำนวนไฟล์ที่ขึ้นเว็บต้องเท่ากับรายการที่ประกาศไว้',
-  servedNow.length === MUST_KEEP.length,
-  'ขึ้นเว็บ ' + servedNow.length + ' · ประกาศไว้ ' + MUST_KEEP.length +
-  ' · ส่วนต่าง: ' + servedNow.filter((p) => !MUST_KEEP.includes(p)).join(' · '));
+ok('ไม่มีไฟล์ที่ขึ้นเว็บโดยไม่ได้ประกาศไว้',
+  servedNow.every((p) => MUST_KEEP.includes(p)),
+  'เกินมา: ' + servedNow.filter((p) => !MUST_KEEP.includes(p)).join(' · '));
+
+/* ── ⭐⭐ ทิศที่ชุดนี้เคยมองไม่เห็น — "ลืมเปิดหน้าใหม่" ────────────────────
+   25 ส.ค. ICT ตัวตรวจอิสระพิสูจน์ว่า: วาง capacity.html + sql/84 เข้าโฟลเดอร์
+   โดยไม่แตะ .assetsignore เลย ⇒ ชุดนี้ได้ ✅ 58/58 เขียวสนิท
+   เพราะข้อข้างบนเดิมเทียบแค่ "จำนวน" — หน้าที่ยังไม่เปิดไม่ถูกนับ ⇒ 16 == 16
+
+   บนเว็บก็จับไม่ได้ เพราะ not_found_handling=single-page-application
+   ตอบ index.html + HTTP 200 ⇒ หน้าใหม่ "หายเงียบ" ได้ทั้งบนเครื่องและบนเว็บ
+
+   แก้ด้วยหลักเดียวกับยาม "ห้ามไฟล์หายเงียบเทียบรุ่นก่อน" ของภาค 1:
+   **ไล่ของจริงที่มีอยู่ ไม่ใช่เทียบกับรายการที่พิมพ์ไว้ในโค้ด** */
+console.log('\n— ⑤ข ทิศ "ลืมเปิด": ไล่ของจริงในโฟลเดอร์ทีละไฟล์ —');
+const rootHtml = all.filter((p) => !p.includes('/') && p.endsWith('.html'));
+for (const p of rootHtml) {
+  ok('หน้าเว็บ ' + p + ' ต้องถูกประกาศใน MUST_KEEP และเสิร์ฟได้',
+    MUST_KEEP.includes(p) && servedBy(rules, p),
+    MUST_KEEP.includes(p) ? 'ประกาศแล้วแต่ .assetsignore ยังไม่เปิด' : 'ยังไม่อยู่ใน MUST_KEEP');
+}
+for (const p of all.filter((q) => /^js\/[^/]+\.js$/.test(q) || /^css\/[^/]+\.css$/.test(q))) {
+  ok('ของประกอบหน้าเว็บ ' + p + ' ต้องเสิร์ฟได้', servedBy(rules, p));
+}
+const srcDirs = all.filter((p) => p.startsWith('sql/') || p.startsWith('test/'));
+const srcLeak = srcDirs.filter((p) => servedBy(rules, p));
+ok('⭐ ทุกไฟล์ใน sql/ และ test/ ต้องถูกปิด (ไล่ของจริง ' + srcDirs.length + ' ไฟล์)',
+  srcLeak.length === 0, srcLeak.join(' · '));
 
 /* ── ⑥ เทสต์ของเทสต์ — ถ้าไม่พิสูจน์ว่าแดงได้ ก็ยังไม่ใช่ยาม ───────────── */
 console.log('\n— ⑥ พิสูจน์ว่าชุดนี้แดงได้จริง —');

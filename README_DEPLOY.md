@@ -49,6 +49,7 @@ gameplearn-hub/
 | 17 | `66_STANDARDS_OWNERSHIP.sql` | **คำอธิบายที่ผู้ดูแลแก้ไว้ เกมทับไม่ได้** (รวมของไฟล์ `61` ไว้ครบแล้ว รันทับได้เลย · ไม่รัน = เกมเขียนทับข้อความของผู้ดูแลทุกครั้งที่ส่งซ้ำ) |
 | 18 | `71_STANDARDS_ADMIN_EDIT.sql` | **ผู้ดูแลแก้ "คำอธิบายที่ครูอ่าน" ได้จากหน้า Admin** (รวมของไฟล์ `61` + `66` ครบแล้ว รันแทนได้เลย · ไม่รัน = หน้า Admin ขึ้นคำเตือนและบันทึกไม่ได้ ส่วนอื่นปกติ) |
 | 19 | `72_PUBLIC_DASHBOARD.sql` | **หน้าสรุปผลรวมที่ทุกคนเปิดดูได้โดยไม่ต้องล็อกอิน** (`dashboard.html`) · ต้องรัน `43_REPORT_CARDS.sql` มาก่อน · ไม่รัน = หน้านั้นขึ้นข้อความบอกให้มารันไฟล์นี้ ส่วนอื่นปกติ |
+| 20 | `84_DB_CAPACITY.sql` | หน้าตรวจความจุฐานข้อมูล (`capacity.html`) — ไม่รันก็ใช้เว็บได้ตามปกติ แต่หน้านั้นจะบอกให้มารันไฟล์นี้ |
 | ท้ายสุด | `56_STD_CLEANUP_MANUAL.sql` | ลบผังที่กรอกมือทิ้ง — **รันเมื่อยืนยันแล้วว่าเกมส่งผังครบ** เท่านั้น<br>⚠️ รันคำสั่ง "ดูก่อน" ท้ายไฟล์ `71` ก่อนเสมอ (แคบลงมากแล้วหลังไฟล์ 71 — มักว่างเปล่า = รันได้เลย) |
 
 > **เว็บออกแบบให้ไม่พังถ้ายังรันไม่ครบ** — ส่วนที่ยังไม่มีข้อมูลจะขึ้นกล่องบอกว่า
@@ -167,10 +168,24 @@ for p in sql/60_ROOM_CLAIM.sql sql/83_VISIT_SOURCE.sql test/t_regress.mjs       
 done
 
 # ② ของที่ต้องยังเปิด — ห้ามได้ index.html
-for p in teacher.html admin.html js/config.js css/gp.css robots.txt favicon.svg ; do
+#    ⚠️ ห้ามตัดสินด้วย '<!doctype html>' — ทุกหน้า .html ก็ขึ้นต้นแบบนั้น
+#       ฉบับแรก (24 ส.ค.) ใช้วิธีนั้น จะรายงานว่าทุกหน้าหายทั้งที่เสิร์ฟถูกต้อง
+#       ต้องวัดด้วย "คำเฉพาะของหน้านั้น" แทน
+while IFS='|' read -r p key ; do
   b=$(curl -s "https://gameplearn.com/$p")
-  printf '%s' "$b" | head -1 | grep -qi '<!doctype html'     && echo "❌ $p หายไปแล้ว!" || echo "✅ $p ยังอยู่"
-done
+  printf '%s' "$b" | grep -q "$key" \
+    && echo "✅ $p ยังอยู่" || echo "❌ $p หายไปแล้ว! ($(printf '%s' "$b" | wc -c) ไบต์)"
+done <<'PAGES'
+teacher.html|ห้องเรียนของฉัน
+admin.html|ผู้ดูแลระบบ
+capacity.html|ความจุฐานข้อมูล
+dashboard.html|ผลการเรียนรู้
+standards.html|มาตรฐาน
+js/config.js|HUB_VERSION
+css/gp.css|--surface
+robots.txt|User-agent
+favicon.svg|<svg
+PAGES
 
 # ③ หัวความปลอดภัยจาก _headers ยังทำงาน (กัน F11 ถอย)
 curl -sI https://gameplearn.com/ | grep -iE 'content-security-policy|cache-control'

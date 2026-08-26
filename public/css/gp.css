@@ -374,32 +374,22 @@ a:hover { text-decoration: underline; }
   background: var(--accent-strong); border-color: var(--accent-strong); color: var(--on-accent);
 }
 .navlinks a.btn-primary:hover { filter: brightness(1.08); }
-/* หน้าครู/ผู้ดูแล มีชื่อผู้ใช้เพิ่มมาอีกชิ้น รวมแล้วกว้างเกินความกว้างสูงสุดของ .wrap เสมอ
-   ไม่ว่าจอจะกว้างแค่ไหน — จึงให้เมนูอยู่แถวล่างตายตัว ดูตั้งใจกว่าปล่อยให้ปุ่มหล่นทีละตัว */
-.topbar-app .navlinks {
+/* [V.1.6.28] เมนูหลักอยู่ "แถวสอง" ตายตัว **ทุกหน้า ทุกความกว้าง** — ครูทัก 25 ส.ค.:
+   กดจากหน้าแรก (เมนูแถวบน) ไปห้องเรียนของฉัน (เมนูแถวสอง) แล้วเมนูเด้งย้ายที่
+   เดิมกฎนี้ใช้เฉพาะ .topbar-app (3 หน้าแอป) + media ≤1180px (หน้า public)
+   ⇒ ตำแหน่งเมนูขึ้นกับหน้าและขนาดจอ · รวมเป็นกฎเดียวจบทั้งสองอาการ:
+   เมนูนิ่งทุกหน้า และปุ่มออกจากระบบเลิกตกบรรทัดบน dashboard/index
+   (วัดจริง @1280: ของในแถวบนตอนล็อกอิน ≈1064px แต่ .wrap ให้ 1044px — ล้น 20px
+    ขยาย breakpoint แก้ไม่ได้เพราะ .wrap ตันที่ 1080px ต่อให้จอ 4K)
+   จอแคบไม่กระทบ — กฎนี้ = กฎ media ≤1180px เดิมคำต่อคำ แค่ใช้ทุกความกว้าง */
+.topbar .navlinks {
   order: 10; flex-basis: 100%; width: 100%;
   overflow-x: auto; padding: 6px 0 0; margin-top: 2px;
   border-top: 1px dashed var(--grid); scrollbar-width: thin;
 }
-.topbar-app .navlinks a:first-child:not(.btn) { padding-left: 4px; }
-
-/* จอกลาง — ของในหัวเว็บเริ่มไม่พอที่ (โดยเฉพาะบัญชีผู้ดูแลที่มีปุ่มสลับโหมดเพิ่มมา)
-   ยกเมนูหลักลงไปเป็นแถวที่สองทั้งก้อน แถวบนเหลือ แบรนด์ · สลับโหมด · ปุ่มบัญชี
-
-   ⚠️ เพิ่ม breakpoint ให้ใหญ่ขึ้นแก้ปัญหาปุ่มตกบรรทัด **ไม่ได้** — .wrap กว้างสูงสุด 1080px
-   ต่อให้จอ 4K พื้นที่หัวเว็บก็เท่าเดิม ต้นเหตุจริงคือจำนวนปุ่ม ไม่ใช่ความกว้างจอ
-   (ดูวิธีแก้ที่ renderAuthButton ใน gp-brand.js — จำกัดปุ่มบนหัวเว็บไว้ที่ 2 ใบ) */
-@media (max-width: 1180px) {
-  .topbar .navlinks {
-    order: 10; flex-basis: 100%; width: 100%;
-    overflow-x: auto; padding: 6px 0 0; margin-top: 2px;
-    border-top: 1px dashed var(--grid);
-    scrollbar-width: thin;
-  }
-  /* ไม่ตัด padding ซ้ายของลิงก์แรก — สระหน้าอย่าง "เ" กินพื้นที่เลยกรอบตัวอักษร
-     พอกล่องมี overflow-x หัวอักษรจะโดนเฉือนหายไปครึ่งตัว */
-  .topbar .navlinks a:first-child:not(.btn) { padding-left: 4px; }
-}
+/* ไม่ตัด padding ซ้ายของลิงก์แรก — สระหน้าอย่าง "เ" กินพื้นที่เลยกรอบตัวอักษร
+   พอกล่องมี overflow-x หัวอักษรจะโดนเฉือนหายไปครึ่งตัว */
+.topbar .navlinks a:first-child:not(.btn) { padding-left: 4px; }
 
 @media (max-width: 720px) {
   .topbar { row-gap: 8px; padding: 10px 0; }

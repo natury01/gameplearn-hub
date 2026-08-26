@@ -27,8 +27,9 @@ for (const page of PUBLIC) {
     const items = [...nav.children].filter((x) => x.tagName === 'A');
     return { has: true, inTopbar: bar.contains(btn), href: btn.getAttribute('href'),
       text: btn.textContent.trim(), primary: btn.classList.contains('btn-primary'),
-      /* ต้องอยู่ใน "แถวบนสุด" จริง ๆ ไม่ใช่หลุดไปแถวล่างของหัวเว็บ */
-      onFirstRow: r.top - br.top < 60, visible: r.width > 0 && r.height > 0,
+      /* [V.1.6.28] เมนูอยู่แถวสองตายตัวทุกหน้า (มติครู 25 ส.ค. — เมนูต้องไม่เด้งย้ายที่)
+         ปุ่มจึงอยู่ "ในแถวเมนู" ไม่ใช่แถวบนสุดอีกแล้ว — คุมด้วยเพดานความสูงหัวเว็บแทน */
+      onFirstRow: r.top - br.top < 110, visible: r.width > 0 && r.height > 0,
       /* V.1.4.3 — ต้องอยู่ "ในเมนู ตัวแรกสุด" ตรงตำแหน่งที่ "เกมทั้งหมด" เคยอยู่ */
       inNav: nav.contains(btn), first: items[0] === btn,
       allGames: [...document.querySelectorAll('.navlinks a')]
@@ -39,7 +40,7 @@ for (const page of PUBLIC) {
          (ย้ายปุ่มเข้าเมนูรอบนี้ทำให้ addThemeButton หา anchor ผิดจนโยน NotFoundError มาแล้ว) */
       themeBtn: !!bar.querySelector(':scope > #gp-theme-btn') };
   });
-  ok(page + ' — มีปุ่มสร้างห้องเรียนบนหัวเว็บ และอยู่แถวบนสุด',
+  ok(page + ' — มีปุ่มสร้างห้องเรียนบนหัวเว็บ ในแถวเมนู (แถวสองตายตัว)',
     st.has && st.inTopbar && st.onFirstRow && st.visible, st);
   ok(page + ' — เป็นปุ่มหลัก (เด่นกว่าปุ่มอื่น) และชี้ไปหน้าสร้างห้อง',
     st.primary && st.href === 'teacher.html#/rooms' && st.text.includes('สร้างห้องเรียน'), st);
@@ -76,9 +77,11 @@ for (const [w, label] of [[1280, 'โน้ตบุ๊ก'], [1440, 'จอก�
       themeBtn: !!bar.querySelector(':scope > #gp-theme-btn'),
       over: document.documentElement.scrollWidth - window.innerWidth };
   });
-  /* หัวเว็บทั้งแถบสูงราว 65px = แถวเดียว · เกิน 100px = มีอะไรตกบรรทัด (จอเล็กยอมให้ตก) */
+  /* [V.1.6.28] เมนูลงแถวสองตายตัวทุกความกว้าง — หัวเว็บสองแถวโดยเจตนา ≈120px
+     เพดาน 140px ยังจับของจริงตก: แถวที่สามเมื่อไรจะทะลุ · ปุ่มบัญชีต้องแถวเดียวกันเสมอ
+     (ก่อนแก้ ปุ่มออกจากระบบเคยตกบรรทัดบน dashboard/index ตอนล็อกอิน — ครูเห็นจากจอจริง) */
   ok('หัวเว็บ @' + w + 'px (' + label + ') — ล็อกอินแล้วปุ่มบัญชี 2 ใบยังอยู่แถวเดียวกัน',
-    st.loggedIn && st.side === 2 && st.rows === 1 && (w < 700 || st.barH < 100), st);
+    st.loggedIn && st.side === 2 && st.rows === 1 && (w < 700 || st.barH < 140), st);
   ok('หัวเว็บ @' + w + 'px — ปุ่มสลับสว่าง/มืดยังอยู่ และหน้าไม่ล้นแนวนอน',
     st.themeBtn && st.over <= 1, st);
   await p.close();

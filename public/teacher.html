@@ -117,7 +117,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
               /* true = ฐานมีตารางใบรายงานผลแล้ว · false = ยังไม่ได้รัน 43 · null = ตรวจไม่ได้
                  ใช้แยกว่า "หน้าจอว่างเพราะยังไม่มีท่อ" หรือ "มีท่อแล้วแต่ยังไม่มีน้ำ" (ดู pipeNote) */
               has43: null };
-  let TAB = 'ach';   // 'ach' = ผลสัมฤทธิ์ | 'comp' = สมรรถนะ
+  let TAB = 'ach';   // 'ach' = ผลสัมฤทธิ์ | 'comp' = สมรรถนะ | 'cmp' = เทียบเกณฑ์ | 'cert' = เกียรติบัตร
+  /* [V.1.6.29 · ครูสั่ง] เกณฑ์เกียรติบัตรที่เลือกอยู่ — 'finish' เป็นค่าเริ่มต้นเพราะตรงกับ
+     กติกาใบในเกมทั้งสองภาค (เกมออกใบเมื่อผ่านครบทุกด่าน) · เกณฑ์อื่นเป็นระดับเกียรติยศเพิ่มเติม */
+  let CERT_RULE = 'finish';
   /* ตัวกรองห้องบนหน้า Dashboard — '' = รวมทุกห้องของฉัน · ไม่งั้นเป็น id ของห้องเดียว
      ทุกส่วนบนหน้านี้ (กล่องตัวเลข · เรดาร์ · ผลสัมฤทธิ์ · ตารางรายคน) อ่านค่าเดียวกันนี้
      ครูจึงเทียบ "ภาพรวมทุกห้อง" กับ "ห้องเดียว" ได้โดยไม่ต้องเปลี่ยนหน้า */
@@ -708,6 +711,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + '<button class="tab" role="tab" data-tab="comp" aria-selected="' + (TAB === 'comp') + '">สมรรถนะหลัก</button>'
       /* [V.1.6.22 · ครูสั่ง] แท็บเทียบเกณฑ์ — ยกมาจาก Dashboard ภาค 2 ตามที่ครูขอ */
       + '<button class="tab" role="tab" data-tab="cmp" aria-selected="' + (TAB === 'cmp') + '">เทียบเกณฑ์ (ครู/เพื่อน/ตนเอง)</button>'
+      /* [V.1.6.29 · ครูสั่ง] แท็บพิมพ์เกียรติบัตร — รายชื่อทั้งห้อง + เครื่องหมายว่าใครได้รับ + พิมพ์/ดาวน์โหลด */
+      + '<button class="tab" role="tab" data-tab="cert" aria-selected="' + (TAB === 'cert') + '">🏅 พิมพ์เกียรติบัตร</button>'
       /* [V.1.6.19 · ครูสั่ง] ตัดแท็บ "การคิดขั้นสูง (รายเกม)" ออก
          การคิดขั้นสูงเป็น 1 ใน 6 ด้านของกรอบสมรรถนะ มีแท็บของตัวเองแยกออกมา
          เป็นซากจากยุคที่เกมวัดได้ด้านเดียว ตอนนี้เป็นการแสดงของซ้ำสองที่
@@ -831,6 +836,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
     if (TAB === 'comp') {
       html += comp6Section(cid) + comp6Table(cid) + compSection(cid);
+    } else if (TAB === 'cert') {
+      html += certSection(cid);
     } else {
       html += pipeNote(achRows(cid).length > 0) + achSummaryCards(cid);
       /* รายการห้องตามตัวกรองด้วย — ไม่งั้นครูเลือกห้องเดียวแล้วยังเห็นทุกห้องข้างล่าง
@@ -1732,6 +1739,316 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + '(เปิดด้วย Excel ได้เลย ภาษาไทยไม่เพี้ยน)');
   }
 
+  /* ═════════════ [V.1.6.29 · ครูสั่ง] เกียรติบัตร + ส่งออกข้อมูล 5 หมวด ═════════════
+     เกียรติบัตร: เกณฑ์ค่าเริ่มต้น "จบเกมครบทุกด่าน" ตรงกับกติกาใบในเกมทั้งสองภาค
+     (ภาค 1 openCertificate ออกใบเมื่อผ่านครบ 14 ด่าน · ภาค 2 afterClear ออกเมื่อจบด่านรวบยอด)
+     เกณฑ์อื่นใช้ชุดที่ประกาศแล้วเท่านั้น: ACH_BANDS (ห้ามตั้งเกณฑ์ใหม่ — กติกาบรรทัดบน) และ
+     ระดับสมรรถนะที่เกมคิดแล้ว (LV_NAME) — เว็บกลางไม่คิดคะแนนแทนเกม */
+
+  const CERT_RULES = [
+    ['finish', 'จบเกมครบทุกด่าน (ตรงกับใบในเกม)'],
+    ['ach80',  'ผลสัมฤทธิ์ระดับดีเยี่ยม (80 ขึ้นไป)'],
+    ['lv5',    'สมรรถนะระดับ 5 ขึ้นไป (สามารถ/เหนือความคาดหวัง)'],
+  ];
+  /* คืนข้อมูลใบเมื่อ "ได้รับ" ตามเกณฑ์ · null = ไม่ได้รับ — ใช้ทั้งตาราง/พิมพ์/PNG จุดเดียว */
+  function certOf(sid, g) {
+    if (CERT_RULE === 'ach80') {
+      const a = achOf(sid, g.id);
+      return (a && a.percent >= 80)
+        ? { line: 'ได้รับผลสัมฤทธิ์ทางการเรียน ระดับดีเยี่ยม', sub: 'คะแนน ' + Math.round(a.percent) + '%' } : null;
+    }
+    if (CERT_RULE === 'lv5') {
+      const c = (S.comp || []).find((x) => x.student_id === sid && x.level >= 5
+        && ((x.game_id && x.game_id === g.id) || x.game_code === g.code));
+      return c ? { line: 'ได้รับการรับรองสมรรถนะ ระดับ ' + c.level + ' (' + (LV_NAME[c.level] || '') + ')',
+                   sub: 'คะแนนรวม ' + Math.round(c.total || 0) + '%' } : null;
+    }
+    const p = progOf(sid).find((x) => x.game_id === g.id && (x.progress_percent || 0) >= 100);
+    return p ? { line: 'ได้เรียนรู้และผ่านภารกิจครบทุกด่าน',
+                 sub: p.best_score != null ? 'คะแนนดีที่สุด ' + G.fmt(p.best_score) : '' } : null;
+  }
+  const thaiDate = () => new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+  function certMeta(r) {
+    const sch = (S.schools || []).find((x) => x.id === r.school_id);
+    return { school: sch ? sch.name : '', room: r.name || '', year: r.academic_year || '',
+             teacher: (S.teacher && S.teacher.display_name) || '' };
+  }
+
+  function certSection(cid) {
+    if (!cid) {
+      /* หน้ารวมทุกห้อง — ใบผูกกับห้อง/ปีการศึกษา ต้องเลือกห้องก่อนถึงพิมพ์ถูกใบ */
+      return '<div class="card muted">เลือกห้องจากตัวกรองด้านบน (หรือเปิดจากการ์ดห้อง) '
+        + 'เพื่อดูรายชื่อและพิมพ์เกียรติบัตรของห้องนั้น</div>';
+    }
+    const r = roomById(cid); if (!r) return '';
+    const stu = studentsOf(cid).filter(isOn);
+    const games = enabledGames(cid);
+    const ruleSel = '<label class="small">เกณฑ์การได้รับ '
+      + '<select data-cert-rule>' + CERT_RULES.map(([k, n]) =>
+          '<option value="' + k + '"' + (CERT_RULE === k ? ' selected' : '') + '>' + n + '</option>').join('')
+      + '</select></label>';
+    let got = 0;
+    const rows = stu.map((s) => {
+      const cells = games.map((g) => {
+        const c = certOf(s.id, g);
+        if (c) got++;
+        return '<td class="cert-cell">' + (c ? '🏅 ได้รับ' : '<span class="muted">–</span>') + '</td>';
+      }).join('');
+      const any = games.some((g) => certOf(s.id, g));
+      return '<tr><td class="num">' + G.esc(s.student_number || '') + '</td>'
+        + '<td>' + G.esc((s.first_name || '') + ' ' + (s.last_name || '')) + '</td>' + cells
+        + '<td>' + (any
+          ? '<button class="btn btn-sm" data-cert-print="' + cid + '|' + s.id + '">🖨️ พิมพ์</button> '
+            + '<button class="btn btn-sm" data-cert-png="' + cid + '|' + s.id + '">⬇ รูป</button>'
+          : '<span class="muted small">ยังไม่เข้าเกณฑ์</span>') + '</td></tr>';
+    }).join('');
+    return '<h2 class="section-title">พิมพ์เกียรติบัตร <span class="sub">ห้อง ' + G.esc(r.name)
+      + ' · ได้รับ ' + got + ' ใบ (นักเรียน ' + stu.length + ' คน × เกม ' + games.length + ')</span></h2>'
+      + '<div class="card"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'
+      + ruleSel
+      + '<button class="btn btn-primary" data-cert-print="' + cid + '|">🖨️ พิมพ์ทั้งห้อง (' + got + ' ใบ)</button>'
+      + '<button class="btn" data-cert-png="' + cid + '|">⬇ ดาวน์โหลดรูปทั้งห้อง</button>'
+      + '<span class="muted small">พิมพ์ = A4 แนวนอน ใบละหน้า · สั่งเป็น PDF ได้จากหน้าต่างพิมพ์ · รูป = PNG รายใบ</span>'
+      + '</div><div class="table-scroll"><table class="gol"><thead><tr>'
+      + '<th scope="col" class="num">เลขที่</th><th scope="col">ชื่อ–สกุล</th>'
+      + games.map((g) => '<th scope="col">' + G.esc(g.name) + '</th>').join('')
+      + '<th scope="col">พิมพ์ / ดาวน์โหลด</th></tr></thead><tbody>'
+      + (rows || '<tr><td colspan="9" class="muted">ยังไม่มีนักเรียนในห้องนี้</td></tr>')
+      + '</tbody></table></div></div>';
+  }
+
+  /* รายการใบที่จะออก — คู่ (นักเรียน, เกม) ที่เข้าเกณฑ์ · sid ว่าง = ทั้งห้อง */
+  function certList(cid, sid) {
+    const out = [];
+    studentsOf(cid).filter(isOn).forEach((s) => {
+      if (sid && s.id !== sid) return;
+      enabledGames(cid).forEach((g) => {
+        const c = certOf(s.id, g);
+        if (c) out.push({ s, g, c });
+      });
+    });
+    return out;
+  }
+
+  function certSheet(cid, sid) {
+    const r = roomById(cid); if (!r) return;
+    const list = certList(cid, sid);
+    if (!list.length) { showErr('ยังไม่มีใครเข้าเกณฑ์ที่เลือก — เปลี่ยนเกณฑ์หรือรอผลจากเกมก่อน'); return; }
+    const w = window.open('', '_blank', 'width=1100,height=800');
+    if (!w) { showErr('เบราว์เซอร์บล็อกหน้าต่างใหม่ — อนุญาต pop-up ให้เว็บนี้ก่อน'); return; }
+    const m = certMeta(r); const esc = G.esc;
+    const paper = (x) =>
+      '<div class="cert"><div class="in">'
+      + '<div class="brand">GamePlearn · เกมเพลิน</div>'
+      + '<div class="t1">เกียรติบัตร</div>'
+      + '<div class="t2">ฉบับนี้ให้ไว้เพื่อแสดงว่า</div>'
+      + '<div class="name">' + esc((x.s.first_name || '') + ' ' + (x.s.last_name || '')) + '</div>'
+      + '<div class="line">' + esc(x.c.line) + '</div>'
+      + '<div class="game">เกม ' + esc(x.g.name) + (x.c.sub ? ' · ' + esc(x.c.sub) : '') + '</div>'
+      + '<div class="meta">' + esc([m.school, 'ห้อง ' + m.room, m.year ? 'ปีการศึกษา ' + m.year : '']
+          .filter(Boolean).join(' · ')) + '</div>'
+      + '<div class="date">ให้ไว้ ณ วันที่ ' + esc(thaiDate()) + '</div>'
+      + '<div class="sign">ลงชื่อ<span class="sigline"></span><b>' + esc(m.teacher) + '</b>ครูผู้สอน</div>'
+      + '<div class="foot">www.GamePlearn.com</div>'
+      + '</div></div>';
+    w.document.write('<!doctype html><html lang="th"><head><meta charset="utf-8">'
+      + '<title>เกียรติบัตร ' + esc(r.name) + '</title><style>'
+      + '@page{size:A4 landscape;margin:0}'
+      + 'body{margin:0;font-family:"Sarabun","Noto Sans Thai",system-ui,sans-serif;color:#3b2f14}'
+      + '.cert{width:297mm;height:209mm;box-sizing:border-box;padding:10mm;page-break-after:always;'
+      +   'display:flex;background:#fffdf5;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+      + '.in{flex:1;border:2.2mm solid #b45309;outline:0.6mm solid #b45309;outline-offset:-4.4mm;'
+      +   'border-radius:4mm;text-align:center;padding:12mm 14mm;display:flex;flex-direction:column}'
+      + '.brand{font-size:17px;letter-spacing:2px;color:#92600a;font-weight:700}'
+      + '.t1{font-size:56px;font-weight:800;margin:8mm 0 2mm;color:#7c3f06}'
+      + '.t2{font-size:19px;color:#6b5527}'
+      + '.name{font-size:42px;font-weight:800;margin:6mm 0 2mm;border-bottom:0.5mm solid #d8b56a;'
+      +   'display:inline-block;align-self:center;padding:0 12mm 2mm}'
+      + '.line{font-size:22px;margin-top:4mm}'
+      + '.game{font-size:20px;font-weight:700;color:#92600a;margin-top:1.5mm}'
+      + '.meta{font-size:16px;color:#6b5527;margin-top:5mm}'
+      + '.date{font-size:16px;color:#6b5527;margin-top:2mm}'
+      + '.sign{margin-top:auto;font-size:16px;color:#3b2f14}'
+      + '.sign b{display:block;font-size:19px;margin-top:1mm}'
+      + '.sigline{display:block;width:52mm;margin:9mm auto 0;border-bottom:0.4mm solid #3b2f14}'
+      + '.foot{font-size:13px;color:#a08040;margin-top:3mm}'
+      + '</style></head><body>' + list.map(paper).join('') + '</body></html>');
+    w.document.close(); w.focus();
+    setTimeout(() => { try { w.print(); } catch (e) {} }, 350);
+  }
+
+  /* PNG A4 แนวนอน ~150dpi — ขนาดเดียวกับใบของภาค 1 (1754×1240) เผื่อครูเอาไปใช้ปนกัน */
+  function certPngOne(x, r) {
+    const m = certMeta(r);
+    const cv = document.createElement('canvas'); cv.width = 1754; cv.height = 1240;
+    const ctx = cv.getContext('2d');
+    const F = '"Sarabun","Noto Sans Thai",system-ui,sans-serif';
+    ctx.fillStyle = '#fffdf5'; ctx.fillRect(0, 0, 1754, 1240);
+    ctx.strokeStyle = '#b45309'; ctx.lineWidth = 14; ctx.strokeRect(46, 46, 1662, 1148);
+    ctx.lineWidth = 4; ctx.strokeRect(72, 72, 1610, 1096);
+    ctx.textAlign = 'center'; const cx = 877;
+    const t = (txt, y, font, color) => { ctx.font = font; ctx.fillStyle = color; ctx.fillText(txt, cx, y); };
+    t('GamePlearn · เกมเพลิน', 170, '700 30px ' + F, '#92600a');
+    t('เกียรติบัตร', 300, '800 104px ' + F, '#7c3f06');
+    t('ฉบับนี้ให้ไว้เพื่อแสดงว่า', 370, '400 36px ' + F, '#6b5527');
+    const name = (x.s.first_name || '') + ' ' + (x.s.last_name || '');
+    t(name, 490, '800 76px ' + F, '#3b2f14');
+    const nw = Math.min(ctx.measureText(name).width + 80, 1400);
+    ctx.strokeStyle = '#d8b56a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(cx - nw / 2, 520); ctx.lineTo(cx + nw / 2, 520); ctx.stroke();
+    t(x.c.line, 610, '400 42px ' + F, '#3b2f14');
+    t('เกม ' + x.g.name + (x.c.sub ? ' · ' + x.c.sub : ''), 675, '700 38px ' + F, '#92600a');
+    t([m.school, 'ห้อง ' + m.room, m.year ? 'ปีการศึกษา ' + m.year : ''].filter(Boolean).join(' · '),
+      780, '400 32px ' + F, '#6b5527');
+    t('ให้ไว้ ณ วันที่ ' + thaiDate(), 835, '400 32px ' + F, '#6b5527');
+    ctx.strokeStyle = '#3b2f14'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx - 130, 1010); ctx.lineTo(cx + 130, 1010); ctx.stroke();
+    t('ลงชื่อ', 960, '400 30px ' + F, '#3b2f14');
+    t(m.teacher, 1055, '700 36px ' + F, '#3b2f14');
+    t('ครูผู้สอน', 1100, '400 30px ' + F, '#3b2f14');
+    t('www.GamePlearn.com', 1165, '400 26px ' + F, '#a08040');
+    /* toDataURL แทน toBlob — ภาค 1 เคยเจอ toBlob เงียบหายบางเครื่อง (บทเรียนที่จดไว้ในเกม) */
+    const a = document.createElement('a');
+    a.href = cv.toDataURL('image/png');
+    a.download = 'GamePlearn-Cert-' + asciiRoom(r) + '-' + String(x.s.student_number || 'x')
+      + '-' + (x.g.code || 'game').replace(/[^A-Za-z0-9]+/g, '') + '.png';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => a.remove(), 4000);
+  }
+  async function certPng(cid, sid) {
+    const r = roomById(cid); if (!r) return;
+    const list = certList(cid, sid);
+    if (!list.length) { showErr('ยังไม่มีใครเข้าเกณฑ์ที่เลือก'); return; }
+    /* รอฟอนต์ไทยพร้อมก่อนวาด — ไม่งั้นใบแรกได้ฟอนต์สำรอง (บทเรียนภาค 2 จดไว้ในเกม) */
+    try { await document.fonts.ready; } catch (e) {}
+    for (let i = 0; i < list.length; i++) {
+      certPngOne(list[i], r);
+      /* เว้นจังหวะ — เบราว์เซอร์บางตัวกลืนดาวน์โหลดที่ยิงติดกันเร็วเกิน */
+      if (i < list.length - 1) await new Promise((res) => setTimeout(res, 400));
+    }
+    showOk('⬇ ดาวน์โหลดเกียรติบัตรแล้ว ' + list.length + ' ใบ');
+  }
+
+  /* ───────────── ส่งออกข้อมูลห้อง 5 หมวด (CSV มาตรฐาน หมวดละไฟล์) ─────────────
+     ทำไมหมวดละไฟล์: CSV มาตรฐาน = 1 ไฟล์ 1 ตาราง — ยัดหลายหมวดในไฟล์เดียวแล้ว
+     Excel จะ sort/filter พังทันที · ใช้สูตร BOM+CRLF+ชื่อไฟล์ ASCII ชุดเดียวกับ roomCsv */
+  function asciiRoom(r) {
+    const part = String(r.name || '')
+      .replace(/([อปม])\s*\.?\s*/g, (mm, c) => GRADE_ASCII[c] || '')
+      .replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return (part ? part + '-' : '') + (r.join_key || 'room');
+  }
+  function csvDl(fileBase, head, body) {
+    const cell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const csv = '﻿' + [head].concat(body).map((row) => row.map(cell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = fileBase + '.csv';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000);
+  }
+  const stuCols = (s) => [s.student_number || '', s.first_name || '', s.last_name || ''];
+  const STU_HEAD = ['เลขที่', 'ชื่อ', 'นามสกุล'];
+  /* วันเวลาแบบที่ Excel ไทยอ่านออกและ sort ได้ */
+  const xTime = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : '');
+
+  const ROOM_EXPORTS = {
+    ach: { th: 'ผลสัมฤทธิ์', make(cid) {
+      const body = [];
+      studentsOf(cid).forEach((s) => enabledGames(cid).forEach((g) => {
+        const a = achOf(s.id, g.id); if (!a) return;
+        const b = a.percent != null ? achBandOf(a.percent) : null;
+        body.push(stuCols(s).concat([g.name, a.percent != null ? Math.round(a.percent) : '',
+          b ? b.name : '', a.criteria_note || '', a.is_legacy ? 'ข้อมูลชุดเก่า' : '', xTime(a.computed_at)]));
+      }));
+      return { head: STU_HEAD.concat(['เกม', 'คะแนน (%)', 'ช่วงคะแนน', 'เกณฑ์ที่เกมใช้', 'หมายเหตุ', 'คำนวณเมื่อ']), body };
+    } },
+    comp: { th: 'สมรรถนะหลัก', make(cid) {
+      const body = [];
+      studentsOf(cid).forEach((s) => (S.comp || []).filter((x) => x.student_id === s.id)
+        .forEach((c) => {
+          const g = (S.games || []).find((x) => x.id === c.game_id || x.code === c.game_code);
+          body.push(stuCols(s).concat([g ? g.name : (c.game_code || ''),
+            c.total != null ? Math.round(c.total) : '', c.level || '', LV_NAME[c.level] || c.level_label || '',
+            c.ctc != null ? Math.round(c.ctc) : '', c.stm != null ? Math.round(c.stm) : '',
+            c.crt != null ? Math.round(c.crt) : '', c.prb != null ? Math.round(c.prb) : '',
+            c.research_eligible ? 'เข้าเกณฑ์วิจัย' : '', c.game_version || '']));
+        }));
+      return { head: STU_HEAD.concat(['เกม', 'คะแนนรวม (%)', 'ระดับ', 'ชื่อระดับ',
+        'คิดวิเคราะห์ (CTC)', 'คิดเป็นระบบ (STM)', 'คิดสร้างสรรค์ (CRT)', 'แก้ปัญหา (PRB)',
+        'สถานะวิจัย', 'รุ่นเกม']), body };
+    } },
+    total: { th: 'คะแนนรวม-ความคืบหน้า', make(cid) {
+      const body = [];
+      studentsOf(cid).forEach((s) => progOf(s.id).forEach((p) => {
+        const g = gameById(p.game_id);
+        body.push(stuCols(s).concat([g ? g.name : '', p.progress_percent != null ? Math.round(p.progress_percent) : '',
+          p.best_score != null ? p.best_score : '', p.attempts_count || 0, xTime(p.last_played_at)]));
+      }));
+      return { head: STU_HEAD.concat(['เกม', 'ความคืบหน้า (%)', 'คะแนนดีที่สุด', 'จำนวนครั้งที่เล่น', 'เล่นล่าสุด']), body };
+    } },
+    stage: { th: 'รายด่าน', async make(cid) {
+      /* คะแนนรายด่านไม่ได้อยู่ในของที่หน้าโหลดไว้ — ดึงสดเฉพาะตอนกด (เฉพาะเด็กห้องนี้ kind=progress) */
+      const ids = studentsOf(cid).map((s) => s.id);
+      const evs = ids.length ? await G.get('/rest/v1/events?kind=eq.progress'
+        + '&select=student_id,game_id,stage_id,score,created_at'
+        + '&student_id=in.(' + ids.join(',') + ')&order=created_at') : [];
+      const best = {}; // sid|game|stage → {score สูงสุด, ครั้ง, ล่าสุด}
+      evs.forEach((e) => {
+        const k = e.student_id + '|' + e.game_id + '|' + (e.stage_id || '');
+        const b = best[k] || (best[k] = { score: null, n: 0, last: '' });
+        b.n++; b.last = e.created_at;
+        if (e.score != null && (b.score == null || e.score > b.score)) b.score = e.score;
+      });
+      const body = [];
+      studentsOf(cid).forEach((s) => Object.keys(best).forEach((k) => {
+        const [sid2, gid, stage] = k.split('|'); if (sid2 !== s.id) return;
+        const g = gameById(gid); const b = best[k];
+        body.push(stuCols(s).concat([g ? g.name : '', stage || '–',
+          b.score != null ? b.score : '', b.n, xTime(b.last)]));
+      }));
+      return { head: STU_HEAD.concat(['เกม', 'ด่าน', 'คะแนนดีที่สุด', 'จำนวนครั้ง', 'เล่นล่าสุด']), body };
+    } },
+    dims: { th: 'สมรรถนะรายด้าน', make(cid) {
+      const evTh = { scored: 'เกมวัดจากการเล่น', observed: 'สังเกต/ประกอบ', self_report: 'ประเมินตนเอง' };
+      const body = [];
+      studentsOf(cid).forEach((s) => (S.compDims || []).filter((x) => x.student_id === s.id)
+        .forEach((d) => {
+          const c6 = COMP6.find((x) => x[0] === d.comp_code);
+          const g = d.game_id ? gameById(d.game_id) : null;
+          body.push(stuCols(s).concat([c6 ? c6[1] : (d.comp_code || ''), g ? g.name : '',
+            d.score != null ? Math.round(d.score) : '', d.level || '',
+            LV_NAME[d.level] || d.level_label || (d.level == null ? 'กำลังเก็บหลักฐาน' : ''),
+            evTh[d.evidence] || d.evidence || '', d.decided_by === 'teacher' ? 'ครู' : 'เกม',
+            d.criteria_note || '']));
+        }));
+      return { head: STU_HEAD.concat(['ด้านสมรรถนะ', 'เกม', 'คะแนน', 'ระดับ', 'ชื่อระดับ',
+        'ที่มาหลักฐาน', 'ผู้ตัดสิน', 'หมายเหตุเกณฑ์']), body };
+    } },
+  };
+  function exportBar(cid) {
+    const btn = (k) => '<button class="btn btn-sm" data-export-room="' + cid + '|' + k + '">'
+      + '⬇ ' + ROOM_EXPORTS[k].th + '</button>';
+    return '<div class="card" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+      + '<b class="small">ส่งออกข้อมูลห้อง (CSV เปิดใน Excel ได้เลย):</b>'
+      + ['ach', 'comp', 'total', 'stage', 'dims'].map(btn).join('')
+      + '<button class="btn btn-sm btn-primary" data-export-room="' + cid + '|all">⬇ ทั้งชุด 5 ไฟล์</button>'
+      + '<span class="muted small">หมวดละไฟล์ หัวคอลัมน์ภาษาไทย — แยกไฟล์เพื่อให้ sort/filter ใน Excel ไม่พัง</span>'
+      + '</div>';
+  }
+  async function exportRoom(cid, kind) {
+    const r = roomById(cid); if (!r) return;
+    const kinds = kind === 'all' ? ['ach', 'comp', 'total', 'stage', 'dims'] : [kind];
+    for (let i = 0; i < kinds.length; i++) {
+      const k = kinds[i]; const ex = ROOM_EXPORTS[k];
+      const d = await ex.make(cid);
+      if (!d.body.length) { showErr('หมวด "' + ex.th + '" ยังไม่มีข้อมูลของห้องนี้'); continue; }
+      csvDl('GamePlearn-' + asciiRoom(r) + '-' + k, d.head, d.body);
+      if (i < kinds.length - 1) await new Promise((res) => setTimeout(res, 450));
+    }
+    showOk('⬇ ส่งออกข้อมูลห้อง <b>' + G.esc(r.name) + '</b> แล้ว');
+  }
+
   function bindRoomActions() {
     document.querySelectorAll('[data-edit-room]').forEach(function (b) {
       b.onclick = function () {
@@ -2087,7 +2404,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + tabs();
 
     /* [V.1.6.19] แท็บการคิดขั้นสูงถูกตัดออกตามคำสั่งครู — ดูที่แท็บสมรรถนะแทน */
-    if (TAB === 'cmp') {
+    /* [V.1.6.29 · ครูสั่ง] แถบส่งออก 5 หมวด — โชว์ทุกแท็บของหน้าห้อง จะได้ไม่ต้องหา */
+    html += exportBar(cid);
+
+    if (TAB === 'cert') {
+      html += certSection(cid);
+    } else if (TAB === 'cmp') {
       /* [V.1.6.22 · ครูสั่ง] เทียบเกณฑ์ เกม/ครู/เพื่อน/ตนเอง */
       html += '<h2 class="section-title">เทียบเกณฑ์ '
         + '<span class="sub">เกม · ครู · เพื่อน · ตนเอง — ดูว่าสี่แหล่งเห็นตรงกันไหม</span></h2>'
@@ -3083,7 +3405,23 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const t = ev.target.closest('[data-tab]');
     if (t) { TAB = t.getAttribute('data-tab'); route(); return; }
     const c = ev.target.closest('[data-copy]');
-    if (c) { navigator.clipboard && navigator.clipboard.writeText(c.getAttribute('data-copy')); c.textContent = 'คัดลอกแล้ว ✓'; }
+    if (c) { navigator.clipboard && navigator.clipboard.writeText(c.getAttribute('data-copy')); c.textContent = 'คัดลอกแล้ว ✓'; return; }
+    /* [V.1.6.29] เกียรติบัตร + ส่งออก 5 หมวด — ค่าใน data-* เป็น "cid|sid" / "cid|kind" */
+    const cp = ev.target.closest('[data-cert-print]');
+    if (cp) { const p = cp.getAttribute('data-cert-print').split('|'); certSheet(p[0], p[1] || ''); return; }
+    const cg = ev.target.closest('[data-cert-png]');
+    if (cg) { const p = cg.getAttribute('data-cert-png').split('|'); certPng(p[0], p[1] || ''); return; }
+    const xr = ev.target.closest('[data-export-room]');
+    if (xr) {
+      const p = xr.getAttribute('data-export-room').split('|');
+      xr.disabled = true;
+      exportRoom(p[0], p[1]).catch((e) => showErr('ส่งออกไม่สำเร็จ: ' + (e && e.message ? e.message : e)))
+        .finally(() => { xr.disabled = false; });
+    }
+  });
+  document.addEventListener('change', function (ev) {
+    const cr = ev.target.closest('[data-cert-rule]');
+    if (cr) { CERT_RULE = cr.value; route(); }
   });
   document.addEventListener('change', async function (ev) {
     const a = ev.target.closest('[data-assign]');

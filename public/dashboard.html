@@ -87,8 +87,10 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
         <label class="f">เกม
           <select id="f-game"><option value="">ทุกเกม</option></select></label>
         <!-- [V.1.6.31 · A12] ทางออกจากตัวกรองในกริ๊กเดียว — เดิมครูที่เลือกไป 3 ช่องแล้วเจอจอว่าง
-             ต้องไล่ตั้งกลับทีละช่องเองว่าช่องไหนทำข้อมูลหาย -->
-        <button type="button" class="btn btn-sm" id="f-clear" style="align-self:end">↺ ล้างตัวกรอง</button>
+             ต้องไล่ตั้งกลับทีละช่องเองว่าช่องไหนทำข้อมูลหาย
+             [V.1.6.32 · HUB ทัก] เลิก inline style — ปุ่มเป็น grid item เลยยืดเท่าช่อง select
+             ดูเป็นช่องกรอก · กติกาขนาดอยู่ที่ gp.css (.dashfilters > .btn) -->
+        <button type="button" class="btn btn-sm" id="f-clear">↺ ล้างตัวกรอง</button>
       </div>
       <div class="muted small" id="scope-note" style="margin-top:8px" role="status"></div>
     </section>
@@ -192,7 +194,8 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
       s += '<text x="' + (LW - 10) + '" y="' + (y + 21) + '" text-anchor="end" fill="var(--ink)"'
         + ' font-size="14">' + esc(lab) + '</text>';
       if (has) {
-        s += '<g><title>' + esc(r.label) + ': ' + r.v + (opt.unit || '')
+        /* [V.1.6.32] tooltip ใช้ชื่อเต็มจากเกมเสมอ (r.full) — ป้ายที่แสดงอาจถูกถอดรูปแบบ */
+        s += '<g><title>' + esc(r.full || r.label) + ': ' + r.v + (opt.unit || '')
           + (r.note ? ' · ' + esc(r.note) : '') + '</title>'
           + '<rect x="' + LW + '" y="' + (y + 7) + '" width="' + bw(r.v) + '" height="' + (H - 14)
           + '" rx="4" fill="var(--s1)"/></g>';
@@ -322,16 +325,33 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
             ตอนตัวกรองเกมเป็น "ทุกเกม" เติมชื่อเกมนำหน้าป้าย · เลือกเกมเดียวอยู่แล้วไม่เติมซ้ำ
             (รองรับรูปเก่าที่ไม่มี game ด้วย — ระหว่างที่ครูยังไม่ได้รัน 88) */
       const oneGame = !!$('f-game').value;
+      /* [V.1.6.32 · ครูทัก + สเปก HUB] สามเรื่องในจุดเดียว:
+         ① ฐานเรียง unit_name แบบข้อความ ⇒ "ด่านที่ 1 · 10 · 11 · … · 2" ผิดลำดับบนจอ
+            → ดึงเลขจาก "ด่านที่ N" มาเป็นตัวเรียงตัวเลข (ช่องไม่มีเลขไปท้าย เรียงตามชื่อ)
+         ② ครูสั่งถอดเลขด่านออกจากป้ายแท่ง + "(เต็ม N)" ตัดได้เพราะแท่งเป็น % แล้ว
+            → ป้ายที่แสดง = ชื่อด่านล้วน (ยาวสุด ~24 ตัว ไม่ถูกตัดอีก)
+         ③ กติกาเหล็ก "ชื่อช่องมาจากเกม" ยังครบ: ตัดรูปแบบออกจาก "ป้ายที่แสดง" เท่านั้น
+            ห้ามแปล/ย่อ/ตั้งชื่อใหม่ · ชื่อเต็มอยู่ในตารางและ tooltip เสมอ (ข้อยกเว้นแคบ
+            ที่ HUB ยื่นเข้าสัญกรณ์กลาง P-HUB-10) */
       const uAll = units.map((x) => {
-        const m = /\(เต็ม\s*([0-9.]+)\)/.exec(String(x.name || ''));
+        const nm = String(x.name || '');
+        const m = /\(เต็ม\s*([0-9.]+)\)/.exec(nm);
         const ceil = m ? Number(m[1]) : null;
-        return { game: x.game || '', name: x.name, n: x.n, avg: Number(x.avg),
+        const sn = /ด่านที่\s*(\d+)/.exec(nm);
+        const short = nm.replace(/^ด่านที่\s*\d+\s*/, '').replace(/\s*\(เต็ม\s*[0-9.]+\)\s*$/, '');
+        const prefix = (!oneGame && x.game ? x.game + ' · ' : '');
+        return { game: x.game || '', name: nm, n: x.n, avg: Number(x.avg),
+          stageNo: sn ? Number(sn[1]) : null,
           pct: ceil ? Math.round(Number(x.avg) / ceil * 1000) / 10 : null,
-          label: (!oneGame && x.game ? x.game + ' · ' : '') + x.name };
+          label: prefix + short, full: prefix + nm };
       });
+      uAll.sort((a, b) => (a.game < b.game ? -1 : a.game > b.game ? 1 : 0)
+        || ((a.stageNo == null) - (b.stageNo == null))
+        || (a.stageNo != null && b.stageNo != null ? a.stageNo - b.stageNo : 0)
+        || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
       const withCeil = uAll.filter((x) => x.pct != null);
       const noCeil = uAll.filter((x) => x.pct == null);
-      const ub = withCeil.map((x) => ({ label: x.label, v: x.pct,
+      const ub = withCeil.map((x) => ({ label: x.label, full: x.full, v: x.pct,
         note: 'เฉลี่ย ' + x.avg + ' จาก ' + x.n + ' รายการ' }));
       const ucols = [];
       if (!oneGame && uAll.some((x) => x.game)) ucols.push(['เกม', (r) => r.game || '—']);

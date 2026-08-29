@@ -70,8 +70,32 @@ console.log('\n═══ 3) ตัวเลขที่ฐานส่งมา 
   /* [V.1.6.31 · A7+ข้อ C] เส้นทางกราฟ % ต้องถูกรันจริง (ผู้ตรวจหักล้างจับได้ว่าชุดเดิม
      fixture รูปเก่าทำให้กิ่งนี้ไม่เคยถูกทดสอบเลยทั้งที่แบตเตอรี่เขียว) */
   ok('⭐ แท่งคะแนนเก็บเป็น % ของเพดานช่องนั้น (60/80 → 75%)', t.includes('75%'), '');
-  ok('⭐ "(เต็ม N)" รอดการตัดป้าย (ตัดจากหัว ไม่ใช่ท้าย)', t.includes('(เต็ม 80)'), '');
   ok('มีคำอธิบายว่าแท่งเทียบเป็น % ของคะแนนเต็ม', t.includes('% ของคะแนนเต็ม'), '');
+  /* [V.1.6.32 · ครูทัก + สเปก HUB] ล็อกกติกาป้าย/ลำดับสองทาง:
+     ป้ายที่แสดง (text) ต้องไม่มี "ด่านที่ N"/"(เต็ม N)" · ชื่อเต็มต้องอยู่ใน tooltip (title)
+     · ลำดับแท่งเรียงด้วยเลขด่าน (fixture จงใจส่ง 10 มาก่อน 2 แบบที่ฐานเรียงข้อความจริง) */
+  const lb = await p.evaluate(() => {
+    const box = [...document.querySelectorAll('.chartbox svg')]
+      .find((s) => (s.getAttribute('aria-label') || '').includes('ร้อยละของคะแนนเต็ม'));
+    const texts = box ? [...box.querySelectorAll('text')].map((x) => x.textContent) : [];
+    const titles = box ? [...box.querySelectorAll('title')].map((x) => x.textContent) : [];
+    return { texts, titles };
+  });
+  ok('⭐ ป้ายแท่งไม่มีเลขด่านและ "(เต็ม N)" แล้ว (ครูสั่งถอด)',
+    lb.texts.length > 0 && !lb.texts.some((x) => /ด่านที่\s*\d|\(เต็ม/.test(x)), JSON.stringify(lb.texts.slice(0, 6)));
+  ok('⭐ ชื่อเต็มจากเกมยังอยู่ครบใน tooltip (กติกาเหล็กไม่แตก)',
+    lb.titles.some((x) => x.includes('ด่านที่ 10 มินิเกม จัดการน้ำในเขื่อน (เต็ม 10)')), '');
+  const i2 = lb.texts.findIndex((x) => x.includes('สุสานทหารสัมพันธมิตร'));
+  const i10 = lb.texts.findIndex((x) => x.includes('จัดการน้ำในเขื่อน'));
+  ok('⭐ ลำดับแท่งเรียงตามเลขด่านจริง (ด่าน 2 มาก่อนด่าน 10 แม้ฐานส่ง 10 มาก่อน)',
+    i2 >= 0 && i10 >= 0 && i2 < i10, 'i2=' + i2 + ' i10=' + i10);
+  const btnW = await p.evaluate(() => {
+    const b = document.getElementById('f-clear');
+    const s = b ? getComputedStyle(b) : null;
+    return s ? { js: s.justifySelf, w: b.getBoundingClientRect().width } : null;
+  });
+  ok('ปุ่มล้างตัวกรองไม่ยืดเต็มช่องกริด (justify-self:start)',
+    Boolean(btnW && btnW.js === 'start' && btnW.w < 190), JSON.stringify(btnW));
   ok('⭐ ช่องภาค 2 ที่ไม่บอกเพดาน ไปอยู่ตาราง ไม่ปนแกนกราฟ', t.includes('น้ำตกเอราวัณ'), '');
   ok('ตารางบอกชื่อเกมที่ไม่บอกเพดาน ไม่ใช่แค่ "บางเกม"', t.includes('ภาค 2 ไม่ได้บอกคะแนนเต็ม'), '');
   /* [V.1.6.31 · A6] สไตล์ของชิปที่เลือกต้องมีจริงใน CSS ไม่ใช่แค่ attribute ถูก

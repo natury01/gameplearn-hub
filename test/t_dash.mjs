@@ -67,6 +67,24 @@ console.log('\n═══ 3) ตัวเลขที่ฐานส่งมา 
   ok('⭐ แยกคะแนนเก็บ/คะแนนสอบให้ตามที่เกมส่งมา',
     t.includes('คะแนนเก็บ') && t.includes('คะแนนสอบ'), '');
   ok('บอกว่าชื่อช่องมาจากเกม ไม่ใช่เว็บกลางตั้งเอง', t.includes('ชื่อช่องมาจากเกมโดยตรง'), '');
+  /* [V.1.6.31 · A7+ข้อ C] เส้นทางกราฟ % ต้องถูกรันจริง (ผู้ตรวจหักล้างจับได้ว่าชุดเดิม
+     fixture รูปเก่าทำให้กิ่งนี้ไม่เคยถูกทดสอบเลยทั้งที่แบตเตอรี่เขียว) */
+  ok('⭐ แท่งคะแนนเก็บเป็น % ของเพดานช่องนั้น (60/80 → 75%)', t.includes('75%'), '');
+  ok('⭐ "(เต็ม N)" รอดการตัดป้าย (ตัดจากหัว ไม่ใช่ท้าย)', t.includes('(เต็ม 80)'), '');
+  ok('มีคำอธิบายว่าแท่งเทียบเป็น % ของคะแนนเต็ม', t.includes('% ของคะแนนเต็ม'), '');
+  ok('⭐ ช่องภาค 2 ที่ไม่บอกเพดาน ไปอยู่ตาราง ไม่ปนแกนกราฟ', t.includes('น้ำตกเอราวัณ'), '');
+  ok('ตารางบอกชื่อเกมที่ไม่บอกเพดาน ไม่ใช่แค่ "บางเกม"', t.includes('ภาค 2 ไม่ได้บอกคะแนนเต็ม'), '');
+  /* [V.1.6.31 · A6] สไตล์ของชิปที่เลือกต้องมีจริงใน CSS ไม่ใช่แค่ attribute ถูก
+     (ผู้ตรวจหักล้างจับได้: เปลี่ยน attribute แล้วไม่มี .chip[aria-selected] ใน CSS = ชิปหน้าตาเหมือนกันหมด) */
+  const chipStyle = await p.evaluate(() => {
+    const on = document.querySelector('.chip[aria-selected="true"]');
+    const off = document.querySelector('.chip[aria-selected="false"]');
+    return { on: on ? getComputedStyle(on).backgroundColor : null,
+      off: off ? getComputedStyle(off).backgroundColor : null };
+  });
+  ok('⭐ ชิปที่เลือกมีพื้นสีต่างจากตัวที่ไม่เลือกจริง (CSS จับ aria-selected)',
+    Boolean(chipStyle.on && chipStyle.off && chipStyle.on !== chipStyle.off),
+    JSON.stringify(chipStyle));
   await p.close();
 }
 
@@ -105,9 +123,19 @@ console.log('\n═══ 5) แยกตามกลุ่ม 4 แบบ — �
   const body = JSON.parse(calls.filter((c) => String(c[1]).includes('rpc_pub_breakdown')).pop()[2] || '{}');
   ok('กดแล้วยิงคำขอใหม่จริง', after === before + 1, { before, after });
   ok('ส่งกลุ่มที่เลือกไปให้ฐานถูกตัว', body.p_group === 'classroom', body);
-  const pressed = await p.evaluate(() =>
-    (document.querySelector('[data-group="classroom"]') || {}).getAttribute('aria-pressed'));
-  ok('ปุ่มที่เลือกอยู่บอกสถานะให้โปรแกรมอ่านหน้าจอด้วย (aria-pressed)', pressed === 'true', pressed);
+  /* [V.1.6.31 · A6] เปลี่ยนมาตรฐานจาก aria-pressed → aria-selected (รวมให้ตรงหน้าครู)
+     ล็อกกติกาใหม่ "สองทาง" ไม่ใช่แค่กลับด้านคำตอบ: ของใหม่ต้องมี และของเก่าต้องหายไปจริง
+     + roving tabindex ต้องทำงาน (ตัวเลือกอยู่ = 0 · ตัวอื่น = -1) */
+  const aria = await p.evaluate(() => {
+    const on = document.querySelector('[data-group="classroom"]');
+    const off = document.querySelector('[data-group="school"]');
+    return { sel: on && on.getAttribute('aria-selected'),
+      pressedGone: !document.querySelector('[role="tab"][aria-pressed]'),
+      tabOn: on && on.getAttribute('tabindex'), tabOff: off && off.getAttribute('tabindex') };
+  });
+  ok('ปุ่มที่เลือกอยู่บอกสถานะให้โปรแกรมอ่านหน้าจอ (aria-selected)', aria.sel === 'true', aria);
+  ok('มาตรฐานเก่า aria-pressed หายไปจริง (ไม่เหลือสองมาตรฐาน)', aria.pressedGone === true, aria);
+  ok('roving tabindex: ตัวเลือกอยู่ 0 · ตัวอื่น -1', aria.tabOn === '0' && aria.tabOff === '-1', aria);
   ok('บอกว่าเรียงตามชื่อ ไม่ใช่ตามคะแนน (ไม่จัดอันดับ)',
     (await p.evaluate(() => document.getElementById('content').textContent)).includes('เรียงตามชื่อ'), '');
   await p.close();

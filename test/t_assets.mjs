@@ -81,6 +81,9 @@ const MUST_SERVE = [
   'js/config.js', 'js/gp-core.js', 'js/gp-brand.js', 'js/gp-catalog.js',
   'js/gp-standards-panel.js', 'js/gp-tour.js',
   'css/gp.css', 'favicon.svg', 'robots.txt', '_headers',
+  /* [V.1.6.30 · ครูเคาะทาง ก] ภาพใบเกียรติบัตร — คัดจากซิปเกมรุ่นล่าสุด
+     ความตรงรุ่นถูกคุมโดย t_lvguards หมวด ง (เทียบ md5 กับซิปสดทุกครั้งที่รัน) */
+  'img/cert-bg-kan1.jpg', 'img/cert-logo-kan1.png', 'img/cert-bg-kan2.webp',
 ];
 const inPub = walk(PUB);
 for (const p of MUST_SERVE) ok(p, inPub.includes(p));

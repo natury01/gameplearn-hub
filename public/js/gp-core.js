@@ -190,6 +190,34 @@
     return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
+  /* [V.1.6.31 · A6] คีย์บอร์ดของ tablist ทุกหน้า — ลูกศรซ้าย/ขวา + Home/End ตาม WAI
+     ติดตั้งที่นี่ที่เดียว (ทั้ง teacher.html และ dashboard.html โหลดไฟล์นี้)
+     เลื่อนแล้วเปิดแท็บนั้นเลย (activation follows focus) เพราะแท็บของเราวาดเร็ว ไม่มีโหลดหนัก
+     หลัง click หน้าอาจวาด DOM ใหม่ทั้งก้อน ⇒ ตามไปโฟกัสแท็บตัวใหม่ด้วย data-* เดิม */
+  document.addEventListener('keydown', function (ev) {
+    const tab = ev.target && ev.target.closest && ev.target.closest('[role="tab"]');
+    if (!tab) return;
+    const list = tab.closest('[role="tablist"]');
+    if (!list) return;
+    const all = Array.prototype.slice.call(list.querySelectorAll('[role="tab"]'));
+    const i = all.indexOf(tab);
+    let j = -1;
+    if (ev.key === 'ArrowRight') j = (i + 1) % all.length;
+    else if (ev.key === 'ArrowLeft') j = (i - 1 + all.length) % all.length;
+    else if (ev.key === 'Home') j = 0;
+    else if (ev.key === 'End') j = all.length - 1;
+    if (j < 0) return;
+    ev.preventDefault();
+    const idAttr = all[j].hasAttribute('data-tab') ? 'data-tab'
+      : all[j].hasAttribute('data-group') ? 'data-group' : null;
+    const val = idAttr ? all[j].getAttribute(idAttr) : null;
+    all[j].focus(); all[j].click();
+    if (idAttr) {
+      const fresh = document.querySelector('[role="tab"][' + idAttr + '="' + val + '"]');
+      if (fresh && fresh !== all[j]) fresh.focus();
+    }
+  });
+
   window.GP = { loadSess, ensure, session: () => sess, api, get, rpc, countRows,
     loginGoogle, captureOAuthReturn, anonSignup, recoverTeacher, logout,
     ensureTeacherRow, jwtPayload, esc, fmt, fmtInt, joinKeyGen, timeAgo,

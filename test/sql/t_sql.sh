@@ -1111,6 +1111,40 @@ ok "กรองชั้นที่มีผล = ได้ครบ" "$n" "3"
 n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary(null,'ป.5')->'ach'->>'avg_all'); rollback;")
 ok "⭐ ค่าเฉลี่ยรวมทุกโรงเรียนยังคืนมาเป็นเส้นเทียบ แม้กรองอยู่" "$n" "64.3"
 
+# ── [V.1.6.31 · ข้อ C — ใบ HUB 25/26 ส.ค.] คีย์ชื่อซ้ำสองเกมห้ามยุบเฉลี่ยข้ามเกม ──
+#  โรคจริงบน production: `_boss` ภาค 1 (19.1) กับภาค 2 (13) ถูกยุบเป็นแท่งเดียว
+#  ตอนตัวกรองเป็น "ทุกเกม" ซึ่งเป็นค่าเริ่มต้นของหน้า — เลขผิดที่ดูเหมือนถูก
+#  จำลองในธุรกรรมแล้ว rollback: เพิ่มเกมที่สอง + คีย์ชนกัน แล้วดูว่า units แยก 2 แถวจริง
+#  _CLASH_DATA = ก้อนข้อมูลจำลอง (สิทธิ์เจ้าของฐาน) · ปิดท้ายด้วย $AS_ANON เฉพาะข้อที่ยิง RPC
+#  — negative control ต้องอ่านตารางตรง จึงห้ามสลับเป็น anon (RLS ปิดตารางกับ anon โดยถูกต้อง)
+_CLASH_DATA="begin;
+ insert into games (id, code, name) values
+   ('44444444-4444-4444-8444-44444444444c','kan-p2-test','เกมภาคสองจำลอง');
+ insert into achievement_results (student_id, game_id, run_id, score, max_score, percent, unit_scores) values
+   ('$SA','44444444-4444-4444-8444-44444444444c','live',65,100,65,'{\"_boss\":13}'::jsonb);
+ update achievement_results set unit_scores = unit_scores || '{\"_boss\":19.1}'::jsonb
+  where game_id='$GID' and student_id='$SA';"
+#  เทสต์ของเทสต์ (negative control ตามข้อกำชับ HUB "เทสต์ต้องแดงได้"): ข้อมูลชุดนี้ต้อง "ชนจริง"
+#  — จัดกลุ่มท่าเก่า (group by key เฉย ๆ) _boss ต้องยุบเหลือแถวเดียว
+#  ถ้าข้อนี้ไม่ออก 1 แปลว่าข้อมูลจำลองไม่ชน = ข้อถัดไปจะเขียวหลอกทันที
+n=$($Q -c "$_CLASH_DATA select count(*) from (
+   select u.key from achievement_results ar
+   cross join lateral jsonb_each_text(case when jsonb_typeof(ar.unit_scores)='object'
+        then ar.unit_scores else '{}'::jsonb end) u
+   where u.key='_boss' group by u.key) q; rollback;")
+ok "⭐ negative control: จัดกลุ่มท่าเก่า _boss ยุบเหลือแถวเดียว (ข้อมูลจำลองชนจริง)" "$n" "1"
+n=$($Q -c "$_CLASH_DATA $AS_ANON select count(*) from jsonb_array_elements(rpc_pub_summary()->'units') u
+   where u->>'name'='_boss'; rollback;")
+ok "⭐⭐ ข้อ C: _boss ของสองเกมแยกเป็น 2 แถว (คนละเกม) ไม่ยุบเฉลี่ยข้ามเกม" "$n" "2"
+n=$($Q -c "$_CLASH_DATA $AS_ANON select (select u->>'avg' from jsonb_array_elements(rpc_pub_summary()->'units') u
+   where u->>'name'='_boss' and u->>'game_code'='kan-p2-test'); rollback;")
+ok "⭐ และค่าเฉลี่ยของแต่ละเกมเป็นของเกมนั้นเอง (เกมจำลอง = 13.0)" "$n" "13.0"
+#  หน้าเว็บพึ่งคีย์ 'game' (ชื่อเกม) วาดป้าย — ถ้าใครทำหลุด หน้าเว็บ fallback เงียบ ไม่มีใครเห็น
+#  (ผู้ตรวจหักล้างจับได้ว่าสามข้อบนตรวจแค่ game_code/avg — คีย์ 'game' ไม่มีใครล็อก)
+n=$($Q -c "begin; $AS_ANON select bool_and(u ?& array['game','game_code','name','n','avg'])
+   from jsonb_array_elements(rpc_pub_summary()->'units') u; rollback;")
+ok "⭐ ทุกแถว units มีคีย์ครบ {game, game_code, name, n, avg}" "$n" "t"
+
 echo ""
 echo "═══ 13) 52+83 — สถิติการเข้าถึงเกม + ป้ายแหล่งที่มา ═══"
 
@@ -1182,7 +1216,8 @@ echo ""
 # ยามพื้น: ถ้าจำนวนข้อลดฮวบ แปลว่ามีหมวดหนึ่ง "ไม่ได้รัน" (เช่นไฟล์ SQL หาย แล้วกิ่งนั้นถูกข้าม)
 # ซึ่งจะไม่มีข้อตกให้เห็นเลย — เป็นรูปแบบ "ตายเงียบ" ที่ STD-006 ข้อ 1 ตั้งมาเพื่อกัน
 # ฐาน ณ V.1.6.7 = 184 ข้อ (ผ่าน ok/okc) · อีกราว 26 ข้อเป็น echo ตรงในหมวด 0 ไม่ถูกนับ
-FLOOR=231   # [V.1.6.27] +19 ข้อจากหมวด 8b (F4 ท่อจริง 9 ตัว + ยาม + สิทธิ์) · ของจริง 232 เผื่อ 1 แบบเดิม
+FLOOR=235   # [V.1.6.31] +4 ข้อยามข้อ C (คีย์ชนข้ามเกม + negative control + คีย์ครบ) · ของจริง 236 เผื่อ 1 แบบเดิม
+            # [V.1.6.27] +19 ข้อจากหมวด 8b (F4 ท่อจริง 9 ตัว + ยาม + สิทธิ์)
             # (ผู้ตรวจหักล้าง 25 ส.ค. จับได้ว่าค้าง 212 ทั้งที่ของจริง 221 — หมวดหายทั้งหมวดยามไม่ฟ้อง)
 if [ "$_nchk" -lt "$FLOOR" ]; then
   echo "❌ นับหัวได้แค่ $_nchk ข้อ (ฐานที่ควรได้ ≥ $FLOOR) — สงสัยมีหมวดที่ไม่ได้รัน"

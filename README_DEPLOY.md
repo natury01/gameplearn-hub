@@ -186,7 +186,7 @@ select * from events where created_at >= now() - interval '90 days';
 **ทางลัด (V.1.6.26 · P33): สคริปต์เดียวจบ ตรวจครบทั้งเปิด/ปิด/เลขรุ่น — ตามลิงก์ redirect ให้เอง**
 
 ```bash
-python3 test/verify_deployed.py V.1.6.29
+python3 test/verify_deployed.py V.1.6.30
 ```
 
 หรือทำมือทีละข้อแบบเดิม:

@@ -88,6 +88,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       </nav>
     <div id="crumb" class="crumb hidden"><a href="#/">← กลับหน้ารวม</a></div>
     <div id="content"><div class="card muted"><span class="loading"></span> กำลังโหลดข้อมูล…</div></div>
+    <!-- [V.1.6.31 · A11] live region ถาวรสำหรับประกาศสถานะตัวกรอง — อยู่นอก #content
+         เพราะ innerHTML ทั้งก้อนทุกรอบวาดทำให้ live region ที่เกิดใหม่ไม่ถูกประกาศ -->
+    <div id="pick-status" class="sr-only" aria-live="polite"></div>
   </div>
 
   </main>
@@ -706,13 +709,18 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + (unit ? '<span class="unit">' + unit + '</span>' : '') + '</div></div>';
   }
   function tabs() {
+    /* [V.1.6.31 · A6] roving tabindex ตาม WAI tablist — แท็บที่เลือกอยู่ tab ได้ (0)
+       ที่เหลือ -1 แล้วเลื่อนด้วยลูกศรซ้าย/ขวา (ตัวจัดการ keydown อยู่ท้ายไฟล์)
+       มาตรฐานเดียวกับ grouptabs หน้าสาธารณะ — เดิมสองหน้าใช้ aria คนละชุด */
+    const tb = (k, label) => '<button class="tab" role="tab" data-tab="' + k + '"'
+      + ' aria-selected="' + (TAB === k) + '" tabindex="' + (TAB === k ? 0 : -1) + '">' + label + '</button>';
     return '<div class="tabs" role="tablist">'
-      + '<button class="tab" role="tab" data-tab="ach"  aria-selected="' + (TAB === 'ach') + '">ผลสัมฤทธิ์</button>'
-      + '<button class="tab" role="tab" data-tab="comp" aria-selected="' + (TAB === 'comp') + '">สมรรถนะหลัก</button>'
+      + tb('ach', 'ผลสัมฤทธิ์')
+      + tb('comp', 'สมรรถนะหลัก')
       /* [V.1.6.22 · ครูสั่ง] แท็บเทียบเกณฑ์ — ยกมาจาก Dashboard ภาค 2 ตามที่ครูขอ */
-      + '<button class="tab" role="tab" data-tab="cmp" aria-selected="' + (TAB === 'cmp') + '">เทียบเกณฑ์ (ครู/เพื่อน/ตนเอง)</button>'
+      + tb('cmp', 'เทียบเกณฑ์ (ครู/เพื่อน/ตนเอง)')
       /* [V.1.6.29 · ครูสั่ง] แท็บพิมพ์เกียรติบัตร — รายชื่อทั้งห้อง + เครื่องหมายว่าใครได้รับ + พิมพ์/ดาวน์โหลด */
-      + '<button class="tab" role="tab" data-tab="cert" aria-selected="' + (TAB === 'cert') + '">🏅 พิมพ์เกียรติบัตร</button>'
+      + tb('cert', '🏅 พิมพ์เกียรติบัตร')
       /* [V.1.6.19 · ครูสั่ง] ตัดแท็บ "การคิดขั้นสูง (รายเกม)" ออก
          การคิดขั้นสูงเป็น 1 ใน 6 ด้านของกรอบสมรรถนะ มีแท็บของตัวเองแยกออกมา
          เป็นซากจากยุคที่เกมวัดได้ด้านเดียว ตอนนี้เป็นการแสดงของซ้ำสองที่
@@ -770,8 +778,17 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + '</select>';
     }
     if (!cid && ROOM) html += '<a class="btn btn-sm" href="#/room/' + G.esc(ROOM) + '">เปิดหน้าห้องนี้ →</a>';
+    /* [V.1.6.31 · A11] บรรทัดสถานะตัวกรอง — ท่าเดียวกับหน้าสาธารณะ (dashboard.html:90)
+       ⚠️ ไม่ใส่ role="status" ตรงนี้ — element ถูกสร้างใหม่ทุกรอบวาด live region เกิดใหม่
+       จะไม่ถูกประกาศ (ผู้ตรวจหักล้างชี้) · เสียงประกาศใช้ #pick-status ที่อยู่นอกโซนวาดแทน */
+    const gSel = GAME ? (gameById(GAME) || {}).name : '';
+    const rSel = cid ? (roomById(cid) || {}).name
+      : (ROOM ? (roomById(ROOM) || {}).name : '');
+    _scopeMsg = 'กำลังดู: ' + (rSel || 'ทุกห้องของฉัน') + ' · ' + (gSel || 'ทุกเกม');
+    html += '<div class="muted small" style="flex-basis:100%">' + G.esc(_scopeMsg) + '</div>';
     return html + '</div>';
   }
+  let _scopeMsg = '';
 
   /* ผูกช่องเลือกทั้งสอง — เรียกหลังวาดทุกครั้ง · redraw = ฟังก์ชันวาดหน้าที่กำลังอยู่
      เปลี่ยนห้อง = ล้างตัวกรองเกมด้วย เพราะห้องใหม่อาจไม่ได้เปิดเกมนั้น
@@ -781,6 +798,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     if (rp) rp.onchange = function () { ROOM = rp.value; GAME = ''; redraw(); };
     const gp = $('game-pick');
     if (gp) gp.onchange = function () { GAME = gp.value; redraw(); };
+    /* [V.1.6.31 · A11] live region ถาวรนอกโซนวาด — อัปเดต textContent เท่านั้น
+       โปรแกรมอ่านหน้าจอจึงประกาศ "กำลังดู: …" ทุกครั้งที่ครูเปลี่ยนห้อง/เกมจริง */
+    const st = $('pick-status');
+    if (st && st.textContent !== _scopeMsg) st.textContent = _scopeMsg;
   }
 
   function renderHome() {
@@ -1245,12 +1266,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         ไม่งั้นหน้าครูกับหน้าสาธารณะจะพูดคนละเรื่องเรื่องเด็กคนเดียวกัน
      เรียงจาก "ต้องช่วยเหลือ" ขึ้นก่อน — ครูเปิดหน้านี้เพื่อหาคนที่ต้องช่วย
      ไม่ได้เปิดมาชื่นชมคนที่ได้ดีเยี่ยม */
+  /* [V.1.6.31 · A2] สีย้ายไปเป็นโทเคน --ach-* ใน gp.css (ตระกูลแยกจาก --lv* โดยเจตนา —
+     คนละสเกลกัน ถ้าใช้ตระกูลเดียว "สีส้ม" จะแปลได้สองอย่างบนหน้าเดียว)
+     ช่วงคะแนน (lo/hi) ยังตรงกับฐาน sql/72 ทุกตัว — ห้ามตั้งเกณฑ์ใหม่เองเหมือนเดิม */
   const ACH_BANDS = [
-    { k: 'low',  lo: 0,  hi: 50,  name: 'ต้องช่วยเหลือ (ต่ำกว่า 50)', c: '#b91c1c' },
-    { k: 'pass', lo: 50, hi: 60,  name: 'ผ่านเกณฑ์ (50–59)',        c: '#b45309' },
-    { k: 'ok',   lo: 60, hi: 70,  name: 'พอใช้ (60–69)',            c: '#a16207' },
-    { k: 'good', lo: 70, hi: 80,  name: 'ดี (70–79)',               c: '#0d9488' },
-    { k: 'best', lo: 80, hi: 101, name: 'ดีเยี่ยม (80–100)',        c: '#047857' },
+    { k: 'low',  lo: 0,  hi: 50,  name: 'ต้องช่วยเหลือ (ต่ำกว่า 50)', c: 'var(--ach-low)' },
+    { k: 'pass', lo: 50, hi: 60,  name: 'ผ่านเกณฑ์ (50–59)',        c: 'var(--ach-pass)' },
+    { k: 'ok',   lo: 60, hi: 70,  name: 'พอใช้ (60–69)',            c: 'var(--ach-ok)' },
+    { k: 'good', lo: 70, hi: 80,  name: 'ดี (70–79)',               c: 'var(--ach-good)' },
+    { k: 'best', lo: 80, hi: 101, name: 'ดีเยี่ยม (80–100)',        c: 'var(--ach-best)' },
   ];
   const achBandOf = (pct) => ACH_BANDS.find((b) => pct >= b.lo && pct < b.hi) || null;
 
@@ -1274,18 +1298,26 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const legend = ACH_BANDS.map(function (b) {
       const c = wp.filter((r) => achBandOf(Number(r.percent)) === b).length;
       if (!c) return '';
+      /* [V.1.6.31 · A5] ปุ่มนี้กาง/หุบกล่องรายชื่อ ⇒ ต้องประกาศ aria-expanded + aria-controls
+         (id ของกล่องแทนช่องว่างในชื่อเกมด้วย - เพราะ id ห้ามมีช่องว่าง) */
       return '<button type="button" class="lvkey achband" data-ach-band="' + b.k + '"'
         + ' data-ach-game="' + G.esc(gameKey) + '"'
+        + ' aria-expanded="false" aria-controls="achnames-' + G.esc(String(gameKey).replace(/\s+/g, '-')) + '"'
         + ' style="background:none;border:0;padding:2px 4px;cursor:pointer;font:inherit"'
         + ' title="กดเพื่อดูรายชื่อ">'
         + '<i style="background:' + b.c + '"></i>' + G.esc(b.name) + ' <b>' + c + '</b></button>';
     }).join('');
     const none = rows.length - wp.length;
-    return '<div class="lvbar" style="margin-top:8px">' + seg + '</div>'
+    /* [V.1.6.31 · C4 ตามใบ HUB] สองแถบใกล้กันขั้วต่างกันโดยเจตนา (แถบนี้เรียงตามความเร่งด่วน
+       ตามคำสั่งครู V.1.6.21 · แถบระดับเรียงตามสเกล) ⇒ ติดป้ายทิศทาง ไม่พลิกขั้ว
+       สัญกรณ์กลาง: แถบเรียงตามความเร่งด่วน กับแถบเรียงตามสเกล ต้องติดป้ายทิศทางเสมอ */
+    return '<div class="muted small" style="margin-top:8px">← กลุ่มที่ต้องช่วยเหลืออยู่ซ้ายสุด (เรียงตามความเร่งด่วน)</div>'
+      + '<div class="lvbar" style="margin-top:4px">' + seg + '</div>'
       + '<div class="lvlegend">' + legend
-      + (none ? '<span class="lvkey"><i style="background:#e5e7eb"></i>ยังไม่มีคะแนน <b>'
+      + (none ? '<span class="lvkey"><i class="nodata"></i>ยังไม่มีคะแนน <b>'
           + none + '</b></span>' : '')
       + '</div><div class="achnames muted small" data-ach-names="' + G.esc(gameKey) + '"'
+      + ' id="achnames-' + G.esc(String(gameKey).replace(/\s+/g, '-')) + '"'
       + ' style="display:none;margin-top:6px"></div>';
   }
 
@@ -1323,14 +1355,22 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     if (!btn) return;
     const bandK = btn.getAttribute('data-ach-band');
     const gameKey = btn.getAttribute('data-ach-game');
-    const box = document.querySelector('[data-ach-names="' + gameKey + '"]');
+    /* [V.1.6.31] getAttribute คืนค่าดิบ (decode แล้ว) — ชื่อเกมที่มีเครื่องหมายคำพูด
+       จะทำ selector พังทั้ง handler ⇒ escape ก่อนประกอบเสมอ (โรคแฝงเดิม แก้พร้อมกัน) */
+    const gq = String(gameKey || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const box = document.querySelector('[data-ach-names="' + gq + '"]');
     if (!box) return;
     const band = ACH_BANDS.find((b) => b.k === bandK);
     if (!band) return;
+    /* [V.1.6.31 · A5] ให้ aria-expanded ตามความจริงเสมอ — ปุ่มทุกตัวของเกมเดียวกันหุบก่อน
+       แล้วค่อยเปิดตัวที่กด (เปิดได้ทีละช่วง กติกาเดิมของกล่อง) */
+    const sib = document.querySelectorAll('[data-ach-game="' + gq + '"]');
+    sib.forEach((b) => b.setAttribute('aria-expanded', 'false'));
     /* กดซ้ำที่ช่วงเดิม = ปิด — ครูจะได้ไม่ต้องหาปุ่มปิด */
     if (box.dataset.open === bandK) {
       box.style.display = 'none'; box.dataset.open = ''; return;
     }
+    btn.setAttribute('aria-expanded', 'true');
     const rows = achRows(ROOM || null).filter((r) => r.game_name === gameKey
       && r.percent != null && achBandOf(Number(r.percent)) === band);
     const names = rows.map(function (r) {
@@ -1362,19 +1402,30 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       const c = rows.filter((r) => Number(r.level) === lv).length;
       if (!c) return '';
       const pct = (c / n) * 100;
-      return '<div style="width:' + pct.toFixed(2) + '%;background:' + (LV_COLOR[lv] || 'var(--lv3)') + '"'
+      /* [V.1.6.31 · A1 — ใบ HUB 26 ส.ค. แทนตารางจุดเรียกเดิม] แท่งนี้พิมพ์จำนวนคนสีขาวทับ
+         (บรรทัดล่าง เมื่อ pct ≥ 9) จึงต้องใช้ชุด -on ไม่ใช่ LV_COLOR — ของเดิมระดับ 4/5
+         ขาวทับได้แค่ 3.19/3.30:1 ตก AA ทั้งคู่ */
+      return '<div style="width:' + pct.toFixed(2) + '%;background:' + (LV_COLOR_ON[lv] || 'var(--lv3-on)') + '"'
         + ' title="ระดับ ' + lv + ' ' + LV_NAME[lv] + ' — ' + c + ' คน">'
         + (pct >= 9 ? c : '') + '</div>';
     }).join('');
     const legend = [6, 5, 4, 3].map(function (lv) {
       const c = rows.filter((r) => Number(r.level) === lv).length;
-      return '<span class="lvkey"><i style="background:' + (LV_COLOR[lv] || 'var(--lv3)') + '"></i>ระดับ ' + lv
+      /* [V.1.6.31] ชิป legend ใช้ชุดเดียวกับแท่ง (-on) — ผู้ตรวจหักล้างจับได้ว่าถ้าแก้ฝั่งเดียว
+         ครูจะจับคู่สีคำอธิบายกับแท่งไม่ได้ (ระดับ 4: #d97706 vs #a13e0b คนละสีด้วยตาเปล่า) */
+      return '<span class="lvkey"><i style="background:' + (LV_COLOR_ON[lv] || 'var(--lv3-on)') + '"></i>ระดับ ' + lv
         + ' <b>' + c + '</b></span>';
     }).join('');
     const none = rows.filter((r) => r.level == null).length;
-    return '<div class="lvbar">' + seg + '</div>'
+    /* [V.1.6.31] "ยังไม่สรุป" ต้องเป็นท่อนแถบของตัวเอง (เส้นประ) — ไม่ใช่ปล่อยพื้นแถบโผล่
+       ไม่งั้นส่วนที่เหลือกลายเป็นบล็อกสีเส้นคั่นที่อ่านเป็นแท่งข้อมูลผี (หนักสุดในโหมดมืด) */
+    const noneSeg = none ? '<div class="nodata" style="width:' + ((none / n) * 100).toFixed(2)
+      + '%" title="ยังไม่สรุป — ' + none + ' คน"></div>' : '';
+    /* [V.1.6.31 · C4] ป้ายทิศทางคู่กับแถบผลสัมฤทธิ์ — แถบนี้เรียงตามสเกล ไม่ใช่ความเร่งด่วน */
+    return '<div class="muted small">ระดับ 6 → 3 (เรียงตามสเกล)</div>'
+      + '<div class="lvbar" style="margin-top:4px">' + seg + noneSeg + '</div>'
       + '<div class="lvlegend">' + legend
-      + (none ? '<span class="lvkey"><i style="background:#e5e7eb"></i>ยังไม่สรุป <b>' + none + '</b></span>' : '')
+      + (none ? '<span class="lvkey"><i class="nodata"></i>ยังไม่สรุป <b>' + none + '</b></span>' : '')
       + '</div>';
   }
 
@@ -1830,6 +1881,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     return out;
   }
 
+  /* [V.1.6.30 · ครูเคาะ "ทาง ก"] ใบเว็บกลางใช้ภาพพื้น+โทนของเกมจริง —
+     ภาพใน img/ คัดจากซิปเกมรุ่นล่าสุด (มียามใน t_lvguards เทียบ md5 กับซิปสด กันเหลื่อมรุ่น P-HUB-08)
+     สิ่งที่เว็บกลางเติมจากมุมครู: บรรทัดเกณฑ์ที่ได้รับ + ลงชื่อครูผู้สอน (ใบภาค 2 มีช่องนี้อยู่แล้ว) */
+  const certStyleOf = (g) => (g.code === 'kanchanaburi2050' ? 'k1'
+    : /-p2$/.test(g.code || '') ? 'k2' : 'gen');
   function certSheet(cid, sid) {
     const r = roomById(cid); if (!r) return;
     const list = certList(cid, sid);
@@ -1837,28 +1893,103 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const w = window.open('', '_blank', 'width=1100,height=800');
     if (!w) { showErr('เบราว์เซอร์บล็อกหน้าต่างใหม่ — อนุญาต pop-up ให้เว็บนี้ก่อน'); return; }
     const m = certMeta(r); const esc = G.esc;
-    const paper = (x) =>
-      '<div class="cert"><div class="in">'
-      + '<div class="brand">GamePlearn · เกมเพลิน</div>'
-      + '<div class="t1">เกียรติบัตร</div>'
-      + '<div class="t2">ฉบับนี้ให้ไว้เพื่อแสดงว่า</div>'
-      + '<div class="name">' + esc((x.s.first_name || '') + ' ' + (x.s.last_name || '')) + '</div>'
-      + '<div class="line">' + esc(x.c.line) + '</div>'
-      + '<div class="game">เกม ' + esc(x.g.name) + (x.c.sub ? ' · ' + esc(x.c.sub) : '') + '</div>'
-      + '<div class="meta">' + esc([m.school, 'ห้อง ' + m.room, m.year ? 'ปีการศึกษา ' + m.year : '']
-          .filter(Boolean).join(' · ')) + '</div>'
-      + '<div class="date">ให้ไว้ ณ วันที่ ' + esc(thaiDate()) + '</div>'
-      + '<div class="sign">ลงชื่อ<span class="sigline"></span><b>' + esc(m.teacher) + '</b>ครูผู้สอน</div>'
-      + '<div class="foot">www.GamePlearn.com</div>'
-      + '</div></div>';
+    const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+    const metaLine = esc([m.school, 'ห้อง ' + m.room, m.year ? 'ปีการศึกษา ' + m.year : '']
+      .filter(Boolean).join(' · '));
+    const signBlk = '<div class="sign">ลงชื่อ<span class="sigline"></span><b>' + esc(m.teacher)
+      + '</b>ครูผู้สอน</div>';
+    const paper = (x) => {
+      const st = certStyleOf(x.g);
+      const nm = esc((x.s.first_name || '') + ' ' + (x.s.last_name || ''));
+      if (st === 'k1') {
+        /* โทน/ลำดับตามใบจริงภาค 1 (certRenderCanvas): โลโก้ → หัวเรื่อง → ชื่อ+เส้นทอง →
+           โรงเรียน → เนื้อความ → ชิปทอง → วันที่ · เว็บกลางเติมบรรทัดลงชื่อครูช่วงท้าย */
+        return '<div class="cert k1"><div class="in">'
+          + '<img class="logo" src="' + base + 'img/cert-logo-kan1.png" alt="">'
+          + '<div class="k1h">ขอมอบเกียรติบัตรฉบับนี้เพื่อแสดงว่า</div>'
+          + '<div class="k1name">' + nm + '</div>'
+          + '<div class="k1meta">' + metaLine + '</div>'
+          + '<div class="k1line">' + esc(x.c.line) + ' — เกม' + esc(x.g.name) + '</div>'
+          + '<div class="chips"><span class="chip">🏅 ' + esc(x.c.sub || 'ผ่านเกณฑ์ที่ครูกำหนด') + '</span>'
+          +   (m.year ? '<span class="chip">📚 ปีการศึกษา ' + esc(m.year) + '</span>' : '') + '</div>'
+          + '<div class="k1date">ให้ไว้ ณ วันที่ ' + esc(thaiDate()) + '</div>'
+          + signBlk
+          + '<div class="k1foot">🌏 www.GamePlearn.com — ทุกเกม คืออีกชั้นของการเรียนรู้</div>'
+          + '</div></div>';
+      }
+      if (st === 'k2') {
+        /* โทนตามใบผู้พิทักษ์ภาค 2 (CERT.toCanvas): พื้นไล่ครีม+ภาพจาง 20% + กรอบทองสองชั้น+มุมประดับ
+           + ชื่อบนเส้นประทอง + ป้ายระดับ · ช่องลงชื่อครูมีในใบจริงอยู่แล้ว — เว็บกลางเติมชื่อให้ */
+        return '<div class="cert k2"><div class="bg"></div><div class="in">'
+          + '<div class="k2t">เกมเพลิน: ' + esc(x.g.name) + '</div>'
+          + '<div class="k2h">ขอมอบประกาศนียบัตรฉบับนี้ไว้เพื่อแสดงว่า</div>'
+          + '<div class="k2name">' + nm + '</div>'
+          + '<div class="k2meta">' + metaLine + '</div>'
+          + '<div class="k2line">' + esc(x.c.line) + (x.c.sub ? ' · ' + esc(x.c.sub) : '') + '</div>'
+          + '<div class="k2pill">' + esc(x.c.sub || x.c.line) + '</div>'
+          + '<div class="k2date">' + esc(thaiDate()) + '</div>'
+          + signBlk
+          + '<div class="k2foot">www.GamePlearn.com</div>'
+          + '</div></div>';
+      }
+      return '<div class="cert gen"><div class="in">'
+        + '<div class="brand">GamePlearn · เกมเพลิน</div>'
+        + '<div class="t1">เกียรติบัตร</div>'
+        + '<div class="t2">ฉบับนี้ให้ไว้เพื่อแสดงว่า</div>'
+        + '<div class="name">' + nm + '</div>'
+        + '<div class="line">' + esc(x.c.line) + '</div>'
+        + '<div class="game">เกม ' + esc(x.g.name) + (x.c.sub ? ' · ' + esc(x.c.sub) : '') + '</div>'
+        + '<div class="meta">' + metaLine + '</div>'
+        + '<div class="date">ให้ไว้ ณ วันที่ ' + esc(thaiDate()) + '</div>'
+        + signBlk
+        + '<div class="foot">www.GamePlearn.com</div>'
+        + '</div></div>';
+    };
     w.document.write('<!doctype html><html lang="th"><head><meta charset="utf-8">'
       + '<title>เกียรติบัตร ' + esc(r.name) + '</title><style>'
       + '@page{size:A4 landscape;margin:0}'
       + 'body{margin:0;font-family:"Sarabun","Noto Sans Thai",system-ui,sans-serif;color:#3b2f14}'
-      + '.cert{width:297mm;height:209mm;box-sizing:border-box;padding:10mm;page-break-after:always;'
-      +   'display:flex;background:#fffdf5;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
-      + '.in{flex:1;border:2.2mm solid #b45309;outline:0.6mm solid #b45309;outline-offset:-4.4mm;'
-      +   'border-radius:4mm;text-align:center;padding:12mm 14mm;display:flex;flex-direction:column}'
+      + '.cert{width:297mm;height:209mm;box-sizing:border-box;page-break-after:always;position:relative;'
+      +   'display:flex;background:#fffdf5;-webkit-print-color-adjust:exact;print-color-adjust:exact;overflow:hidden}'
+      + '.in{flex:1;text-align:center;display:flex;flex-direction:column;position:relative;z-index:1}'
+      + '.sign{margin-top:auto;font-size:15px}.sign b{display:block;font-size:18px;margin-top:1mm}'
+      + '.sigline{display:block;width:50mm;margin:6mm auto 0;border-bottom:0.4mm solid currentColor;opacity:.75}'
+      /* ── ภาค 1: ภาพพื้นเต็มใบ (กรอบทองอยู่ในภาพแล้ว — ไม่วาดซ้อน ตามโค้ดเกม) ── */
+      + '.k1{background:url("' + base + 'img/cert-bg-kan1.jpg") center/cover no-repeat #fffdf5}'
+      + '.k1 .in{padding:14mm 30mm 12mm;color:#1f2937}'
+      + '.k1 .logo{width:76mm;margin:0 auto}'
+      + '.k1h{font-size:24px;font-weight:800;color:#92400e;margin-top:6mm}'
+      + '.k1name{font-size:40px;font-weight:900;color:#1e3a5f;margin-top:3mm;'
+      +   'border-bottom:0.8mm solid #d6b25e;display:inline-block;align-self:center;padding:0 14mm 1.5mm;'
+      +   'max-width:230mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+      + '.k1meta{font-size:15px;color:#57534e;margin-top:2.5mm}'
+      + '.k1line{font-size:19px;margin-top:5mm}'
+      + '.chips{display:flex;gap:6mm;justify-content:center;margin-top:5mm}'
+      + '.chip{background:#fef3c7;border:0.6mm solid #f59e0b;color:#92400e;font-weight:800;'
+      +   'font-size:15px;padding:2mm 6mm;border-radius:10mm}'
+      + '.k1date,.k1 .sign{color:#57534e;text-shadow:0 0 3mm #fffdf5,0 0 3mm #fffdf5,0 0 3mm #fffdf5}'
+      + '.k1date{font-size:15px;margin-top:5mm}'
+      + '.k1foot{font-size:14px;font-weight:800;color:#92400e;margin-top:2.5mm;'
+      +   'text-shadow:0 0 3mm #fffdf5,0 0 3mm #fffdf5}'
+      /* ── ภาค 2: ครีมไล่เฉด + ภาพผู้พิทักษ์จาง 20% + กรอบทองสองชั้น + มุมประดับ (ตามโค้ดเกม) ── */
+      + '.k2{background:linear-gradient(135deg,#fffdf2,#f4e9c9)}'
+      + '.k2 .bg{position:absolute;inset:0;background:url("' + base + 'img/cert-bg-kan2.webp") center/cover no-repeat;opacity:.2}'
+      + '.k2 .in{margin:5mm;border:1.6mm solid #c9a95c;outline:0.5mm solid #e0c98a;outline-offset:-3.2mm;'
+      +   'padding:12mm 26mm 10mm;color:#3a3a2a}'
+      + '.k2t{font-size:28px;font-weight:800;color:#14406b;margin-top:4mm}'
+      + '.k2h{font-size:17px;color:#5a5a45;margin-top:2mm}'
+      + '.k2name{font-size:38px;font-weight:800;color:#7c4a03;margin-top:4mm;'
+      +   'border-bottom:0.8mm dashed #c9a95c;display:inline-block;align-self:center;padding:0 16mm 2mm;'
+      +   'max-width:230mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+      + '.k2meta{font-size:15px;color:#5a5a45;margin-top:3mm}'
+      + '.k2line{font-size:18px;margin-top:5mm}'
+      + '.k2pill{background:rgba(21,90,60,.10);color:#14406b;font-weight:800;font-size:17px;'
+      +   'padding:2.5mm 8mm;border-radius:5mm;display:inline-block;align-self:center;margin-top:5mm}'
+      + '.k2date{font-size:14px;color:#8a7a4a;margin-top:5mm}'
+      + '.k2 .sign{color:#6a6046}.k2foot{font-size:14px;font-weight:700;color:#8a6a1e;margin-top:2mm}'
+      /* ── เกมอื่น: แบบกลางเดิม ── */
+      + '.gen .in{border:2.2mm solid #b45309;outline:0.6mm solid #b45309;outline-offset:-4.4mm;'
+      +   'border-radius:4mm;margin:10mm;padding:12mm 14mm}'
       + '.brand{font-size:17px;letter-spacing:2px;color:#92600a;font-weight:700}'
       + '.t1{font-size:56px;font-weight:800;margin:8mm 0 2mm;color:#7c3f06}'
       + '.t2{font-size:19px;color:#6b5527}'
@@ -1868,45 +1999,128 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + '.game{font-size:20px;font-weight:700;color:#92600a;margin-top:1.5mm}'
       + '.meta{font-size:16px;color:#6b5527;margin-top:5mm}'
       + '.date{font-size:16px;color:#6b5527;margin-top:2mm}'
-      + '.sign{margin-top:auto;font-size:16px;color:#3b2f14}'
-      + '.sign b{display:block;font-size:19px;margin-top:1mm}'
-      + '.sigline{display:block;width:52mm;margin:9mm auto 0;border-bottom:0.4mm solid #3b2f14}'
       + '.foot{font-size:13px;color:#a08040;margin-top:3mm}'
       + '</style></head><body>' + list.map(paper).join('') + '</body></html>');
     w.document.close(); w.focus();
-    setTimeout(() => { try { w.print(); } catch (e) {} }, 350);
+    /* รอภาพพื้นโหลดก่อนสั่งพิมพ์ — ไม่งั้นหน้าแรกได้ใบขาว (ภาพ 97-246KB โหลดไวแต่ไม่ใช่ทันที) */
+    setTimeout(() => { try { w.print(); } catch (e) {} }, 900);
   }
 
-  /* PNG A4 แนวนอน ~150dpi — ขนาดเดียวกับใบของภาค 1 (1754×1240) เผื่อครูเอาไปใช้ปนกัน */
-  function certPngOne(x, r) {
+  /* [V.1.6.30 · ทาง ก] PNG ตามแบบใบของเกมจริง — พิกัดลอกจาก certRenderCanvas (ภาค 1 1754×1240)
+     และ CERT.toCanvas (ภาค 2 1600×1130) · ภาพพื้นโหลดครั้งเดียวแล้ว cache */
+  const _certImgs = {};
+  function certImg(src) {
+    if (_certImgs[src]) return _certImgs[src];
+    return (_certImgs[src] = new Promise((res) => {
+      const im = new Image();
+      im.onload = () => res(im); im.onerror = () => res(null);
+      im.src = 'img/' + src;
+    }));
+  }
+  async function certPngOne(x, r) {
     const m = certMeta(r);
-    const cv = document.createElement('canvas'); cv.width = 1754; cv.height = 1240;
-    const ctx = cv.getContext('2d');
+    const st = certStyleOf(x.g);
     const F = '"Sarabun","Noto Sans Thai",system-ui,sans-serif';
-    ctx.fillStyle = '#fffdf5'; ctx.fillRect(0, 0, 1754, 1240);
-    ctx.strokeStyle = '#b45309'; ctx.lineWidth = 14; ctx.strokeRect(46, 46, 1662, 1148);
-    ctx.lineWidth = 4; ctx.strokeRect(72, 72, 1610, 1096);
-    ctx.textAlign = 'center'; const cx = 877;
-    const t = (txt, y, font, color) => { ctx.font = font; ctx.fillStyle = color; ctx.fillText(txt, cx, y); };
-    t('GamePlearn · เกมเพลิน', 170, '700 30px ' + F, '#92600a');
-    t('เกียรติบัตร', 300, '800 104px ' + F, '#7c3f06');
-    t('ฉบับนี้ให้ไว้เพื่อแสดงว่า', 370, '400 36px ' + F, '#6b5527');
     const name = (x.s.first_name || '') + ' ' + (x.s.last_name || '');
-    t(name, 490, '800 76px ' + F, '#3b2f14');
-    const nw = Math.min(ctx.measureText(name).width + 80, 1400);
-    ctx.strokeStyle = '#d8b56a'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(cx - nw / 2, 520); ctx.lineTo(cx + nw / 2, 520); ctx.stroke();
-    t(x.c.line, 610, '400 42px ' + F, '#3b2f14');
-    t('เกม ' + x.g.name + (x.c.sub ? ' · ' + x.c.sub : ''), 675, '700 38px ' + F, '#92600a');
-    t([m.school, 'ห้อง ' + m.room, m.year ? 'ปีการศึกษา ' + m.year : ''].filter(Boolean).join(' · '),
-      780, '400 32px ' + F, '#6b5527');
-    t('ให้ไว้ ณ วันที่ ' + thaiDate(), 835, '400 32px ' + F, '#6b5527');
-    ctx.strokeStyle = '#3b2f14'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(cx - 130, 1010); ctx.lineTo(cx + 130, 1010); ctx.stroke();
-    t('ลงชื่อ', 960, '400 30px ' + F, '#3b2f14');
-    t(m.teacher, 1055, '700 36px ' + F, '#3b2f14');
-    t('ครูผู้สอน', 1100, '400 30px ' + F, '#3b2f14');
-    t('www.GamePlearn.com', 1165, '400 26px ' + F, '#a08040');
+    const metaLine = [m.school, 'ห้อง ' + m.room, m.year ? 'ปีการศึกษา ' + m.year : '']
+      .filter(Boolean).join(' · ');
+    const W = st === 'k2' ? 1600 : 1754, H = st === 'k2' ? 1130 : 1240;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d'); const cx = W / 2;
+    ctx.textAlign = 'center';
+    const t = (txt, y, font, color, maxw) => {
+      let f = font;
+      ctx.font = f; ctx.fillStyle = color;
+      if (maxw) { /* ย่อฟอนต์อัตโนมัติแบบเดียวกับเกม — ชื่อ/ข้อความไทยยาวไม่มีช่องว่างให้ตัด */
+        let sz = parseInt(f.match(/(\d+)px/)[1], 10);
+        while (sz > 20 && ctx.measureText(String(txt)).width > maxw) {
+          sz -= 4; f = f.replace(/\d+px/, sz + 'px'); ctx.font = f;
+        }
+      }
+      ctx.fillText(String(txt), cx, y);
+    };
+    const cover = (im, alpha) => {
+      if (!im) return false;
+      ctx.save(); if (alpha != null) ctx.globalAlpha = alpha;
+      const s2 = Math.max(W / im.naturalWidth, H / im.naturalHeight);
+      ctx.drawImage(im, (W - im.naturalWidth * s2) / 2, (H - im.naturalHeight * s2) / 2,
+        im.naturalWidth * s2, im.naturalHeight * s2);
+      ctx.restore(); return true;
+    };
+    if (st === 'k1') {
+      const [bg, logo] = await Promise.all([certImg('cert-bg-kan1.jpg'), certImg('cert-logo-kan1.png')]);
+      if (!cover(bg)) { ctx.fillStyle = '#fffdf5'; ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = '#b45309'; ctx.lineWidth = 14; ctx.strokeRect(24, 24, W - 48, H - 48); }
+      if (logo) { const lw = 500, lh = lw * logo.naturalHeight / logo.naturalWidth;
+        ctx.drawImage(logo, (W - lw) / 2, 105, lw, lh); }
+      t('ขอมอบเกียรติบัตรฉบับนี้เพื่อแสดงว่า', 380, '800 56px ' + F, '#92400e');
+      t(name, 530, '900 100px ' + F, '#1e3a5f', W - 460);
+      const nw = Math.max(ctx.measureText(name).width + 110, 620);
+      ctx.strokeStyle = '#d6b25e'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(cx - nw / 2, 598); ctx.lineTo(cx + nw / 2, 598); ctx.stroke();
+      t(metaLine, 646, '400 34px ' + F, '#57534e', W - 300);
+      t(x.c.line, 735, '400 42px ' + F, '#1f2937', W - 300);
+      t('เกม' + x.g.name + (x.c.sub ? ' · ' + x.c.sub : ''), 800, '400 42px ' + F, '#1f2937', W - 300);
+      /* วันที่+ท้ายใบ อยู่บนวิวสะพาน — เกมวาดแสงขาวหลังตัวหนังสือ ลอกท่าเดียวกัน */
+      const glow = (txt, y, font, color) => {
+        ctx.save(); ctx.shadowColor = 'rgba(255,253,245,.95)'; ctx.shadowBlur = 16;
+        ctx.font = font; ctx.fillStyle = color;
+        ctx.fillText(txt, cx, y); ctx.fillText(txt, cx, y); ctx.restore();
+        t(txt, y, font, color);
+      };
+      glow('ให้ไว้ ณ วันที่ ' + thaiDate(), 920, '400 34px ' + F, '#57534e');
+      ctx.save(); ctx.shadowColor = 'rgba(255,253,245,.95)'; ctx.shadowBlur = 16;
+      ctx.strokeStyle = '#57534e'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(cx - 150, 1000); ctx.lineTo(cx + 150, 1000); ctx.stroke(); ctx.restore();
+      glow('ลงชื่อ  ' + m.teacher + '  ครูผู้สอน', 1040, '700 34px ' + F, '#3b2f14');
+      glow('🌏 www.GamePlearn.com — ทุกเกม คืออีกชั้นของการเรียนรู้', 1120, '800 34px ' + F, '#92400e');
+    } else if (st === 'k2') {
+      const bg = await certImg('cert-bg-kan2.webp');
+      const gg = ctx.createLinearGradient(0, 0, W, H);
+      gg.addColorStop(0, '#fffdf2'); gg.addColorStop(1, '#f4e9c9');
+      ctx.fillStyle = gg; ctx.fillRect(0, 0, W, H);
+      cover(bg, 0.20);
+      ctx.strokeStyle = '#c9a95c'; ctx.lineWidth = 10; ctx.strokeRect(26, 26, W - 52, H - 52);
+      ctx.strokeStyle = '#e0c98a'; ctx.lineWidth = 3; ctx.strokeRect(48, 48, W - 96, H - 96);
+      ctx.strokeStyle = '#c9a95c'; ctx.lineWidth = 6;
+      [[70, 70, 1, 1], [W - 70, 70, -1, 1], [70, H - 70, 1, -1], [W - 70, H - 70, -1, -1]].forEach((p2) => {
+        ctx.beginPath(); ctx.moveTo(p2[0] + 58 * p2[2], p2[1]); ctx.lineTo(p2[0], p2[1]);
+        ctx.lineTo(p2[0], p2[1] + 58 * p2[3]); ctx.stroke();
+      });
+      t('เกมเพลิน: ' + x.g.name, 246, '800 54px ' + F, '#14406b', W - 300);
+      t('ขอมอบประกาศนียบัตรฉบับนี้ไว้เพื่อแสดงว่า', 300, '400 32px ' + F, '#5a5a45');
+      t(name, 400, '800 74px ' + F, '#7c4a03', W - 300);
+      ctx.strokeStyle = '#c9a95c'; ctx.lineWidth = 4; ctx.setLineDash([12, 10]);
+      ctx.beginPath(); ctx.moveTo(cx - 420, 428); ctx.lineTo(cx + 420, 428); ctx.stroke();
+      ctx.setLineDash([]);
+      t(metaLine, 486, '400 30px ' + F, '#5a5a45', W - 300);
+      t(x.c.line, 580, '400 36px ' + F, '#3a3a2a', W - 300);
+      const pill = x.c.sub || x.c.line;
+      ctx.font = '800 36px ' + F;
+      const pw = Math.min(W - 260, ctx.measureText(pill).width + 80);
+      ctx.fillStyle = 'rgba(21,90,60,0.10)';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect((W - pw) / 2, 660, pw, 62, 18); else ctx.rect((W - pw) / 2, 660, pw, 62);
+      ctx.fill();
+      t(pill, 703, '800 36px ' + F, '#14406b', pw - 60);
+      t(thaiDate(), H - 200, '400 30px ' + F, '#8a7a4a');
+      t('ลงชื่อ  ' + m.teacher + '  ครูผู้สอน', H - 140, '700 30px ' + F, '#6a6046', W - 300);
+      t('www.GamePlearn.com', H - 70, '700 26px ' + F, '#8a6a1e');
+    } else {
+      ctx.fillStyle = '#fffdf5'; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = '#b45309'; ctx.lineWidth = 14; ctx.strokeRect(46, 46, W - 92, H - 92);
+      ctx.lineWidth = 4; ctx.strokeRect(72, 72, W - 144, H - 144);
+      t('GamePlearn · เกมเพลิน', 170, '700 30px ' + F, '#92600a');
+      t('เกียรติบัตร', 300, '800 104px ' + F, '#7c3f06');
+      t('ฉบับนี้ให้ไว้เพื่อแสดงว่า', 370, '400 36px ' + F, '#6b5527');
+      t(name, 490, '800 76px ' + F, '#3b2f14', W - 400);
+      t(x.c.line, 610, '400 42px ' + F, '#3b2f14', W - 300);
+      t('เกม ' + x.g.name + (x.c.sub ? ' · ' + x.c.sub : ''), 675, '700 38px ' + F, '#92600a', W - 300);
+      t(metaLine, 780, '400 32px ' + F, '#6b5527', W - 300);
+      t('ให้ไว้ ณ วันที่ ' + thaiDate(), 835, '400 32px ' + F, '#6b5527');
+      t('ลงชื่อ  ' + m.teacher + '  ครูผู้สอน', 1010, '700 34px ' + F, '#3b2f14');
+      t('www.GamePlearn.com', 1165, '400 26px ' + F, '#a08040');
+    }
     /* toDataURL แทน toBlob — ภาค 1 เคยเจอ toBlob เงียบหายบางเครื่อง (บทเรียนที่จดไว้ในเกม) */
     const a = document.createElement('a');
     a.href = cv.toDataURL('image/png');
@@ -1922,7 +2136,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     /* รอฟอนต์ไทยพร้อมก่อนวาด — ไม่งั้นใบแรกได้ฟอนต์สำรอง (บทเรียนภาค 2 จดไว้ในเกม) */
     try { await document.fonts.ready; } catch (e) {}
     for (let i = 0; i < list.length; i++) {
-      certPngOne(list[i], r);
+      await certPngOne(list[i], r);   /* [V.1.6.30] async แล้ว — รอภาพพื้นโหลด/วาดเสร็จก่อนใบถัดไป */
       /* เว้นจังหวะ — เบราว์เซอร์บางตัวกลืนดาวน์โหลดที่ยิงติดกันเร็วเกิน */
       if (i < list.length - 1) await new Promise((res) => setTimeout(res, 400));
     }
@@ -2130,7 +2344,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         const nAch = (S.achieve || []).filter((x) => sids.has(x.student_id)).length;
         const lost = ['นักเรียน <b>' + stu.length + '</b> คน'];
         if (nProg) lost.push('ความคืบหน้ารายเกม <b>' + nProg + '</b> รายการ');
-        if (nAch) lost.push('ใบรายงานผลจากเกม <b>' + nAch + '</b> ใบ');
+        /* [V.1.6.31 · A8] หน่วยนับคำเดียวทั้งระบบ = "รายการ" (ตามนิยาม 1 คน × 1 เกม) */
+        if (nAch) lost.push('ใบรายงานผลจากเกม <b>' + nAch + '</b> รายการ');
 
         box.innerHTML = '<div class="err-box on" style="margin-top:12px">'
           + '<b>ลบห้อง “' + G.esc(r.name) + '” ถาวร?</b><br>'
@@ -3401,6 +3616,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   /* ===================== events ===================== */
+  /* [V.1.6.31 · A6] คีย์บอร์ดลูกศรของ tablist อยู่ที่ gp-core.js (G.tablistKeys)
+     — มาตรฐานเดียว ใช้ร่วมกับหน้าสาธารณะ ไม่เขียนซ้ำสองที่ */
   document.addEventListener('click', function (ev) {
     const t = ev.target.closest('[data-tab]');
     if (t) { TAB = t.getAttribute('data-tab'); route(); return; }

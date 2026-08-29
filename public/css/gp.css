@@ -26,7 +26,29 @@
    ⚠️ ต้องนิยามใน :root เปล่า — นิยามครั้งแรกในบล็อกธีมจะทำธีมตามระบบไม่มีสีเลย */
 :root {
   --lv3: #64748b;  --lv4: #d97706;  --lv5: #16a34a;  --lv6: #7c3aed;
-  --lv3-on: #64748b;  --lv4-on: #b45309;  --lv5-on: #15803d;  --lv6-on: #7c3aed;
+  /* [V.1.6.31 · P-HUB-11] --lv4-on เดิม #b45309 ชนกับ ACH_BANDS ช่วง 50–59 + กรอบเกียรติบัตร
+     + ข้อความเตือน = สีเดียวสี่ความหมายบนหน้าครูหน้าเดียว · มติครูผูกที่ --lv4 ไม่ใช่ -on จึงเปลี่ยนได้
+     ค่าใหม่คัดจากการกวาด hex ทั้งสามเว็บ (1,933 ค่า ในซิปรุ่นล่าสุด) — #a13e0b ยังไม่มีใครใช้ · ขาวทับ 6.54:1 */
+  --lv3-on: #64748b;  --lv4-on: #a13e0b;  --lv5-on: #15803d;  --lv6-on: #7c3aed;
+
+  /* [V.1.6.31 · A2] ช่วงผลสัมฤทธิ์ — คนละสเกลกับระดับสมรรถนะ (5 ขั้น vs 4 ขั้น)
+     จึงเป็นคนละตระกูลโทเคน ห้ามยุบรวมกับ --lv* และห้ามมีค่าซ้ำกันข้ามตระกูล (ยาม t_lvguards คุม)
+     ช่วงคะแนนผูกกับฐาน (sql/72) ห้ามเปลี่ยน · เฉดสีเป็นเรื่องจอ:
+     70–79 เดิม #0d9488 ขาวทับ 3.74:1 ตก AA → #0e6b64 (6.35:1 · ไม่ซ้ำใครในสามเว็บ) */
+  --ach-low: #b91c1c;  --ach-pass: #b45309;  --ach-ok: #a16207;
+  --ach-good: #0e6b64; --ach-best: #047857;
+
+  /* [V.1.6.31 · A1+A3] เส้นคั่นแท่ง + สี "ไม่มีข้อมูล"
+     คู่สีเข้มสองสีที่ตัวอักษรขาวทับผ่าน 4.5:1 ทั้งคู่ จะต่างกันเองไม่ถึง 3:1 โดยคณิตศาสตร์
+     (วัดจริงทุกคู่ที่ลอง ≤2.0) ⇒ WCAG 1.4.11 ปิดด้วยช่องว่างสีอ่อนคั่นทุกแท่งแทน
+     ใช้ค่าเดียวทั้งโหมดสว่าง/มืด — ในโหมดมืดคือเส้นสว่างบาง ๆ ซึ่งยิ่งเห็นขอบชัด */
+  --lvbar-sep: #f9f9f7;
+  --nodata: #e5e7eb;
+
+  /* [V.1.6.31 · A2] หมึกหัวกลุ่มตาราง (ตั้งเป็นโทเคนเพื่อให้โหมดมืดสลับได้ — เดิม hex ตายตัว
+     ทำให้ตัวหนังสือเข้มจมหายบนพื้นมืด) */
+  --grp-ach-ink: #92400e;
+  --grp-c6-ink: #5b21b6;
 }
 
 :root {
@@ -262,6 +284,11 @@
   --on-brand-orange: #2a1505; /* รอบ ก: ส้มโหมดมืด #f08256 อ่อน → ตัวเข้ม 6.7:1 (ทับค่าขาวของสกิน contrast) */
   --btn-play-bg: var(--brand-orange);
   --lift: 0 6px 18px rgba(0, 0, 0, 0.5);
+  /* [V.1.6.31 · A2] หมึกหัวกลุ่มตารางเวอร์ชันมืด — ตัวสว่างบนพื้นมืด ≥8:1 ทั้งคู่ */
+  --grp-ach-ink: #f0a75c;
+  --grp-c6-ink: #c4b5fd;
+  /* [V.1.6.31] "ไม่มีข้อมูล" เวอร์ชันมืด — ค่าเดิม #e5e7eb สว่างจนเด่นกว่าข้อมูลจริงบนพื้นมืด */
+  --nodata: #3a3a38;
 }
 /* auto = ตามเครื่องของผู้ใช้ */
 @media (prefers-color-scheme: dark) {
@@ -293,6 +320,10 @@
     --on-brand-orange: #2a1505; /* รอบ ก: ส้มโหมดมืด #f08256 อ่อน → ตัวเข้ม 6.7:1 (ทับค่าขาวของสกิน contrast) */
     --btn-play-bg: var(--brand-orange);
     --lift: 0 6px 18px rgba(0, 0, 0, 0.5);
+    /* [V.1.6.31 · A2] หมึกหัวกลุ่มตารางเวอร์ชันมืด — ค่าเดียวกับบล็อก data-theme="dark" */
+    --grp-ach-ink: #f0a75c;
+    --grp-c6-ink: #c4b5fd;
+    --nodata: #3a3a38;
   }
 }
 
@@ -605,14 +636,22 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
 
 /* สโลแกนสลับวน — จางออกแล้วจางเข้า ไม่ให้ข้อความกระตุกเปลี่ยนทันที */
 /* ---------- แถบเทียบเกณฑ์ระดับสมรรถนะ (หน้าครู) ---------- */
-.lvbar { display: flex; height: 26px; border-radius: 8px; overflow: hidden;
-  background: var(--grid); border: 1px solid var(--border); }
+.lvbar { display: flex; gap: 2px; height: 26px; border-radius: 8px; overflow: hidden;
+  /* [V.1.6.31 · A1] พื้นแถบ = เส้นคั่นสีอ่อน — โผล่เป็นช่องว่าง 2px ระหว่างแท่ง
+     ทำให้แท่งเข้มสองแท่งติดกันแยกขอบได้ตาม WCAG 1.4.11 (คู่เข้ม-เข้มวัดตรง ๆ ไม่มีทางถึง 3:1) */
+  background: var(--lvbar-sep); border: 1px solid var(--border); }
 .lvbar > div { display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 12px; font-weight: 700; min-width: 0; }
+  color: #fff; font-size: 12.5px; font-weight: 700; min-width: 0; }
 .lvlegend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 7px;
   font-size: 12.5px; color: var(--ink-2); }
 .lvkey { display: inline-flex; align-items: center; gap: 5px; }
 .lvkey i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; flex: none; }
+/* [V.1.6.31 · A3] ชิป "ไม่มีข้อมูล" — เดิม #e5e7eb ล้วน 1.24:1 แทบมองไม่เห็นบนการ์ดขาว
+   ตั้งใจให้ยังดูจาง (ไม่มีข้อมูลไม่ควรเด่นเท่าข้อมูลจริง) แต่เพิ่มเส้นขอบให้เห็นว่า "มีชิปอยู่" */
+.lvkey i.nodata { background: var(--nodata); border: 1px solid var(--muted); }
+/* ท่อนแถบของ "ยังไม่สรุป" — เส้นประบอกว่าเป็นพื้นที่รอข้อมูล ไม่ใช่แท่งคะแนน
+   (ผู้ตรวจหักล้างชี้: ถ้าปล่อยเป็นพื้นแถบเฉย ๆ ส่วนที่เหลือจะเป็นบล็อกสว่างไร้ป้ายในโหมดมืด) */
+.lvbar > div.nodata { background: var(--nodata); border: 1px dashed var(--muted); }
 .lvpill { display: inline-block; min-width: 22px; padding: 1px 8px; border-radius: 999px;
   color: #fff; font-weight: 800; font-size: 12px; text-align: center; }
 
@@ -646,9 +685,12 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
   transition: background .12s, color .12s, border-color .12s;
 }
 .chip:hover { border-color: var(--baseline); color: var(--ink); }
-.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+/* [V.1.6.31 · A6] ชิปที่เป็นแท็บ (grouptabs หน้าสาธารณะ) ย้ายมาตรฐานเป็น aria-selected แล้ว
+   ต้องมีสไตล์คู่กัน — ห้ามถอด aria-pressed ทิ้ง: index/contact/admin ยังใช้ .chip แบบปุ่มสลับอยู่จริง */
+.chip[aria-pressed="true"], .chip[aria-selected="true"] {
+  background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .chip .n { font-size: 11.5px; opacity: .72; font-variant-numeric: tabular-nums; }
-.chip[aria-pressed="true"] .n { opacity: .85; }
+.chip[aria-pressed="true"] .n, .chip[aria-selected="true"] .n { opacity: .85; }
 .filter-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--grid); font-size: 13.5px; color: var(--ink-2); }
 .filter-foot .sp { flex: 1; }
@@ -897,7 +939,7 @@ button.zcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
 
 .brand .logo { background: var(--accent-strong); color: var(--on-accent); }
 
-.chip[aria-pressed="true"] {
+.chip[aria-pressed="true"], .chip[aria-selected="true"] {
   background: var(--accent-strong);
   border-color: var(--accent-strong);
   color: var(--on-accent);
@@ -1038,12 +1080,18 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
    ไม่งั้นครูเดาไม่ออกว่ากดแล้วจะ "เปลี่ยนหน้า" หรือ "เปลี่ยนมุมมองในหน้าเดิม"
    — นี่คือต้นเหตุของอาการ "กดไปเด้งไปเด้งมา" ที่ครูรายงาน
    วางไว้ในหน้า (ไม่ใช่บนหัวเว็บ) เพราะถ้าอยู่บนหัวเว็บจะไปดันปุ่มบัญชีตกบรรทัด */
+/* [V.1.6.31 · A4] เดิมอ้าง --card/--line/--primary ซึ่งไม่มีนิยามใน :root เลย
+   ⇒ ค่าสำรองชนะเสมอ เมนูย่อยเลยไม่ตามสกิน 7 แบบและไม่ตามโหมดมืด (P-HUB-08 ในรูปค่าสำรอง)
+   เปลี่ยนเป็นโทเคนจริงที่มีค่าโหมดมืดครบ · ปุ่ม .on ใช้ --accent-strong (ขาวทับผ่าน 4.5:1
+   ซึ่ง --accent ปกติได้แค่ 4.42) และโหมดมืดใช้ --on-accent ตัวเข้มตามระบบเดิมของสกิน */
 .navlinks.navsub{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px;
-  padding:4px; background:var(--card,#fff); border:1px solid var(--line,#e2e8f0); border-radius:12px; }
+  padding:4px; background:var(--surface); border:1px solid var(--border); border-radius:12px; }
 .navlinks.navsub a{ padding:7px 13px; border-radius:9px; font-size:13px; font-weight:700;
-  color:var(--muted,#64748b); text-decoration:none; }
-.navlinks.navsub a:hover{ background:#f1f5f9; }
-.navlinks.navsub a.on{ background:var(--primary,#2563eb); color:#fff; }
+  color:var(--muted); text-decoration:none; }
+/* hover ต้องเข้มขึ้นด้วย — --muted จูนไว้ผ่านบนพื้น --surface ไม่ใช่บนพื้น --grid ที่เข้มกว่า
+   (ผู้ตรวจหักล้างวัดจริง: ถ้าไม่เติม color จะตก 4.5:1 ใน 6 จาก 8 สกิน/ธีม) */
+.navlinks.navsub a:hover{ background:var(--grid); color:var(--ink); }
+.navlinks.navsub a.on{ background:var(--accent-strong); color:var(--on-accent,#fff); }
 
 /* [V.1.6.12] เมนูหลัก 6 รายการ ต้องอยู่แถวเดียวกับปุ่มบัญชีบนจอโน้ตบุ๊ก
    หัวเว็บถูกจำกัดที่ max-width:1240px ⇒ จอ 1280 กับ 1440 มีที่เท่ากัน
@@ -1059,9 +1107,9 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
    หัวสองชั้น: ชั้นบนคือชื่อกลุ่ม ชั้นล่างคือคอลัมน์จริง */
 .utable th.grp { text-align:center; font-size:12.5px; letter-spacing:.2px;
   border-bottom:2px solid var(--border); padding:6px 8px; }
-.utable th.grp-ach { background:rgba(217,119,6,.10); color:#92400e; }
-.utable th.grp-c6  { background:rgba(124,58,237,.10); color:#5b21b6; }
-.utable th.sub-h { font-size:11.5px; font-weight:700; text-align:center;
+.utable th.grp-ach { background:rgba(217,119,6,.10); color:var(--grp-ach-ink); }
+.utable th.grp-c6  { background:rgba(124,58,237,.10); color:var(--grp-c6-ink); }
+.utable th.sub-h { font-size:12.5px; font-weight:700; text-align:center;
   white-space:nowrap; padding:5px 7px; }
 /* วงกลมระดับสมรรถนะ — ตัวเลขเดียวอ่านเร็วกว่าแถบยาวเมื่อมี 6 คอลัมน์เรียงกัน
    (แถบยาวกินความกว้างจนตารางเลื่อนแนวนอน ซึ่งครูต้องเลื่อนไปมาเพื่ออ่านแถวเดียว) */
@@ -1077,8 +1125,9 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
    ซึ่งกว้างเกินจอทุกขนาด ครูต้องเลื่อนแนวนอนตลอดเวลาจนเทียบแถวเดียวไม่ได้ */
 .cmptable .cmpcell { display:flex; gap:3px; justify-content:center; }
 .cmptable .cmpchip { display:inline-flex; align-items:center; justify-content:center;
-  min-width:20px; height:20px; border-radius:5px; font-size:11.5px; font-weight:700;
+  min-width:20px; height:20px; border-radius:5px; font-size:12.5px; font-weight:700;
   background:var(--grid); color:var(--ink); }
 .cmptable .cmpchip.off { background:transparent; color:var(--muted); font-weight:400; }
-.cmptable .cmpst { font-size:10px; margin-top:2px; white-space:nowrap; }
+/* [V.1.6.31 · A10] เดิม 10px เล็กกว่าเกณฑ์อ่านออกบนโปรเจกเตอร์ — ขั้นต่ำของหน้านี้คือ 12.5px */
+.cmptable .cmpst { font-size:12.5px; margin-top:2px; white-space:nowrap; }
 

@@ -178,7 +178,12 @@ as $fn$
        and (p_game is null or d.game_code = p_game)
   ),
   units as (
-    select u.key as unit_name,
+    /* [V.1.6.31 · ข้อ C — ใบ HUB 25/26 ส.ค.] เพิ่มมิติเกม
+       เดิม group by u.key อย่างเดียว ⇒ คีย์ชื่อซ้ำของสองเกม (เช่น `_boss` ภาค1=19.1 · ภาค2=13)
+       ถูกยุบเป็นแท่งเดียวแล้วเฉลี่ยข้ามเกม บนจอ "ทุกเกม" ซึ่งเป็นค่าเริ่มต้นของหน้า
+       — เลขผิดที่ดูเหมือนถูก · กติกาเหล็กเดิมคงครบ: ชื่อช่องมาจากเกม เว็บกลางไม่ตั้งชื่อเอง
+       แค่เลิกยุบของสองเกมเข้าด้วยกัน · ลายเซ็นฟังก์ชันไม่เปลี่ยน (ไม่มีปัญหา overload) */
+    select a.game_code, a.game_name, u.key as unit_name,
            count(*)                                  as n,
            round(avg((u.value)::numeric), 1)          as avg_value
       from ach a
@@ -190,7 +195,7 @@ as $fn$
         case when jsonb_typeof(a.unit_scores) = 'object' then a.unit_scores
              else '{}'::jsonb end) u
      where u.value ~ '^-?[0-9]+(\.[0-9]+)?$'          -- เก็บเฉพาะช่องที่เป็นตัวเลขจริง
-     group by u.key
+     group by a.game_code, a.game_name, u.key         -- [V.1.6.31 · ข้อ C] มิติเกม
   )
   select jsonb_build_object(
     'scope', jsonb_build_object('school', p_school, 'grade', p_grade, 'year', p_year, 'game', p_game),
@@ -234,8 +239,12 @@ as $fn$
                                      (5,'CZ','การเป็นพลเมืองที่เข้มแข็ง'),
                                      (6,'SN','การอยู่ร่วมกับธรรมชาติและวิทยาการอย่างยั่งยืน'))
                              as v(ord, code, nm)) c),
-    'units', (select coalesce(jsonb_agg(jsonb_build_object('name', unit_name, 'n', n, 'avg', avg_value)
-                              order by unit_name), '[]'::jsonb) from units),
+    /* [V.1.6.31 · ข้อ C] เพิ่ม game/game_code ต่อแถว — หน้าเว็บเติมชื่อเกมนำหน้าป้าย
+       เฉพาะตอนตัวกรองเกมว่าง (ดู dashboard.html ส่วนกราฟคะแนนเก็บ) */
+    'units', (select coalesce(jsonb_agg(jsonb_build_object(
+                                'game', game_name, 'game_code', game_code,
+                                'name', unit_name, 'n', n, 'avg', avg_value)
+                              order by game_name, unit_name), '[]'::jsonb) from units),
     'updated_at', (select max(computed_at) from ach)
   )
 $fn$;

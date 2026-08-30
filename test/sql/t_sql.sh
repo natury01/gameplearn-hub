@@ -697,13 +697,34 @@ n=$($Q -c "select bool_and(has_function_privilege('anon', f, 'execute'))::text f
 ok "สิทธิ์ anon ครบทั้ง 7 ลายเซ็นใหม่ (ยาม grant ที่ฐานจำลองเดิมมองไม่เห็น)" "$n" "true"
 
 # ── ยามทะเบียน (สเปกข้อ 2): ฟังก์ชันเขียนตารางผูก game_id ต้องแยกภาค — ห้ามมี ❌ เหลือ ──
-n=$($Q -c "with exempt(fn) as (values ('rpc_split_group'),('rpc_split_named')),
+# [V.1.6.33 · P-KAN1-08 ตามใบ HUB 29 ส.ค.] รายชื่อตารางเลิกพิมพ์มือ — ถามสคีมาเอง
+# (รายชื่อพิมพ์มือเดิมตามหลังสคีมาแล้วจริง 1 ตาราง: ครอบ 12 จาก 13)
+# ทะเบียนยกเว้น — เหตุผลต้องอยู่ในไฟล์นี้ ไม่ใช่ในกระดาน (ใบ HUB ข้อ ③):
+#   rpc_split_group / rpc_split_named — เครื่องมือครูแยกบัญชีกลุ่มนอกวงจรเล่น:
+#     คัดลอก game_id จากแถวที่มีอยู่แล้ว ไม่ได้หาเกมจากรหัส จึงไม่มีอะไรให้ resolve
+#   classroom_games — ทะเบียน "ห้องเปิดเกมอะไร": game_id มาจากตัวเลือกในหน้าจอ
+#     (id ตรงจากทะเบียน games) ไม่ได้แปลงจากรหัสข้อความ ⇒ ไม่มีความเสี่ยงแบบ F4
+#     [ตัดสิน 30 ส.ค. โดย Code ตามที่ HUB ขอให้ตัดสินพร้อมเหตุผล]
+n=$($Q -c "select count(*) from pg_attribute a
+  join pg_class c on c.oid=a.attrelid join pg_namespace n on n.oid=c.relnamespace
+  where n.nspname='public' and c.relkind='r' and a.attname='game_id'
+    and a.attnum>0 and not a.attisdropped;")
+if [ "$n" -ge 5 ]; then pass_note="(พบ $n ตาราง)"; echo "  ✅ ⭐ ยามคู่: ตัวดึงรายชื่อตารางจากสคีมายังทำงาน $pass_note"; else
+  echo "  ❌ ⭐ ยามคู่: ตัวดึงรายชื่อคืน $n ตาราง (<5) — สิทธิ์อ่าน catalog หาย? ยามหลักจะเขียวหลอก"; bad=$((bad+1)); fi
+n=$($Q -c "with gid_tables as (
+    select c.relname from pg_attribute a
+      join pg_class c on c.oid=a.attrelid join pg_namespace n on n.oid=c.relnamespace
+     where n.nspname='public' and c.relkind='r' and a.attname='game_id'
+       and a.attnum>0 and not a.attisdropped
+       and c.relname <> 'classroom_games'),
+  pat as (select 'insert\\s+into\\s+(public\\.)?(' || string_agg(relname,'|') || ')\\M' as re from gid_tables),
+  exempt(fn) as (values ('rpc_split_group'),('rpc_split_named')),
   writers as (select p.proname, prosrc from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and p.prokind in ('f','p')
-      and prosrc ~* 'insert\\s+into\\s+(public\\.)?(attempts|events|surveys|feedback|competency_results|competency_dim_results|achievement_results|student_item_scores|student_game_progress|game_media|game_framework_items|standards_publish_log)\\M')
+      and prosrc ~* (select re from pat))
   select count(*) from writers w left join exempt e on e.fn=w.proname
    where e.fn is null and w.prosrc !~* 'gp_resolve_game|gp_game_for';")
-ok "⭐ ยามทะเบียน: ไม่มีฟังก์ชันเขียนตารางเกมที่ยังไม่แยกภาค (นอกทะเบียนยกเว้นที่เซ็นชื่อ)" "$n" "0"
+ok "⭐ ยามทะเบียน: ไม่มีฟังก์ชันเขียนตารางเกมที่ยังไม่แยกภาค (รายชื่อจากสคีมาสด)" "$n" "0"
 
 echo ""
 echo "═══ 9) 66 — ใครเป็นเจ้าของผังตัวชี้วัด (คำถามของภาค 2) ═══"

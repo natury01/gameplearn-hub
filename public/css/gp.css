@@ -785,6 +785,8 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
   box-shadow: 0 0 2px rgba(0,0,0,.55); transition: background .2s; }
 .gcover .gdots i.on { background: #fff; }
 .gcover .gdots i.gone { display: none; }
+/* [V.1.6.33] จุดแรก = เฟรมปก — ขีดสั้นให้รู้ว่าไม่ใช่ภาพด่าน (สเปก HUB สไลด์ปกเกม ข้อ ①) */
+.gcover .gdots i.cov { width: 12px; border-radius: 3px; }
 /* ตั้งค่าเครื่องว่าลดการเคลื่อนไหว = ไม่ค่อย ๆ จาง (สคริปต์ก็ไม่เลื่อนให้อยู่แล้ว) */
 @media (prefers-reduced-motion: reduce) { .gcover .gshot { transition: none; } }
 
@@ -1135,3 +1137,22 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
 /* [V.1.6.31 · A10] เดิม 10px เล็กกว่าเกณฑ์อ่านออกบนโปรเจกเตอร์ — ขั้นต่ำของหน้านี้คือ 12.5px */
 .cmptable .cmpst { font-size:12.5px; margin-top:2px; white-space:nowrap; }
 
+/* ---------- [V.1.6.34 · D2] แท็บข้อมูลวิจัย (teacher.html) ---------- */
+/* แถวตารางความครอบคลุม 22 องค์ — เขียว/เหลือง/แดงเป็นพื้นจาง อ่านสถานะได้โดยไม่พึ่งสีล้วน
+   (ข้อความสถานะ 🟢🟡🔴 อยู่ในเซลล์เสมอ — สีเป็นตัวช่วย ไม่ใช่ตัวพาความหมายเดี่ยว) */
+.rs-ok   > td { background: #eef7ee; }
+.rs-wait > td { background: #fdf6e0; }
+.rs-none > td { background: #fdecea; }
+/* ▲ ค่าทดแทน (ประเมินตนเอง) — สัญลักษณ์แยกจากหลักฐานจริงตามสเปก D2 ข้อ ③ */
+.rs-subst { color: #7c3aed; font-weight: 700; }
+.rs-flag  { border-left: 4px solid #b45309; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .rs-ok   > td { background: #1d2b1f; }
+  :root:not([data-theme="light"]) .rs-wait > td { background: #2c2617; }
+  :root:not([data-theme="light"]) .rs-none > td { background: #2f1d1b; }
+  :root:not([data-theme="light"]) .rs-subst { color: #b79df5; }
+}
+[data-theme="dark"] .rs-ok   > td { background: #1d2b1f; }
+[data-theme="dark"] .rs-wait > td { background: #2c2617; }
+[data-theme="dark"] .rs-none > td { background: #2f1d1b; }
+[data-theme="dark"] .rs-subst { color: #b79df5; }

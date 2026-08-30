@@ -205,26 +205,27 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
     /* ใบแรกใบเดียวที่ใส่ src ตั้งแต่วาด — ที่เหลือรอจนสไลด์เริ่มเลื่อนจริง (ดู shotsWake)
        หน้าแรกมีการ์ดหลายสิบใบ ถ้าโหลดทุกใบพร้อมกันคือภาพหลักร้อยใบบนเน็ตโรงเรียน */
+    /* [V.1.6.33 · ครูทัก + สเปก HUB "สไลด์ปกเกม" ทาง ก] ปกกลายเป็น "เฟรมที่ 0" ของสไลด์
+       เดิม .gshot[data-i=0] ติด .on ตั้งแต่วาด ⇒ ปกไม่เคยถูกแสดงเลย (เป็นแค่ชั้นสำรองภาพเสีย)
+       ใหม่: ตอนวาดไม่มีใบไหนติด .on ⇒ .gbase ข้างใต้โผล่เป็นเฟรมแรก · วนกลับมาหาปกทุก ๆ 4 ภาพ
+       ผลพลอยได้: ผู้ใช้ prefers-reduced-motion เห็น "ปก" ค้าง (ของที่ควรเห็นที่สุด) แทนภาพด่านใบแรก */
     const imgs = shots.map(function (m, i) {
       /* ไม่มี alt ที่เกมส่งมา ใช้ชื่อด่านแทน · ไม่มีทั้งคู่ = ปล่อยว่าง (ภาพประกอบล้วน)
          alt="" ที่ตั้งใจว่าง ถูกต้องกว่าใส่ข้อความเดาเอง โปรแกรมอ่านหน้าจอจะข้ามให้ */
       const alt = G.esc(m.alt || m.caption || '');
-      return '<img class="gshot' + (i === 0 ? ' on' : '') + '" data-i="' + i + '"'
+      return '<img class="gshot" data-i="' + i + '"'
         + ' data-cap="' + G.esc(m.caption || '') + '"'
         + (i === 0 ? ' src="' + G.esc(m.url) + '"' : ' data-src="' + G.esc(m.url) + '"')
         + ' alt="' + alt + '" loading="lazy" decoding="async">';
     }).join('');
 
-    /* ภาพเดียว = ไม่ใช่สไลด์ ไม่ต้องมีจุดบอกหน้าและไม่ต้องเลื่อน (ไม่ติดคลาส gshots) */
-    if (shots.length < 2) {
-      return '<div class="' + cls + '">' + coverBase(g) + imgs + ribbon + part + '</div>';
-    }
-
-    const dots = shots.map(function (m, i) { return '<i' + (i === 0 ? ' class="on"' : '') + '></i>'; }).join('');
-    const cap = G.esc(shots[0].caption || '');
+    /* ภาพเดียวก็ยังเป็นสไลด์ — "ปก + 1 ภาพ" คือสองอย่างที่ครูอยากเห็น (สเปก HUB ข้อควรระวัง) */
+    /* จุดแรก = ปก (รูปทรงขีดสั้น ต่างจากจุดภาพด่าน) · จุดภาพด่าน i อยู่ตำแหน่ง i+1 */
+    const dots = '<i class="cov on"></i>'
+      + shots.map(function () { return '<i></i>'; }).join('');
     return '<div class="' + cls + ' gshots" data-shots="' + shots.length + '">'
       + coverBase(g) + imgs + ribbon + part
-      + '<div class="gcap"' + (cap ? '' : ' hidden') + '>' + cap + '</div>'
+      + '<div class="gcap" hidden></div>'
       + '<div class="gdots" aria-hidden="true">' + dots + '</div>'
       + '</div>';
   }
@@ -234,7 +235,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      เหตุผล: หน้าแรกมีการ์ดหลายสิบใบ ถ้าทุกใบขยับตลอดเวลา หน้าจะกระพริบทั้งหน้าจนอ่านชื่อเกมไม่ทัน
      และเครื่องของโรงเรียนจะทำงานหนักโดยไม่ได้อะไรกลับมา
      นาฬิกามีตัวเดียวทั้งหน้า ผูกกับการ์ดที่ชี้อยู่ — ออกจากการ์ดเมื่อไหร่ก็หยุดทันที */
-  const SHOT_MS = 2400;
+  /* [V.1.6.33] 2400 → 3200: คำบรรยายไทย ~40 ตัวอ่านไม่ทันใน 2.4 วิ (สเปก HUB ข้อ ②)
+     ใช้จังหวะเดียวทั้งปกและภาพด่าน — ปกที่ 3.2 วิ อยู่ใต้เพดาน WCAG 2.2.2 (<5 วิ ไม่ต้องมีปุ่มหยุด)
+     SHOTS_PER_ROUND = ภาพด่านกี่ใบก่อนวนกลับมาหาปก (ครูเห็นปกทุก ~16 วิ ไม่ว่ามีภาพกี่ใบ) */
+  const SHOT_MS = 3200, SHOTS_PER_ROUND = 4;
   /* ผู้ใช้ที่ตั้งค่าเครื่องว่า "ลดการเคลื่อนไหว" (เมาง่าย/ไวต่อภาพขยับ) — ไม่เลื่อนให้เลย
      ยังเห็นภาพด่านแรกและยังกดเล่นได้ตามปกติ */
   const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -273,11 +277,20 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   var autoTimer = null;
   var inView = new Set();
 
+  /* [V.1.6.33 · สเปก HUB ข้อ ③] เฟสเหลื่อมรายการ์ด — เดิมทุกการ์ดพลิกพร้อมกันเป๊ะทั้งหน้า
+     อ่านเป็นความกระตุก · ให้การ์ดใบที่ i รอ (i mod รอบ) จังหวะก่อนเริ่มเดิน — ต้นทุนเกือบศูนย์
+     ทุกใบยังเริ่มที่ "ปก" เหมือนกัน แค่ออกตัวคนละจังหวะแล้วเหลื่อมถาวร */
+  var skewSeq = 0;
   function autoStep() {
     try {
       if (document.hidden) return;
       inView.forEach(function (box) {
         if (!box.isConnected) { inView.delete(box); return; }
+        /* เหลื่อมแค่ 0/1 จังหวะสลับกัน — พอให้ครึ่งหน้าไม่พลิกพร้อมกัน โดยการ์ดท้าย ๆ
+           ไม่ต้องจมอยู่กับปกนานหลายรอบก่อนภาพแรกจะมา */
+        if (box.dataset.wait == null) box.dataset.wait = String(skewSeq++ % 2);
+        const w = Number(box.dataset.wait);
+        if (w > 0) { box.dataset.wait = String(w - 1); return; }
         shotsStep(box);
       });
     } catch (e) { /* สไลด์พังต้องไม่ทำให้หน้าเว็บพัง */ }
@@ -336,40 +349,69 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
      ⚠️ ทุกดัชนีในฟังก์ชันชุดนี้คือ "ตำแหน่งในรายการภาพทั้งหมด" ซึ่งตรงกับ data-i และตรงกับจุดบอกหน้า
      เคยพลาดตรงนี้มาแล้วเพราะเผลอนับจากรายการที่กรองใบตายออก พอมีภาพเสียจุดจะเลื่อนไม่ตรงกับภาพ */
+  /* [V.1.6.33] วงจรเฟรม: ปก → ภาพด่าน SHOTS_PER_ROUND ใบ → กลับปก → ชุดถัดไป …
+     สถานะต่อการ์ด: ไม่มีใบไหนติด .on = กำลังโชว์ปก (ชั้น .gbase ข้างใต้)
+       data-step  = โชว์ภาพด่านมากี่ใบแล้วในรอบนี้ (0 = อยู่ที่ปก)
+       data-chunk = ดัชนีภาพที่รอบถัดไปจะเริ่มหยิบ (หมุนไปเรื่อย ๆ จนครบทุกใบ) */
   function shotsStep(box, fromIdx) {
     const all = Array.prototype.slice.call(box.querySelectorAll('.gshot'));
     const cur = box.querySelector('.gshot.on');
     const live = all.filter(function (im) { return !im.classList.contains('dead'); });
-    /* ตายหมดทุกใบ = ปกเดิมชั้นล่างทำหน้าที่แทน · ต้องเก็บชื่อด่านกับจุดบอกหน้าไปด้วย
-       ไม่งั้นจะเหลือคำว่า "ด่าน 3 ถ้ำกระแซ" ลอยอยู่บนภาพปกที่ไม่ใช่ด่าน 3 */
+    /* ตายหมดทุกใบ = ปกยืนโรงถาวร (ตอนนี้ปกเป็นเฟรมจริง ไม่ใช่แค่ชั้นสำรองแล้ว) */
     if (!live.length) {
-      const cap = box.querySelector('.gcap'), dots = box.querySelector('.gdots');
-      if (cap) { cap.textContent = ''; cap.hidden = true; }
+      const dots = box.querySelector('.gdots');
       if (dots) dots.style.display = 'none';
+      paintCover(box);
       if (box === shotBox) shotsStop();
       return;
     }
 
-    const start = (fromIdx != null) ? fromIdx : (cur ? all.indexOf(cur) : -1);
+    const stepN = Number(box.dataset.step || 0);
+    /* ครบโควตาภาพด่านของรอบนี้ (หรือใบที่โชว์อยู่ตายและเหลือน้อย) → กลับไปหาปก */
+    if (cur && fromIdx == null && stepN >= Math.min(SHOTS_PER_ROUND, live.length)) {
+      box.dataset.chunk = String((all.indexOf(cur) + 1) % all.length);
+      box.dataset.step = '0';
+      cur.classList.remove('on');
+      paintCover(box);
+      return;
+    }
+
+    /* หาใบถัดไปที่ยังใช้ได้: จากใบปัจจุบัน (หรือจุดที่ใบตายทิ้งไว้) · จากปก = เริ่มที่ chunk */
+    const start = (fromIdx != null) ? fromIdx
+      : (cur ? all.indexOf(cur) : (Number(box.dataset.chunk || 0) - 1));
     let next = null;
     for (let k = 1; k <= all.length; k++) {
       const c = all[(start + k + all.length) % all.length];
       if (c && !c.classList.contains('dead')) { next = c; break; }
     }
-    if (live.length < 2 && box === shotBox) shotsStop();   /* เหลือใบเดียว ไม่มีอะไรให้สลับแล้ว */
-    if (!next || next === cur) return;
+    if (!next) return;
+    if (next === cur) {   /* เหลือใบเดียว — สลับ ปก ↔ ใบนั้น ไปเรื่อย ๆ */
+      box.dataset.step = '0';
+      cur.classList.remove('on');
+      paintCover(box);
+      return;
+    }
     /* ⚠️ ปลุกใบที่กำลังจะโชว์ก่อนเสมอ — ไม่งั้นกรณีใบแรกโหลดไม่ขึ้นตั้งแต่เปิดหน้า
        เราจะเลื่อนไปใบที่ยังไม่มี src (ยังรอ lazy อยู่) แล้วได้ชื่อด่านใหม่ทับบนปกเดิมที่ไม่ใช่ด่านนั้น
        เจอจริงตอนทดสอบกับชุด 14 ใบของภาค 1 ที่โฮสต์ภาพยังไม่ได้อัปโหลด */
     wakeOne(next);
     if (cur) cur.classList.remove('on');
     next.classList.add('on');
+    box.dataset.step = String((cur || fromIdx != null) ? stepN + 1 : 1);
     paintShotMeta(box, all.indexOf(next));
   }
-  /* คำบรรยาย (ชื่อด่าน) กับจุดบอกหน้า ต้องตรงกับภาพที่เห็นอยู่เสมอ */
+  /* เฟรมปก: จุดแรก (ขีด .cov) ติด แล้วซ่อนคำบรรยาย — ปกมีชื่อเกม/ป้ายของมันเองอยู่แล้ว */
+  function paintCover(box) {
+    const dots = box.querySelectorAll('.gdots i');
+    Array.prototype.forEach.call(dots, function (d, k) { d.classList.toggle('on', k === 0); });
+    const cap = box.querySelector('.gcap');
+    if (cap) { cap.textContent = ''; cap.hidden = true; }
+  }
+  /* คำบรรยาย (ชื่อด่าน) กับจุดบอกหน้า ต้องตรงกับภาพที่เห็นอยู่เสมอ
+     [V.1.6.33] จุดแรกเป็นของปก ⇒ ภาพด่าน data-i=i คู่กับจุดตำแหน่ง i+1 */
   function paintShotMeta(box, idx) {
     const dots = box.querySelectorAll('.gdots i');
-    Array.prototype.forEach.call(dots, function (d, k) { d.classList.toggle('on', k === idx); });
+    Array.prototype.forEach.call(dots, function (d, k) { d.classList.toggle('on', k === idx + 1); });
     const cap = box.querySelector('.gcap');
     if (!cap) return;
     const im = box.querySelector('.gshot[data-i="' + idx + '"]');
@@ -402,8 +444,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const idx = Number(im.getAttribute('data-i'));
     const wasOn = im.classList.contains('on');
     im.classList.add('dead'); im.classList.remove('on');
-    /* จุดของใบที่ตายต้อง "ซ่อน" ไม่ใช่ "ลบ" — ลบแล้วลำดับจุดที่เหลือจะเลื่อนไม่ตรงกับ data-i ของภาพ */
-    const dot = box && box.querySelectorAll('.gdots i')[idx];
+    /* จุดของใบที่ตายต้อง "ซ่อน" ไม่ใช่ "ลบ" — ลบแล้วลำดับจุดที่เหลือจะเลื่อนไม่ตรงกับ data-i ของภาพ
+       [V.1.6.33] จุดแรกเป็นของปก ⇒ จุดของภาพ data-i=idx อยู่ตำแหน่ง idx+1 */
+    const dot = box && box.querySelectorAll('.gdots i')[idx + 1];
     if (dot) dot.classList.add('gone');
     if (wasOn && box) shotsStep(box, idx);
   }, true);

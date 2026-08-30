@@ -28,7 +28,9 @@ console.log('═══ 1) หน้าแรก — สไลด์ภาพร�
       g1WithSrc: shots(c1).filter((i) => i.getAttribute('src')).length,
       g1Lazy: shots(c1).filter((i) => i.getAttribute('data-src')).length,
       g1Dots: c1.querySelectorAll('.gdots i').length,
-      g1Cap: (c1.querySelector('.gcap') || {}).textContent,
+      g1CovDotOn: !!c1.querySelector('.gdots i.cov.on'),
+      g1NoShotOn: !c1.querySelector('.gshot.on'),
+      g1CapHidden: !!(c1.querySelector('.gcap') || {}).hidden,
       g1Ribbon: !!c1.querySelector('.ribbon'),
       g1Part: !!c1.querySelector('.partno'),
       g2IsSlide: !!c2.querySelector('.gcover.gshots'),
@@ -41,74 +43,55 @@ console.log('═══ 1) หน้าแรก — สไลด์ภาพร�
   ok('รับเฉพาะ https — ใบ http ถูกคัดทิ้ง (ส่งมา 4 ใบ เหลือ 3)', st.g1Shots === 3, st);
   ok('lazy: มีแค่ใบแรกที่ใส่ src ตั้งแต่วาด ที่เหลือรออยู่ใน data-src',
     st.g1WithSrc === 1 && st.g1Lazy === 2, st);
-  ok('จุดบอกหน้าเท่าจำนวนภาพ', st.g1Dots === 3, st);
-  ok('คำบรรยายเริ่มที่ชื่อด่านใบแรก', st.g1Cap === 'ด่าน 1 นักสืบสะพานแคว', st);
+  /* [V.1.6.33 · ครูทัก "ไม่เห็นภาพหน้าปก"] ปกเป็นเฟรมแรกของสไลด์ — ล็อกกติกาใหม่สองทาง:
+     ตอนวาดยังไม่มีภาพด่านใบไหนติด .on (ปกชั้นล่างจึงโชว์) + จุดแรกเป็นขีดปกและติดสถานะ */
+  ok('⭐ เปิดหน้ามาเห็น "ปก" ก่อนเสมอ (ไม่มีภาพด่านทับตั้งแต่เฟรมแรก)',
+    st.g1NoShotOn && st.g1CovDotOn && st.g1CapHidden, st);
+  ok('จุดบอกหน้า = ภาพทุกใบ + จุดปก 1 จุด', st.g1Dots === 4, st);
   ok('ป้าย ⭐ แนะนำ และ ภาค N ยังติดอยู่บนปกที่เป็นสไลด์', st.g1Ribbon && st.g1Part, st);
-  ok('ภาพเดียว = ไม่เป็นสไลด์ (ไม่มีคลาส gshots ไม่มีจุด)',
-    !st.g2IsSlide && st.g2Shots === 1 && st.g2Dots === 0, st);
+  ok('⭐ ภาพเดียวก็เป็นสไลด์ (ปก + 1 ภาพ คือสองอย่างที่ครูอยากเห็น)',
+    st.g2IsSlide && st.g2Shots === 1 && st.g2Dots === 2, st);
 
-  /* ---- เลื่อนเฉพาะการ์ดที่ชี้ ---- */
-  const before = await p.evaluate(() => {
-    const c = [...document.querySelectorAll('#cat .gcard')]
-      .find((x) => x.querySelector('h3').textContent.includes('ภาค 2') === false);
-    return { on: c.querySelector('.gshot.on').getAttribute('data-i') };
-  });
-  await sleep(3000);
-  const idle = await p.evaluate(() => {
-    const c = [...document.querySelectorAll('#cat .gcard')]
-      .find((x) => !x.querySelector('h3').textContent.includes('ภาค 2'));
-    return { on: c.querySelector('.gshot.on').getAttribute('data-i'),
-      loaded: [...c.querySelectorAll('.gshot')].filter((i) => i.getAttribute('src')).length };
-  });
-  /* [V.1.6.20 · ครูสั่ง] สองข้อนี้เดิมยึดสัญญา "เลื่อนเฉพาะตอนเอาเมาส์ชี้"
-     ครูถามว่า "ไม่สไลด์อัตโนมัติหรอ ต้องกดคลิกเลือกดูรูปเอง" ⇒ สัญญากลับด้านโดยตั้งใจ
-     (บนมือถือไม่มี hover เลย ⇒ ของเดิมเห็นแค่ภาพแรกใบเดียวตลอด)
-     แต่สิ่งที่ข้อเดิม "ปกป้อง" ไว้จริง ๆ คือ **ไม่ดึงภาพทุกใบตอนเปิดหน้า**
-     ซึ่งยังสำคัญเท่าเดิมกับเน็ตโรงเรียน — ข้อใหม่จึงคุมเรื่องนั้นต่อในรูปแบบใหม่ */
-  ok('⭐ ไม่ได้ชี้ก็เลื่อนเอง (ครูสั่ง — บนมือถือไม่มี hover)',
-    idle.on !== before.on, { before, idle });
-  ok('⭐ แต่ยังโหลดภาพทีละใบตามที่แสดงจริง ไม่ดึงมาทั้งชุด (เน็ตโรงเรียน)',
-    idle.loaded <= 3, idle);
-
-  await p.hover('#cat .gcard .gcover.gshots');
-  await sleep(3200);
-  const hov = await p.evaluate(() => {
-    const c = document.querySelector('#cat .gcard .gcover.gshots');
-    const on = c.querySelector('.gshot.on');
-    const dots = [...c.querySelectorAll('.gdots i')];
-    return { on: on && on.getAttribute('data-i'), cap: c.querySelector('.gcap').textContent,
-      dotOn: dots.findIndex((d) => d.classList.contains('on')),
-      loaded: [...c.querySelectorAll('.gshot')].filter((i) => i.getAttribute('src')).length,
-      dead: [...c.querySelectorAll('.gshot.dead')].length,
-      goneDots: dots.filter((d) => d.classList.contains('gone')).length };
-  });
-  /* [V.1.6.20] การชี้ไม่ใช่ตัวสั่งเลื่อนอีกแล้ว — หน้าที่ของมันคือ
-     "ครูสนใจการ์ดนี้" ⇒ ปลุกภาพที่เหลือมารอ จะได้ไม่สะดุดตอนสไลด์เดินถึง */
-  ok('ชี้แล้วสไลด์ยังเดินต่อ ไม่หยุดค้าง', hov.on !== null, { before, hov });
-  ok('ชี้แล้วค่อยโหลดภาพที่เหลือ', hov.loaded === 3, hov);
-  ok('จุดบอกหน้าตรงกับภาพที่เห็นอยู่', String(hov.dotOn) === String(hov.on), hov);
-  ok('คำบรรยายเปลี่ยนตามภาพ', hov.cap === 'ด่าน 3 ถ้ำกระแซ' || hov.cap === 'ด่าน 1 นักสืบสะพานแคว', hov);
-  ok('ภาพที่โหลดไม่ขึ้นถูกปิดทิ้ง และจุดของใบนั้นถูกซ่อน (ไม่ใช่ลบจนจุดเลื่อนผิด)',
-    hov.dead === 1 && hov.goneDots === 1, hov);
-
-  await p.mouse.move(5, 5);
-  await sleep(200);
-  /* ⚠️ ห้ามเทียบแค่สองจุดเวลา — การ์ดตัวอย่างมีภาพใช้ได้ 2 ใบ สลับไปมา
-     ถ้าจับตัวอย่างห่างกันพอดีสองรอบ จะได้ค่าเท่ากันแล้วแดงทั้งที่สไลด์เดินอยู่
-     (เทสต์เปราะแบบนี้แย่กว่าไม่มีเทสต์ เพราะทำให้คนเลิกเชื่อผลสีแดง) */
-  let offPrev = await p.evaluate(() => document.querySelector('.gcover.gshots .gshot.on').getAttribute('data-i'));
-  let offChanges = 0;
-  for (let i = 0; i < 12; i++) {
-    await sleep(600);
-    const c = await p.evaluate(() => {
-      const on = document.querySelector('.gcover.gshots .gshot.on');
-      return on ? on.getAttribute('data-i') : null;
+  /* ---- [V.1.6.33] วงจรเฟรม: ปก → ภาพด่าน (สูงสุด 4) → กลับปก · 3.2 วิ + เฟสเหลื่อม 0/1 ----
+     ⚠️ ห้าม sleep ตายตัวแล้วเดาว่าอยู่เฟรมไหน — เก็บสถานะถี่ ๆ แล้วตรวจ "ลำดับ" แทน
+     (จังหวะจริงขึ้นกับเฟสเหลื่อมของการ์ด เทสต์แบบจับเวลาจะเปราะ) */
+  await p.hover('#cat .gcard .gcover.gshots');   /* ชี้ = ปลุกภาพมารอ (ไม่ใช่ตัวสั่งเลื่อนแล้ว) */
+  const states = [];
+  for (let i = 0; i < 26; i++) {                 /* ~15.6 วิ ครอบอย่างน้อย 4 เฟรม + เฟสเหลื่อม */
+    const s = await p.evaluate(() => {
+      const c = [...document.querySelectorAll('#cat .gcard')]
+        .find((x) => !x.querySelector('h3').textContent.includes('ภาค 2'));
+      const on = c.querySelector('.gshot.on');
+      const dots = [...c.querySelectorAll('.gdots i')];
+      return { st: on ? on.getAttribute('data-i') : 'cover',
+        loaded: [...c.querySelectorAll('.gshot')].filter((im) => im.getAttribute('src')).length,
+        dotOn: dots.findIndex((d) => d.classList.contains('on')),
+        capHidden: !!c.querySelector('.gcap').hidden,
+        dead: c.querySelectorAll('.gshot.dead').length,
+        goneDots: dots.filter((d) => d.classList.contains('gone')).length };
     });
-    if (c !== null && c !== offPrev) { offChanges++; offPrev = c; }
+    states.push(s);
+    await sleep(600);
   }
-  ok('⭐ เอาเมาส์ออกแล้วสไลด์ต้องเดินต่อ (ไม่ไปดับนาฬิกาอัตโนมัติทิ้ง)',
-    offChanges >= 2, { เปลี่ยนกี่ครั้งหลังเอาเมาส์ออก: offChanges });
-
+  const seq = [];
+  states.forEach((s) => { if (!seq.length || seq[seq.length - 1] !== s.st) seq.push(s.st); });
+  ok('⭐ เริ่มที่ "ปก" แล้วสไลด์เดินเองโดยไม่ต้องชี้ (ครูสั่ง — มือถือไม่มี hover)',
+    seq[0] === 'cover' && seq.length >= 3, seq);
+  ok('⭐ ปกวนกลับมาอีกครั้งหลังภาพด่าน (ปกเป็นเฟรมจริงของสไลด์ ไม่ใช่แค่ฉากหลัง)',
+    seq.slice(1).includes('cover'), seq);
+  ok('เห็นภาพด่านมากกว่าหนึ่งใบจริง', new Set(seq.filter((x) => x !== 'cover')).size >= 2, seq);
+  ok('⭐ ยังโหลดภาพตามที่แสดงจริง ไม่ดึงเกินชุด (เน็ตโรงเรียน)',
+    states.every((s) => s.loaded <= 3), states[states.length - 1]);
+  const badSync = states.filter((s) =>
+    s.st === 'cover' ? s.dotOn !== 0 : s.dotOn !== Number(s.st) + 1);
+  ok('จุดบอกหน้าตรงกับเฟรมเสมอ (ปก = จุดแรก · ภาพ i = จุดที่ i+1)',
+    badSync.length === 0, badSync.slice(0, 3));
+  const covStates = states.filter((s) => s.st === 'cover');
+  ok('ตอนอยู่เฟรมปก ไม่มีชื่อด่านค้างทับ (คำบรรยายซ่อน)',
+    covStates.length > 0 && covStates.every((s) => s.capHidden), covStates.slice(0, 2));
+  const last = states[states.length - 1];
+  ok('ภาพที่โหลดไม่ขึ้นถูกปิดทิ้ง และจุดของใบนั้นถูกซ่อน (ไม่ใช่ลบจนจุดเลื่อนผิด)',
+    last.dead === 1 && last.goneDots === 1, last);
   ok('สคริปต์ไม่พัง (ภาพเสีย 1 ใบไม่ทำให้หน้าล้ม)', realErrors(calls).length === 0, realErrors(calls));
   await p.close();
 }
@@ -182,11 +165,12 @@ console.log('\n═══ 4) ชุดจริงจากภาค 1 — 14 ด
       isSlide: cover.classList.contains('gshots'),
       dots: c.querySelectorAll('.gdots i').length,
       firstSrc: shots[0].getAttribute('src'),
-      /* ใบที่มี src ต้องเป็นใบที่อยู่ตำแหน่งแรกของอาเรย์ ไม่ใช่ใบที่ชื่อไฟล์ดูเหมือนใบแรก */
-      firstIsFirstSorted: shots[0].classList.contains('on')
+      /* ใบที่มี src ต้องเป็นใบที่อยู่ตำแหน่งแรกของอาเรย์ ไม่ใช่ใบที่ชื่อไฟล์ดูเหมือนใบแรก
+         [V.1.6.33] เลิกดู .on ตอนวาด — เฟรมแรกคือปก ไม่มีใบไหนติด .on แล้ว */
+      firstIsFirstSorted: !!shots[0].getAttribute('src')
         && shots.slice(1).every((i) => !i.getAttribute('src')),
       loaded: shots.filter((i) => i.getAttribute('src')).length,
-      firstCap: cap.textContent,
+      firstCap: shots[0].getAttribute('data-cap') || '',
       alts: shots.slice(0, 3).map((i) => i.getAttribute('alt')),
       coverW: Math.round(r.width), coverH: Math.round(r.height),
       ratio: +(r.width / r.height).toFixed(3),
@@ -197,7 +181,7 @@ console.log('\n═══ 4) ชุดจริงจากภาค 1 — 14 ด
     };
   });
   ok('การ์ดภาค 1 เป็นสไลด์ครบ 14 ใบ', st.isSlide && st.n === 14, st);
-  ok('จุดบอกหน้า 14 จุด และยังอยู่ในกรอบปก ไม่ล้น', st.dots === 14 && st.dotsFit, st);
+  ok('จุดบอกหน้า 14 จุด + จุดปก 1 และยังอยู่ในกรอบปก ไม่ล้น', st.dots === 15 && st.dotsFit, st);
   ok('ตอนเปิดหน้าโหลดภาพจริงใบเดียว', st.loaded === 1, st);
   /* ⚠️ ห้ามผูกกับชื่อไฟล์ — รหัสด่านของภาค 1 ไม่ใช่เลข 1-14 เรียงกัน (มี mg1 · hellfire · pilok ปนอยู่)
      ยึด "ใบแรกของอาเรย์ที่เรียงตาม sort" อย่างเดียว ซึ่งเป็นสัญญาที่ตกลงกันไว้จริง */
@@ -227,7 +211,7 @@ console.log('\n═══ 4) ชุดจริงจากภาค 1 — 14 ด
   await p.waitForSelector('.gcard', { timeout: 15000 });
   await sleep(600);
   await p.hover('#cat .gcard .gcover.gshots');
-  await sleep(3000);
+  await sleep(7200);   /* [V.1.6.33] จังหวะ 3.2 วิ + เฟสเหลื่อม 1 จังหวะ — รอให้ shotsStep เดินแน่ ๆ */
   const st = await p.evaluate(() => {
     const c = document.querySelector('#cat .gcover.gshots');
     const cap = c.querySelector('.gcap');
@@ -299,17 +283,19 @@ console.log('\n═══ สไลด์ต้องเดินเอง ไม
   await stub(p);
   await p.goto(BASE + '/index.html');
   await sleep(2000);
-  const a = await p.evaluate(() => {
-    const on = document.querySelector('.gshots .gshot.on');
-    return on ? on.getAttribute('data-i') : null;
-  });
+  const a = await p.evaluate(() => ({
+    on: !!document.querySelector('.gshots .gshot.on'),
+    covDot: !!document.querySelector('.gshots .gdots i.cov.on'),
+  }));
   await sleep(5500);
-  const b2 = await p.evaluate(() => {
-    const on = document.querySelector('.gshots .gshot.on');
-    return on ? on.getAttribute('data-i') : null;
-  });
-  ok('⭐ ตั้งค่าเครื่องว่าลดการเคลื่อนไหว → ภาพต้องนิ่ง (ข้อกำหนดการเข้าถึง)',
-    a !== null && a === b2, { ก่อน: a, หลัง: b2 });
+  const b2 = await p.evaluate(() => ({
+    on: !!document.querySelector('.gshots .gshot.on'),
+    covDot: !!document.querySelector('.gshots .gdots i.cov.on'),
+  }));
+  /* [V.1.6.33] ของที่คนกลุ่มนี้เห็นค้างไว้เปลี่ยนจาก "ภาพด่านใบแรก" เป็น "ปก" —
+     ดีขึ้นตามสเปก HUB ข้อ ④: ปกคือสิ่งที่บอกว่าเกมนี้คือเกมอะไร */
+  ok('⭐ ตั้งค่าเครื่องว่าลดการเคลื่อนไหว → นิ่งอยู่ที่ "ปก" (ข้อกำหนดการเข้าถึง)',
+    !a.on && !b2.on && a.covDot && b2.covDot, { ก่อน: a, หลัง: b2 });
   await ctx.close();
 }
 

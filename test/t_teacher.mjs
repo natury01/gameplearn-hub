@@ -507,5 +507,41 @@ console.log('\n═══ 11) ตารางรายคนหน้าเดี
   await p.close();
 }
 
+console.log('═══ 10) [V.1.6.34 · D2] แท็บข้อมูลวิจัย ═══');
+{
+  const { p, calls } = await open({}, '#/room/' + F.R1);
+  await p.click('[data-tab="research"]');
+  await sleep(300);
+  const rs = await p.evaluate(() => {
+    const main = document.getElementById('page-main').textContent;
+    const covRows = [...document.querySelectorAll('tr.rs-ok, tr.rs-wait, tr.rs-none')].length;
+    return {
+      main,
+      covRows,
+      tab: !!document.querySelector('[data-tab="research"][aria-selected="true"]'),
+      subst: main.includes('▲'),
+    };
+  });
+  ok('แท็บ 🔬 ข้อมูลวิจัย เปิดได้และ aria-selected ตาม', rs.tab, '');
+  ok('ตารางความครอบคลุมมีครบ 22 องค์ประกอบ (กรอบ STD-008)', rs.covRows === 22, rs.covRows);
+  ok('⛔ ไม่มีคำต้องห้าม "ครบทุกด้านย่อย" (ท้าย STD-008 — ทะเบียนยังเป็นร่าง)',
+    !rs.main.includes('ครบทุกด้านย่อย'), '');
+  ok('ก2: ช่องที่ยังไม่มีผล บอกเหตุ ไม่ใช่ช่องว่างเงียบ',
+    /ยังไม่มีผลรายองค์ส่งขึ้นมา|ไม่ได้แปลว่านักเรียนทำไม่ได้/.test(rs.main), '');
+  ok('สองช่องที่รอเกณฑ์/ท่อ ประกาศตรง ๆ ว่ารออะไร (B4 · ขอครูรัน_94/A7)',
+    rs.main.includes('ขอครูรัน_94') && /B4/.test(rs.main), '');
+  ok('รอบเล่นซ้ำถูกกำกับว่า "ไม่ใช่ตัววัดการเรียนรู้" (บทเรียนไทล์ที่ถูกถอด)',
+    rs.main.includes('ไม่ใช่ตัววัดการเรียนรู้'), '');
+  ok('ธงชวนดูใช้ภาษา "ชวนช่วย" ไม่ใช่ตัดสิทธิ์', /ชวน(ครูเข้าไป)?ดู|ไม่ใช้ตัดสิทธิ์/.test(rs.main), '');
+  ok('คีย์ด้านย่อยจากเกมถูกจับคู่เข้ากรอบ (fixtures: ctc→ht1 · sm-a→sm1 ต้องมีเลขคน)',
+    await p.evaluate(() => {
+      const rows = [...document.querySelectorAll('tr.rs-ok, tr.rs-wait, tr.rs-none')];
+      const cell = (code) => { const r = rows.find((x) => x.textContent.includes(code)); return r ? r.lastElementChild.textContent : ''; };
+      return /1\/\d+/.test(cell('ht1')) && /1\/\d+/.test(cell('sm1'));
+    }), '');
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+
 await b.close(); srv.close();
 process.exit(ok.done());

@@ -77,13 +77,16 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
     <div class="err-box" id="err" role="alert"></div>
 
     <section class="card" aria-label="ตัวกรอง">
+      <!-- [V.1.6.35 · A13 (ใบ 26 ส.ค.) + ครูสั่ง 2 ก.ย.] เรียงจากกว้างไปแคบ: ปี → โรงเรียน → ชั้น → ห้อง → เกม -->
       <div class="dashfilters">
+        <label class="f">ปีการศึกษา
+          <select id="f-year"><option value="">ทุกปี</option></select></label>
         <label class="f">โรงเรียน
           <select id="f-school"><option value="">ทุกโรงเรียน</option></select></label>
         <label class="f">ระดับชั้น
           <select id="f-grade"><option value="">ทุกชั้น</option></select></label>
-        <label class="f">ปีการศึกษา
-          <select id="f-year"><option value="">ทุกปี</option></select></label>
+        <label class="f">ห้อง
+          <select id="f-room"><option value="">ทุกห้อง</option></select></label>
         <label class="f">เกม
           <select id="f-game"><option value="">ทุกเกม</option></select></label>
         <!-- [V.1.6.31 · A12] ทางออกจากตัวกรองในกริ๊กเดียว — เดิมครูที่เลือกไป 3 ช่องแล้วเจอจอว่าง
@@ -255,6 +258,21 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
 
     let html = '';
 
+    /* [V.1.6.35 · ยามกลุ่มเล็ก] กลุ่ม < 5 คน: ฐานกดค่าเฉลี่ย/การกระจายเป็น null/[] มาแล้ว
+       หน้าที่ของหน้าเว็บคือบอกเหตุผลตรง ๆ — ไม่ใช่โชว์ขีด "—" เฉย ๆ ให้ครูงง */
+    if (s.suppressed && s.suppressed_note) {
+      html += '<div class="note-warn" role="note">🔒 ' + esc(s.suppressed_note) + '</div>';
+    }
+    /* [V.1.6.35 · ข้อเสนอ ก ของ HUB — ป้ายสองสเกล] เตือนเมื่อเกมเดียวกันมีผลจากสองเกณฑ์คะแนนปนกัน
+       (ใบเก่าเต็ม 160 / ใบใหม่เต็ม 130 หลังมติตัดบอส) — ตัวเลขเฉลี่ยเทียบกันตรง ๆ ไม่ได้ */
+    if (s.scale_mixed && (s.scales || []).length) {
+      const gtxt = (s.scales || []).map((x) =>
+        esc(x.game || x.game_code) + ' (เต็ม ' + (x.scales || []).join(' และ ') + ')').join(' · ');
+      html += '<div class="note-warn" role="note">⚠️ ช่วงนี้มีผลจากสองเกณฑ์คะแนนปนกันใน '
+        + gtxt + ' — ตัวเลขเฉลี่ยและการจัดช่วงเทียบกันตรง ๆ ไม่ได้ '
+        + 'จนกว่าใบผลใหม่จะเข้าครบทั้งห้อง (ครูเปิดหน้าห้องเรียนในเกมหนึ่งครั้งเพื่อดันใบใหม่)</div>';
+    }
+
     /* ---- ตัวเลขหัวเรื่อง ---- */
     html += '<div class="statrow">'
       + '<div class="stat"><b>' + (ach.avg_percent == null ? '—' : ach.avg_percent + '%') + '</b>'
@@ -425,12 +443,13 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
 
   function scopeText() {
     const g = (id, all) => { const el = $(id); return el.value ? el.options[el.selectedIndex].text : all; };
-    return [g('f-school', 'ทุกโรงเรียน'), g('f-grade', 'ทุกชั้น'),
-            g('f-year', 'ทุกปีการศึกษา'), g('f-game', 'ทุกเกม')].join(' · ');
+    return [g('f-year', 'ทุกปีการศึกษา'), g('f-school', 'ทุกโรงเรียน'), g('f-grade', 'ทุกชั้น'),
+            g('f-room', 'ทุกห้อง'), g('f-game', 'ทุกเกม')].join(' · ');
   }
 
   const args = () => ({ p_school: $('f-school').value || null, p_grade: $('f-grade').value || null,
-                        p_year: $('f-year').value || null, p_game: $('f-game').value || null });
+                        p_year: $('f-year').value || null, p_game: $('f-game').value || null,
+                        p_room: $('f-room').value || null }); /* [V.1.6.35] ตัวกรองห้อง */
 
   /* [V.1.6.31] เลขรอบกันคำตอบเก่าทับคำตอบใหม่ — คีย์ลูกศรของ A6 ทำให้ยิง load() ติด ๆ กัน
      กลายเป็นการใช้งานปกติ (เดิมเกิดได้แต่ยาก) · ชุดที่ช้ากลับมาทีหลังต้องถูกทิ้ง ไม่ใช่ถูกวาด */
@@ -461,8 +480,25 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
     el.innerHTML = keep + (list || []).map(mapper).join('');
   }
 
+  /* [V.1.6.35 · สเปก HUB ⑤] ย่อรายการห้องตาม ปี/โรงเรียน/ชั้น ที่เลือก — ข้อมูลมากับ
+     rpc_pub_filters แล้ว ไม่เรียกฐานซ้ำ · ถ้าห้องที่เลือกอยู่หลุดขอบเขตใหม่ ให้รีเซ็ตเป็น
+     "ทุกห้อง" ทันที — ไม่งั้นครูเจอจอว่างโดยไม่รู้สาเหตุ */
+  function narrowRooms() {
+    const all = (S.filters && S.filters.rooms) || [];
+    const sc = $('f-school').value, gr = $('f-grade').value, yr = $('f-year').value;
+    const list = all.filter((r) => (!sc || r.school === sc) && (!gr || r.grade === gr)
+                                && (!yr || r.year === yr));
+    const cur = $('f-room').value;
+    fill('f-room', list, (x) => '<option value="' + esc(x.id) + '">' + esc(x.name) + '</option>');
+    if (cur && list.some((r) => r.id === cur)) $('f-room').value = cur;
+    else $('f-room').value = '';
+  }
+
   document.addEventListener('change', (ev) => {
-    if (ev.target.closest('.dashfilters')) load();
+    if (!ev.target.closest('.dashfilters')) return;
+    /* เปลี่ยนขอบเขตกว้าง (ปี/โรงเรียน/ชั้น) = รายการห้องต้องย่อตามก่อนยิงโหลด */
+    if (['f-year', 'f-school', 'f-grade'].includes(ev.target.id)) narrowRooms();
+    load();
   });
   document.addEventListener('click', (ev) => {
     const g = ev.target.closest('[data-group]');
@@ -470,7 +506,8 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
     if (ev.target.closest('#tg-table')) { S.table = !S.table; render(); return; }
     /* [V.1.6.31 · A12] ล้างตัวกรองทุกช่องกลับ "ทุก…" แล้วโหลดใหม่รอบเดียว */
     if (ev.target.closest('#f-clear')) {
-      ['f-school', 'f-grade', 'f-year', 'f-game'].forEach((id) => { $(id).value = ''; });
+      ['f-school', 'f-grade', 'f-year', 'f-room', 'f-game'].forEach((id) => { $(id).value = ''; });
+      narrowRooms();
       load();
     }
   });
@@ -483,6 +520,7 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
       fill('f-grade', f.grades, (x) => '<option value="' + esc(x) + '">' + esc(x) + '</option>');
       fill('f-year', f.years, (x) => '<option value="' + esc(x) + '">' + esc(x) + '</option>');
       fill('f-game', f.games, (x) => '<option value="' + esc(x.code) + '">' + esc(x.name) + '</option>');
+      narrowRooms(); /* [V.1.6.35] เติมรายการห้องรอบแรก (ฐานเก่าที่ยังไม่มีคีย์ rooms → รายการว่าง = ตัวกรองเฉย ๆ ไม่พัง) */
     } catch (e) {
       $('content').innerHTML = '';
       showErr(missingRpc(e)

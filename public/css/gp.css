@@ -1156,3 +1156,11 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
 [data-theme="dark"] .rs-wait > td { background: #2c2617; }
 [data-theme="dark"] .rs-none > td { background: #2f1d1b; }
 [data-theme="dark"] .rs-subst { color: #b79df5; }
+/* ---------- [V.1.6.35] กล่องเตือนบนหน้าสาธารณะ (ยามกลุ่มเล็ก · ป้ายสองสเกล) ---------- */
+.note-warn { background: #fdf6e0; border: 1px solid #d9b23c; border-left: 4px solid #b45309;
+  color: var(--ink); border-radius: 10px; padding: 10px 14px; margin: 0 0 12px;
+  font-size: 13.5px; line-height: 1.55; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .note-warn { background: #2c2617; border-color: #8a6d1f; }
+}
+[data-theme="dark"] .note-warn { background: #2c2617; border-color: #8a6d1f; }

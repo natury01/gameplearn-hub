@@ -210,6 +210,22 @@ export async function stub(page, opt = {}) {
       if (has('rpc/rpc_pub_filters')) return json(F.pubFilters);
       if (has('rpc/rpc_pub_summary')) {
         const b = JSON.parse(post || '{}');
+        /* [V.1.6.35] เลือกห้องเล็ก (ป.4/1) = ฐานยามกดค่าเป็น null/[] + ส่ง suppressed_note มาด้วย */
+        if (b.p_room === F.R1) {
+          return json(Object.assign({}, F.pubSummary, {
+            n_students: 3, n_rooms: 1, suppressed: true,
+            suppressed_note: 'กลุ่มนี้มีนักเรียนน้อยกว่า 5 คน — ไม่แสดงค่าเฉลี่ยและการกระจาย เพื่อไม่ให้ระบุตัวผู้เรียนได้',
+            ach: { n: 3, avg_percent: null, avg_all: 61.8, dist: [] }, units: [],
+            comps: (F.pubSummary.comps || []).map((c) => Object.assign({}, c, { avg_score: null })),
+          }));
+        }
+        /* [V.1.6.35] โหมดสองสเกลปน — เปิดด้วย opt.mixedScale */
+        if (opt.mixedScale) {
+          return json(Object.assign({}, F.pubSummary, {
+            scale_mixed: true,
+            scales: [{ game: 'กาญจนบุรี 2050 ภาค 1', game_code: 'kanchanaburi2050', scales: [130, 160] }],
+          }));
+        }
         /* กรองที่ไม่มีผล = คืนก้อนว่าง เพื่อพิสูจน์ว่าหน้าเว็บขึ้นข้อความ ไม่ใช่กราฟเปล่า */
         if (b.p_grade === 'ป.4') {
           return json(Object.assign({}, F.pubSummary,

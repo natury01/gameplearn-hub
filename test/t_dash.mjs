@@ -283,5 +283,62 @@ console.log('\n═══ สถิติการเข้าถึงเกม 
   await p.close();
 }
 
+console.log('═══ 9) [V.1.6.35] ตัวกรองห้อง + ยามกลุ่มเล็ก + ป้ายสองสเกล ═══');
+{
+  const { p, calls } = await open();
+  const st0 = await p.evaluate(() => ({
+    order: [...document.querySelectorAll('.dashfilters select')].map((s) => s.id),
+    rooms: [...document.getElementById('f-room').options].map((o) => o.textContent),
+  }));
+  ok('A13: เรียงตัวกรอง ปี → โรงเรียน → ชั้น → ห้อง → เกม',
+    st0.order.join(',') === 'f-year,f-school,f-grade,f-room,f-game', st0.order);
+  ok('รายการห้องเติมจาก rpc_pub_filters (3 ห้อง + "ทุกห้อง")', st0.rooms.length === 4, st0.rooms);
+
+  /* เลือกโรงเรียน 2 → รายการห้องต้องย่อเหลือ ป.5/1 และค่าห้องที่เลือกถูกรีเซ็ต */
+  await p.selectOption('#f-room', F.R1);
+  await sleep(300);
+  await p.evaluate((sch) => { const el = document.getElementById('f-school'); el.value = sch;
+    el.dispatchEvent(new Event('change', { bubbles: true })); }, F.SCH2);
+  await sleep(500);
+  const st1 = await p.evaluate(() => ({
+    rooms: [...document.getElementById('f-room').options].map((o) => o.textContent),
+    val: document.getElementById('f-room').value,
+  }));
+  ok('เปลี่ยนโรงเรียนแล้วรายการห้องย่อตาม + ห้องที่หลุดขอบเขตถูกรีเซ็ตเป็น "ทุกห้อง"',
+    st1.rooms.length === 2 && st1.rooms[1] === 'ป.5/1' && st1.val === '', st1);
+
+  /* เลือกห้องเล็ก (ป.4/1 — mock คืน suppressed) */
+  await p.evaluate(() => { const el = document.getElementById('f-school'); el.value = '';
+    el.dispatchEvent(new Event('change', { bubbles: true })); });
+  await sleep(400);
+  await p.selectOption('#f-room', F.R1);
+  await sleep(600);
+  const st2 = await p.evaluate(() => ({
+    text: (document.getElementById('page-main') || {}).textContent || '',
+    scope: document.getElementById('scope-note').textContent,
+  }));
+  ok('ยามกลุ่มเล็ก: ขึ้นเหตุผลตรง ๆ ไม่ใช่ขีดเฉย ๆ',
+    st2.text.includes('น้อยกว่า 5 คน'), st2.text.slice(0, 120));
+  ok('บรรทัด "กำลังดู" บอกชื่อห้องที่เลือก', st2.scope.includes('ป.4/1'), st2.scope);
+  const sums = calls.filter((c) => String(c[1]).includes('rpc_pub_summary'));
+  ok('คำขอส่ง p_room จริง', sums.some((c) => { try { return JSON.parse(c[2]).p_room; } catch (e) { return false; } }), '');
+
+  /* ปุ่มล้างต้องล้างห้องด้วย */
+  await p.click('#f-clear'); await sleep(500);
+  ok('ล้างตัวกรองแล้วช่องห้องกลับเป็น "ทุกห้อง"',
+    await p.evaluate(() => document.getElementById('f-room').value === ''), '');
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+{
+  const { p, calls } = await open({ mixedScale: true });
+  const t = await p.evaluate(() => (document.getElementById('page-main') || {}).textContent || '');
+  ok('ป้ายสองสเกล: เตือนพร้อมชื่อเกมและเลขเพดานทั้งสอง',
+    t.includes('สองเกณฑ์คะแนน') && t.includes('130') && t.includes('160'), t.slice(0, 160));
+  ok('ป้ายบอกทางออก (ครูเปิดหน้าห้องเรียนดันใบใหม่)', t.includes('เปิดหน้าห้องเรียน'), '');
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+
 await b.close(); srv.close();
 process.exit(ok.done());

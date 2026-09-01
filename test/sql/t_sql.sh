@@ -1024,13 +1024,40 @@ else
   echo "  ✅ ห้องผู้เล่นทั่วไปไม่ถูกนับเข้าหน้าสาธารณะ (กติกา PDPA เด็ก)"
 fi
 
-# ── ตัวเลขต้องถูก ──
+# ── [V.1.6.35] สถานะที่ 1: ทั้งระบบมีเด็กแค่ 3 คน → ยามกลุ่มเล็ก (<5) ต้องทำงานที่ summary ด้วย ──
+#   (กติกาเดิมของระบบที่เคยมีเฉพาะ breakdown — ตัวกรองห้องทำให้ต้องครอบทุกทางออก)
+n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->>'suppressed'); rollback;")
+ok "⭐ [ยามกลุ่มเล็ก] เด็ก 3 คนทั้งขอบเขต → ติดธง suppressed" "$n" "true"
+n=$($Q -c "begin; $AS_ANON select coalesce((rpc_pub_summary()->'ach'->>'avg_percent'),'NULL'); rollback;")
+ok "[ยาม] ค่าเฉลี่ยถูกกดเป็น null (ไม่ใช่ 0)" "$n" "NULL"
+n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_summary()->'ach'->'dist'); rollback;")
+ok "[ยาม] การกระจาย 5 ช่วงไม่หลุดออกมา (ห้องเล็กชี้ตัวเด็กได้)" "$n" "0"
+n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_summary()->'units'); rollback;")
+ok "[ยาม] คะแนนรายช่องก็ไม่หลุด (ละเอียดกว่าค่าเฉลี่ยอีก)" "$n" "0"
+n=$($Q -c "begin; $AS_ANON select coalesce((select c->>'avg_score' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='HOT'),'NULL'); rollback;")
+ok "[ยาม] ค่าเฉลี่ยรายด้านถูกกดเป็น null เช่นกัน" "$n" "NULL"
+res=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->>'suppressed_note'); rollback;")
+okc "[ยาม] มีเหตุผลบอกครูตรง ๆ" "$res" "น้อยกว่า 5 คน"
+
+# ── [V.1.6.35] สถานะที่ 2: เติมเด็กอีก 2 คน (ห้องใหม่ ป.6/1 ครูคนเดิม) → รวม 5 → ยามปล่อย ──
+CRB=$($Q -c "select teacher_id from classrooms where name='ป.5/1' limit 1;")
+SCB=$($Q -c "select school_id  from classrooms where name='ป.5/1' limit 1;")
+$Q -c "insert into classrooms (id, teacher_id, school_id, name, grade, join_key, academic_year)
+        values ('cccccccc-0000-4000-8000-000000000061','$CRB','$SCB','ป.6/1','ป.6','P61KEY','2569');
+       insert into students (id, classroom_id, first_name, last_name, student_number) values
+        ('cccccccc-0000-4000-8000-000000000101','cccccccc-0000-4000-8000-000000000061','เด็ก','สี่','1'),
+        ('cccccccc-0000-4000-8000-000000000102','cccccccc-0000-4000-8000-000000000061','เด็ก','ห้า','2');
+       insert into achievement_results (student_id, game_id, run_id, score, max_score, percent, unit_scores) values
+        ('cccccccc-0000-4000-8000-000000000101','$GID','live',90,100,90,'{}'::jsonb),
+        ('cccccccc-0000-4000-8000-000000000102','$GID','live',55,100,55,'{}'::jsonb);" >/dev/null
+n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->>'suppressed'); rollback;")
+ok "เด็กครบ 5 คน → ยามปล่อย" "$n" "false"
 n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->'ach'->>'avg_percent'); rollback;")
-ok "ค่าเฉลี่ยผลสัมฤทธิ์คำนวณถูก ((88+64+41)/3 = 64.3)" "$n" "64.3"
+ok "ค่าเฉลี่ยผลสัมฤทธิ์คำนวณถูก ((88+64+41+90+55)/5 = 67.6)" "$n" "67.6"
 n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_summary()->'ach'->'dist'); rollback;")
 ok "การกระจายผลสัมฤทธิ์แบ่งครบ 5 ช่วง" "$n" "5"
 n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->'ach'->'dist'->0->>'n'); rollback;")
-ok "ช่วงดีเยี่ยม (80-100) นับได้ 1 คน" "$n" "1"
+ok "ช่วงดีเยี่ยม (80-100) นับได้ 2 คน (88 และ 90)" "$n" "2"
 n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_summary()->'comps'); rollback;")
 ok "⭐ คืนสมรรถนะครบ 6 ด้านเสมอ ไม่ใช่เฉพาะด้านที่มีข้อมูล" "$n" "6"
 n=$($Q -c "begin; $AS_ANON select (select c->>'avg_score' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='HOT'); rollback;")
@@ -1046,11 +1073,66 @@ ok "แยกคะแนนเก็บ/คะแนนสอบให้ตา
 n=$($Q -c "begin; $AS_ANON select (select u->>'avg' from jsonb_array_elements(rpc_pub_summary()->'units') u where u->>'name'='คะแนนเก็บ'); rollback;")
 ok "ค่าเฉลี่ยคะแนนเก็บถูก ((80+60+40)/3 = 60.0)" "$n" "60.0"
 
-# ── ตารางย่อย 4 แบบ ──
-for g in school grade classroom game; do
-  n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_breakdown('$g')); rollback;")
-  ok "แยกตาม $g ได้ (คืนอย่างน้อย 1 แถว)" "$n" "1"
+# ── [V.1.6.35] ตัวกรองห้อง p_room (ครูสั่ง 2 ก.ย.) ──
+RM5=$($Q -c "select classroom_id from students where last_name='หนึ่ง' limit 1;")
+n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary(null,null,null,null,'$RM5'::uuid)->'ach'->>'n'); rollback;")
+ok "⭐ กรองห้อง ป.5/1 → เห็นเฉพาะใบผล 3 ใบของห้องนั้น" "$n" "3"
+n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary(null,null,null,null,'$RM5'::uuid)->>'suppressed'); rollback;")
+ok "⭐ และห้อง 3 คนโดนยามทันที (ตัวกรองห้องต้องมาพร้อมยาม ไม่ใช่ตามหลัง)" "$n" "true"
+n=$($Q -c "begin; $AS_ANON select coalesce((rpc_pub_summary(null,null,null,null,'$RM5'::uuid)->'ach'->>'avg_percent'),'NULL'); rollback;")
+ok "ค่าเฉลี่ยห้องเล็กไม่หลุดบนหน้าไม่ล็อกอิน" "$n" "NULL"
+n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_breakdown('classroom',null,null,null,null,'$RM5'::uuid)); rollback;")
+ok "breakdown รับ p_room ด้วย (หน้าเว็บส่ง args ชุดเดียวทั้งสอง RPC)" "$n" "1"
+
+# ── [V.1.6.35] ป้ายสองสเกล (ข้อเสนอ ก ของ HUB — AUDIT รับทั้งฉบับ) ──
+n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->>'scale_mixed'); rollback;")
+ok "เพดานเดียวทั้งเกม → ไม่ติดป้าย" "$n" "false"
+GID2=$($Q -c "select id from games where id <> '$GID' limit 1;")
+$Q -c "insert into achievement_results (student_id, game_id, run_id, score, max_score, percent, unit_scores)
+        values ('cccccccc-0000-4000-8000-000000000101','$GID2','live',80,130,61.5,'{}'::jsonb);" >/dev/null
+n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->>'scale_mixed'); rollback;")
+ok "⭐ คนละเกมเพดานต่าง (100 vs 130) = ของปกติ ไม่ติดป้าย (นับปนเฉพาะin-game)" "$n" "false"
+$Q -c "update achievement_results set max_score = 130
+        where student_id = 'cccccccc-0000-4000-8000-000000000102' and game_id = '$GID';" >/dev/null
+n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->>'scale_mixed'); rollback;")
+ok "⭐ เกมเดียวกันมีสองเพดาน (100 กับ 130) → ติดป้ายทันที" "$n" "true"
+n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_summary()->'scales'); rollback;")
+ok "และบอกว่าเกมไหนปน (1 เกม)" "$n" "1"
+res=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->'scales')::text; rollback;")
+okc "พร้อมเลขเพดานทั้งสองให้หน้าเว็บเอาไปเขียนป้าย" "$res" "130"
+$Q -c "update achievement_results set max_score = 100
+        where student_id = 'cccccccc-0000-4000-8000-000000000102' and game_id = '$GID';
+       delete from achievement_results where game_id = '$GID2';" >/dev/null
+
+# ── [V.1.6.35] ใบ AUDIT 1 ก.ย. ข้อ ๔: ชื่อเด็กต้องไม่อยู่ในมือของฟังก์ชันสาธารณะ ──
+res=$($Q -c "select pg_get_functiondef(p.oid) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
+             where ns.nspname='public' and p.proname='rpc_pub_summary';")
+if echo "$res" | grep -qE "first_name|last_name|student_number|select a\.\*"; then
+  echo "  ❌ ชื่อ/เลขที่เด็ก (หรือ select a.*) ยังอยู่ในนิยาม rpc_pub_summary"; bad=$((bad+1))
+else
+  echo "  ✅ ⭐ CTE ระบุคอลัมน์แล้ว — ชื่อเด็กไม่อยู่ในมือ เติมอะไรทีหลังก็ไม่หลุด"
+fi
+for fn in rpc_pub_summary rpc_pub_breakdown; do
+  n=$($Q -c "select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
+             where ns.nspname='public' and p.proname='$fn';")
+  ok "⭐ $fn เหลือลายเซ็นเดียว (ลายเซ็นเก่าถูก drop — กัน PGRST203 ambiguous)" "$n" "1"
 done
+
+# ── [V.1.6.35] รายการห้องในตัวกรอง (rpc_pub_filters ไม่แตะลายเซ็น) ──
+n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_filters()->'rooms'); rollback;")
+ok "filters คืนรายการห้องที่มีผลจริง (ป.5/1 + ป.6/1)" "$n" "2"
+res=$($Q -c "begin; $AS_ANON select (rpc_pub_filters()->'rooms')::text; rollback;")
+okc "แถวห้องมี id/name/school/grade/year ให้หน้าเว็บย่อรายการเอง" "$res" '"grade"'
+
+# ── ตารางย่อย 4 แบบ ── [V.1.6.35] ฟิกซ์เจอร์มีห้อง ป.6/1 เพิ่ม ⇒ grade/classroom เป็น 2 แถว
+n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_breakdown('school')); rollback;")
+ok "แยกตาม school ได้ (1 โรงเรียน)" "$n" "1"
+n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_breakdown('grade')); rollback;")
+ok "แยกตาม grade ได้ (ป.5 + ป.6 = 2 แถว)" "$n" "2"
+n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_breakdown('classroom')); rollback;")
+ok "แยกตาม classroom ได้ (2 ห้อง)" "$n" "2"
+n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_breakdown('game')); rollback;")
+ok "แยกตาม game ได้ (1 เกม)" "$n" "1"
 n=$($Q -c "begin; $AS_ANON select (rpc_pub_breakdown('classroom')->0->>'label'); rollback;")
 ok "แถวรายห้องบอกชื่อห้อง" "$n" "ป.5/1"
 n=$($Q -c "begin; $AS_ANON select (rpc_pub_breakdown('classroom')->0->>'n_students'); rollback;")
@@ -1130,7 +1212,7 @@ ok "กรองชั้นที่ไม่มีผล = ได้ 0 ไม�
 n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary(null,'ป.5')->'ach'->>'n'); rollback;")
 ok "กรองชั้นที่มีผล = ได้ครบ" "$n" "3"
 n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary(null,'ป.5')->'ach'->>'avg_all'); rollback;")
-ok "⭐ ค่าเฉลี่ยรวมทุกโรงเรียนยังคืนมาเป็นเส้นเทียบ แม้กรองอยู่" "$n" "64.3"
+ok "⭐ ค่าเฉลี่ยรวมทุกโรงเรียนยังคืนมาเป็นเส้นเทียบ แม้กรองอยู่ ([V.1.6.35] ฟิกซ์เจอร์โตเป็น 5 คน → 67.6)" "$n" "67.6"
 
 # ── [V.1.6.31 · ข้อ C — ใบ HUB 25/26 ส.ค.] คีย์ชื่อซ้ำสองเกมห้ามยุบเฉลี่ยข้ามเกม ──
 #  โรคจริงบน production: `_boss` ภาค 1 (19.1) กับภาค 2 (13) ถูกยุบเป็นแท่งเดียว
@@ -1237,7 +1319,7 @@ echo ""
 # ยามพื้น: ถ้าจำนวนข้อลดฮวบ แปลว่ามีหมวดหนึ่ง "ไม่ได้รัน" (เช่นไฟล์ SQL หาย แล้วกิ่งนั้นถูกข้าม)
 # ซึ่งจะไม่มีข้อตกให้เห็นเลย — เป็นรูปแบบ "ตายเงียบ" ที่ STD-006 ข้อ 1 ตั้งมาเพื่อกัน
 # ฐาน ณ V.1.6.7 = 184 ข้อ (ผ่าน ok/okc) · อีกราว 26 ข้อเป็น echo ตรงในหมวด 0 ไม่ถูกนับ
-FLOOR=235   # [V.1.6.31] +4 ข้อยามข้อ C (คีย์ชนข้ามเกม + negative control + คีย์ครบ) · ของจริง 236 เผื่อ 1 แบบเดิม
+FLOOR=255   # [V.1.6.35] +20 ข้อ (ยามกลุ่มเล็ก summary · p_room · สองสเกล per-game · ชื่อไม่อยู่ในมือ · ลายเซ็นเดียว · rooms ใน filters) · ของจริง 256 เผื่อ 1 แบบเดิม
             # [V.1.6.27] +19 ข้อจากหมวด 8b (F4 ท่อจริง 9 ตัว + ยาม + สิทธิ์)
             # (ผู้ตรวจหักล้าง 25 ส.ค. จับได้ว่าค้าง 212 ทั้งที่ของจริง 221 — หมวดหายทั้งหมวดยามไม่ฟ้อง)
 if [ "$_nchk" -lt "$FLOOR" ]; then

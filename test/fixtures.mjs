@@ -233,6 +233,13 @@ export const pubFilters = {
   schools: [{ id: SCH1, name: 'โรงเรียนบ้านกาญจน์' }, { id: SCH2, name: 'โรงเรียนวัดใหม่' }],
   grades: ['ป.4', 'ป.5'], years: ['2569'],
   games: [{ code: 'kanchanaburi2050', name: 'กาญจนบุรี 2050' }],
+  /* [V.1.6.35] รายการห้องสำหรับตัวกรองใหม่ — ห้องแรกจงใจสังกัดโรงเรียน 1/ป.4
+     ห้องที่สามสังกัดโรงเรียน 2/ป.5 เพื่อทดสอบการย่อรายการตามตัวกรองกว้าง */
+  rooms: [
+    { id: R1, name: 'ป.4/1', school: SCH1, grade: 'ป.4', year: '2569' },
+    { id: R2, name: 'ป.4/2', school: SCH1, grade: 'ป.4', year: '2569' },
+    { id: 'aaaaaaaa-0000-4000-8000-000000000305', name: 'ป.5/1', school: SCH2, grade: 'ป.5', year: '2569' },
+  ],
   rooms_with_data: 3,
 };
 export const pubSummary = {

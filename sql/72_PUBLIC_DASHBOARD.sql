@@ -119,6 +119,15 @@ as $fn$
         from (select distinct jsonb_build_object('code', a.game_code, 'name', a.game_name) as x
                 from public.v_student_achievement a
                 join room r on r.classroom_id = a.classroom_id) g), '[]'::jsonb),
+    /* [V.1.6.35 · ครูสั่ง 2 ก.ย. "ผลการเรียนรวมต้องมีตัวกรองห้อง" — สเปก HUB ข้อ D + ใบ 2 ก.ย.]
+       รายการห้องที่มีผลจริง พร้อม school/grade/year ให้หน้าเว็บย่อรายการเองโดยไม่เรียกฐานซ้ำ
+       ชื่อห้อง (เช่น "ป.4/2") ไม่ใช่ตัวตนเด็ก — แบบเดียวกับที่ rpc_pub_breakdown โหมด classroom
+       แสดงชื่อห้องอยู่แล้ว · ไม่มี join_key/โค้ดห้องออกไป (กติกาข้อ 2 หัวไฟล์คงเดิม) */
+    'rooms', coalesce((select jsonb_agg(x order by x->>'name')
+        from (select jsonb_build_object('id', classroom_id, 'name', room_name,
+                                        'school', school_id, 'grade', grade,
+                                        'year', academic_year) as x
+                from room) rr), '[]'::jsonb),
     'rooms_with_data', (select count(*) from room)
   )
 $fn$;
@@ -138,11 +147,17 @@ grant execute on function public.rpc_pub_filters() to anon, authenticated;
 --   all_*  — ค่าเฉลี่ยรวม "ทุกโรงเรียน" ไว้เป็นเส้นเทียบ (ครูสั่ง: เทียบ ไม่จัดอันดับ)
 -- ============================================================
 
+/* [V.1.6.35] ลายเซ็นเปลี่ยน (เพิ่ม p_room) — เติมพารามิเตอร์ default = ได้ overload ไม่ใช่แทนที่
+   PostgREST จะเจอสองลายเซ็นแล้วตอบ PGRST203 ⇒ ต้อง drop ลายเซ็นเดิมก่อนเสมอ (คำเตือน HUB ข้อ ③ข)
+   ไม่ขัด additive-only: ลายเซ็นใหม่รับ argument ชุดเดิมได้ครบ ไคลเอนต์เก่ายิงผ่านเหมือนเดิม */
+drop function if exists public.rpc_pub_summary(uuid, text, text, text);
+
 create or replace function public.rpc_pub_summary(
   p_school uuid default null,
   p_grade  text default null,
   p_year   text default null,
-  p_game   text default null)
+  p_game   text default null,
+  p_room   uuid default null)
 returns jsonb
 language sql
 security definer
@@ -154,11 +169,29 @@ as $fn$
      where (p_school is null or r.school_id = p_school)
        and (p_grade  is null or r.grade = p_grade)
        and (p_year   is null or r.academic_year = p_year)
+       and (p_room   is null or r.classroom_id = p_room)   -- [V.1.6.35 · ครูสั่ง 2 ก.ย.] ตัวกรองห้อง
   ),
   ach as (
-    select a.* from public.v_student_achievement a
+    /* [V.1.6.35 · ใบ AUDIT 1 ก.ย. ข้อ ๔ "ปืนที่ขึ้นลำ"] เลิกดึงทุกคอลัมน์จาก view — ระบุเฉพาะที่ใช้จริง
+       คอลัมน์ชื่อ-นามสกุล-เลขที่ของผู้เรียนไม่ถูกดึงเข้า CTE เลย: ไม่อยู่ในมือ = เติมอะไรทีหลังก็ไม่หลุด */
+    select a.student_id, a.classroom_id, a.game_code, a.game_name,
+           a.score, a.max_score, a.percent, a.grade_label, a.progress_percent,
+           a.unit_scores, a.computed_at, a.is_legacy
+      from public.v_student_achievement a
      join room r on r.classroom_id = a.classroom_id
      where (p_game is null or a.game_code = p_game)
+  ),
+  /* [V.1.6.35 · ยามกลุ่มเล็ก — กติกาเดิมของระบบ (rpc_pub_breakdown ใช้ head_n < 5 อยู่แล้ว)
+     ตัวกรองห้องทำให้ขอบเขตแคบถึงห้องเดียวได้เป็นครั้งแรก ⇒ ยามต้องมาพร้อมตัวกรอง ไม่ใช่ตามหลัง
+     นับหัวแบบเดียวกับ head_n: นักเรียนที่มีผลอย่างใดอย่างหนึ่งในขอบเขตที่กรอง */
+  head as (
+    select count(*) as n from (
+      select student_id from ach
+      union
+      select d.student_id from public.v_student_comp_dims d
+        join room r on r.classroom_id = d.classroom_id
+       where d.evidence <> 'self_report'
+         and (p_game is null or d.game_code = p_game)) u
   ),
   ach_all as (   -- ทุกโรงเรียน (ไม่กรองโรงเรียน/ชั้น/ปี) — เส้นเทียบ
     select a.percent from public.v_student_achievement a
@@ -198,7 +231,28 @@ as $fn$
      group by a.game_code, a.game_name, u.key         -- [V.1.6.31 · ข้อ C] มิติเกม
   )
   select jsonb_build_object(
-    'scope', jsonb_build_object('school', p_school, 'grade', p_grade, 'year', p_year, 'game', p_game),
+    'scope', jsonb_build_object('school', p_school, 'grade', p_grade, 'year', p_year, 'game', p_game,
+                                'room', p_room),
+    /* [V.1.6.35 · ยามกลุ่มเล็ก] เกณฑ์ < 5 เป็นของระบบอยู่แล้ว (breakdown :suppressed) — ใช้ให้ทั่ว */
+    'suppressed', (select n from head) < 5,
+    'suppressed_note', case when (select n from head) < 5
+        then 'กลุ่มนี้มีนักเรียนน้อยกว่า 5 คน — ไม่แสดงค่าเฉลี่ยและการกระจาย เพื่อไม่ให้ระบุตัวผู้เรียนได้'
+        end,
+    /* [V.1.6.35 · ข้อเสนอ ก ของ HUB — AUDIT รับทั้งฉบับ] ป้ายเตือนสองสเกลปนกัน
+       ⚠️ ปรับจากร่างของ HUB หนึ่งจุด: นับ mixed "ภายในเกมเดียวกัน" ไม่ใช่ข้ามเกม
+       — คนละเกมมี max_score ต่างกันโดยชอบ (ภาค 1 = 130 · ภาค 2 = 160) ถ้านับรวมกัน
+       หน้าจอ "ทุกเกม" จะขึ้นป้ายเตือนตลอดกาลทั้งที่ไม่มีอะไรปน · ที่เป็นโรคจริงคือ
+       เกมเดียวกันมีสองตัวหาร (ใบเก่า 160 / ใบใหม่ 130 หลังมติตัดบอส) */
+    'scale_mixed', (select count(*) > 0 from (
+        select game_code from ach group by game_code
+        having count(distinct max_score) > 1) mx),
+    'scales', coalesce((select jsonb_agg(jsonb_build_object(
+                 'game', s.game_name, 'game_code', s.game_code, 'scales', s.scales)
+               order by s.game_code)
+        from (select game_code, min(game_name) as game_name,
+                     jsonb_agg(distinct max_score order by max_score) as scales
+                from ach group by game_code
+              having count(distinct max_score) > 1) s), '[]'::jsonb),
     /* [V.1.6.8] เดิมนับจาก room ตรง ๆ = นับห้องที่ยังไม่มีผลด้วย และไม่ฟังตัวกรองเกม
        ทำให้หัวเรื่องขึ้น '6 ห้องเรียน · 3 โรงเรียน' ขณะที่กราฟข้างล่างมี 2 แท่ง
        ⇒ นับเฉพาะห้องที่มีผลจริงในขอบเขตที่กรองอยู่ (ทั้งใบผลสัมฤทธิ์และใบสมรรถนะ)
@@ -215,16 +269,19 @@ as $fn$
     'n_students', (select count(distinct student_id)  from ach),
     'ach', jsonb_build_object(
       'n',           (select count(*) from ach),
-      'avg_percent', (select round(avg(percent)::numeric, 1) from ach),
+      /* [V.1.6.35] ค่าเฉลี่ย/การกระจายของกลุ่มเล็ก < 5 คน ถูกยามกดเป็น null/[] — รูปเดียวกับ breakdown */
+      'avg_percent', case when (select n from head) < 5 then null
+                          else (select round(avg(percent)::numeric, 1) from ach) end,
       'avg_all',     (select round(avg(percent)::numeric, 1) from ach_all),
-      'dist', (select coalesce(jsonb_agg(jsonb_build_object('band', b.band, 'label', b.label, 'n', b.n)
+      'dist', case when (select n from head) < 5 then '[]'::jsonb else
+              (select coalesce(jsonb_agg(jsonb_build_object('band', b.band, 'label', b.label, 'n', b.n)
                                          order by b.ord), '[]'::jsonb)
                  from (select 1 as ord, '80-100' as band, 'ดีเยี่ยม (80–100)' as label,
                               count(*) filter (where percent >= 80) as n from ach
                        union all select 2, '70-79',  'ดี (70–79)',        count(*) filter (where percent >= 70 and percent < 80) from ach
                        union all select 3, '60-69',  'พอใช้ (60–69)',      count(*) filter (where percent >= 60 and percent < 70) from ach
                        union all select 4, '50-59',  'ผ่านเกณฑ์ (50–59)',  count(*) filter (where percent >= 50 and percent < 60) from ach
-                       union all select 5, '0-49',   'ต้องช่วยเหลือ (ต่ำกว่า 50)', count(*) filter (where percent < 50) from ach) b)),
+                       union all select 5, '0-49',   'ต้องช่วยเหลือ (ต่ำกว่า 50)', count(*) filter (where percent < 50) from ach) b) end),
     'comps', (select coalesce(jsonb_agg(jsonb_build_object(
                        'code', c.code, 'name', c.name,
                        'n_students', c.n_students, 'avg_score', c.avg_score,
@@ -232,7 +289,9 @@ as $fn$
                 from (select v.ord, v.code,
                              coalesce((select min(d.comp_name) from dim d where d.comp_code = v.code), v.nm) as name,
                              (select count(distinct d.student_id) from dim d where d.comp_code = v.code) as n_students,
-                             (select round(avg(d.score)::numeric, 1) from dim d where d.comp_code = v.code) as avg_score,
+                             /* [V.1.6.35] ยามกลุ่มเล็ก — ค่าเฉลี่ยรายด้านของกลุ่ม < 5 คน ระบุตัวได้เท่าค่าเฉลี่ยรวม */
+                             case when (select n from head) < 5 then null
+                                  else (select round(avg(d.score)::numeric, 1) from dim d where d.comp_code = v.code) end as avg_score,
                              (select round(avg(a.score)::numeric, 1) from dim_all a where a.comp_code = v.code) as avg_all
                         from (values (1,'SM','การจัดการตนเอง'), (2,'HOT','การคิดขั้นสูง'),
                                      (3,'CM','การสื่อสาร'), (4,'TW','การรวมพลังทำงานเป็นทีม'),
@@ -241,16 +300,17 @@ as $fn$
                              as v(ord, code, nm)) c),
     /* [V.1.6.31 · ข้อ C] เพิ่ม game/game_code ต่อแถว — หน้าเว็บเติมชื่อเกมนำหน้าป้าย
        เฉพาะตอนตัวกรองเกมว่าง (ดู dashboard.html ส่วนกราฟคะแนนเก็บ) */
-    'units', (select coalesce(jsonb_agg(jsonb_build_object(
+    'units', case when (select n from head) < 5 then '[]'::jsonb else
+             (select coalesce(jsonb_agg(jsonb_build_object(
                                 'game', game_name, 'game_code', game_code,
                                 'name', unit_name, 'n', n, 'avg', avg_value)
-                              order by game_name, unit_name), '[]'::jsonb) from units),
+                              order by game_name, unit_name), '[]'::jsonb) from units) end,
     'updated_at', (select max(computed_at) from ach)
   )
 $fn$;
 
-revoke all on function public.rpc_pub_summary(uuid, text, text, text) from public;
-grant execute on function public.rpc_pub_summary(uuid, text, text, text) to anon, authenticated;
+revoke all on function public.rpc_pub_summary(uuid, text, text, text, uuid) from public;
+grant execute on function public.rpc_pub_summary(uuid, text, text, text, uuid) to anon, authenticated;
 
 
 -- ============================================================
@@ -260,12 +320,16 @@ grant execute on function public.rpc_pub_summary(uuid, text, text, text) to anon
 --   ⚠️ ไม่มีชื่อนักเรียน ไม่มีโค้ดห้อง ไม่มีตัวตนครู — ดูกติกาข้อ 2 หัวไฟล์
 -- ============================================================
 
+/* [V.1.6.35] ลายเซ็นเปลี่ยน (เพิ่ม p_room) — drop ลายเซ็นเดิมก่อน กัน PGRST203 (เหตุผลเดียวกับ rpc_pub_summary) */
+drop function if exists public.rpc_pub_breakdown(text, uuid, text, text, text);
+
 create or replace function public.rpc_pub_breakdown(
   p_group  text default 'school',
   p_school uuid default null,
   p_grade  text default null,
   p_year   text default null,
-  p_game   text default null)
+  p_game   text default null,
+  p_room   uuid default null)
 returns jsonb
 language sql
 security definer
@@ -277,6 +341,7 @@ as $fn$
      where (p_school is null or r.school_id = p_school)
        and (p_grade  is null or r.grade = p_grade)
        and (p_year   is null or r.academic_year = p_year)
+       and (p_room   is null or r.classroom_id = p_room)   -- [V.1.6.35] ตัวกรองห้อง — ยาม <5 ต่อกลุ่มมีอยู่แล้วข้างล่าง
   ),
   ach as (
     select a.student_id, a.percent, a.game_code, a.game_name, r.*
@@ -386,8 +451,8 @@ as $fn$
     from agg a
 $fn$;
 
-revoke all on function public.rpc_pub_breakdown(text, uuid, text, text, text) from public;
-grant execute on function public.rpc_pub_breakdown(text, uuid, text, text, text) to anon, authenticated;
+revoke all on function public.rpc_pub_breakdown(text, uuid, text, text, text, uuid) from public;
+grant execute on function public.rpc_pub_breakdown(text, uuid, text, text, text, uuid) to anon, authenticated;
 
 notify pgrst, 'reload schema';
 
@@ -403,9 +468,17 @@ select 'ฟังก์ชันสาธารณะครบ 3 ตัว' as �
 union all
 select 'anon เรียกได้ทั้งสามตัว',
        case when has_function_privilege('anon','public.rpc_pub_filters()','execute')
-             and has_function_privilege('anon','public.rpc_pub_summary(uuid,text,text,text)','execute')
-             and has_function_privilege('anon','public.rpc_pub_breakdown(text,uuid,text,text,text)','execute')
+             and has_function_privilege('anon','public.rpc_pub_summary(uuid,text,text,text,uuid)','execute')
+             and has_function_privilege('anon','public.rpc_pub_breakdown(text,uuid,text,text,text,uuid)','execute')
             then '✅ ครบ' else '❌ ขาด' end
+union all
+/* [V.1.6.35] กัน PGRST203: ต้องเหลือลายเซ็นเดียวต่อฟังก์ชัน — ลายเซ็นเก่าถูก drop แล้ว */
+select '⚠️ แต่ละฟังก์ชันต้องมีลายเซ็นเดียว (กัน PGRST203)',
+       case when (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                   where n.nspname='public' and p.proname='rpc_pub_summary') = 1
+             and (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                   where n.nspname='public' and p.proname='rpc_pub_breakdown') = 1
+            then '✅ เดียว' else '❌ ซ้อน — PostgREST จะ ambiguous' end
 union all
 select '⚠️ view ภายใน v_pub_rooms ต้อง **ไม่** ให้ anon อ่านตรง ๆ',
        case when has_table_privilege('anon','public.v_pub_rooms','select')
@@ -420,8 +493,8 @@ select 'ห้องที่นับเข้าหน้าสาธารณ
 -- ============================================================
 -- ROLLBACK
 -- ============================================================
--- drop function if exists public.rpc_pub_breakdown(text, uuid, text, text, text);
--- drop function if exists public.rpc_pub_summary(uuid, text, text, text);
+-- drop function if exists public.rpc_pub_breakdown(text, uuid, text, text, text, uuid);
+-- drop function if exists public.rpc_pub_summary(uuid, text, text, text, uuid);
 -- drop function if exists public.rpc_pub_filters();
 -- drop view if exists public.v_pub_rooms;
 -- ⚠️ ไม่มีตารางหรือข้อมูลใดถูกแตะในไฟล์นี้ — ย้อนกลับแล้วไม่มีอะไรเสีย

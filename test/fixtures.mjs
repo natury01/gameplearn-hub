@@ -93,6 +93,25 @@ export const achieveSpread = [
     progress_percent: 70, unit_scores: { '1': 10 }, criteria_note: null, is_legacy: false },
 ];
 
+/* [V.1.6.36 · ใบ HUB — ตัวหารปนยุค] เกม ก ปนสองเต็ม (ดิบ 120 เท่ากันเป๊ะ แต่ % คนละฐาน —
+   เคสจริงที่ทำให้เกณฑ์เกียรติบัตร 80% ตัดสินไม่ได้) · เกม ข สะอาด (เต็มเดียว)
+   ⇒ ป้ายต้องระบุเฉพาะเกม ก · ใช้ S1/S2 เดิม ไม่เพิ่มนักเรียน (กติกาหัว achieveSpread) */
+/* คู่กับ achieveMixed: S2 ต้องเปิดใช้งาน — เด็กปิดใช้งานถูก achRows กรองทิ้ง (ถูกกติกา)
+   แล้วการปนสเกลจะมองไม่เห็น · ใช้เฉพาะเทสต์ 12 ผ่าน opt.students ไม่แตะชุดกลาง */
+export const studentsAllOn = students.map((s) => ({ ...s, is_active: true }));
+
+export const achieveMixed = [
+  { student_id: S1, classroom_id: R1, game_id: G1, game_name: 'กาญจนบุรี 2050',
+    game_version: 'V.7.99', score: 120, max_score: 160, percent: 75, grade_label: 'ดี',
+    progress_percent: 60, unit_scores: { '1': 10 }, criteria_note: null, is_legacy: false },
+  { student_id: S2, classroom_id: R1, game_id: G1, game_name: 'กาญจนบุรี 2050',
+    game_version: 'V.7.99', score: 120, max_score: 130, percent: 92.3, grade_label: 'ดีเยี่ยม',
+    progress_percent: 65, unit_scores: { '1': 10 }, criteria_note: null, is_legacy: false },
+  { student_id: S1, classroom_id: R1, game_id: G2, game_name: 'กาญจนบุรี 2050 ภาค 2',
+    game_version: 'V.8.84', score: 90, max_score: 130, percent: 69.2, grade_label: 'พอใช้',
+    progress_percent: 40, unit_scores: { '1': 7 }, criteria_note: null, is_legacy: false },
+];
+
 export const compDims = [
   { student_id: S1, classroom_id: R1, comp_code: 'HOT', game_name: 'กาญจนบุรี 2050',
     score: 72, level: 5, level_label: 'สามารถ', sub_scores: { ctc: 70, stm: 74 },

@@ -543,5 +543,81 @@ console.log('═══ 10) [V.1.6.34 · D2] แท็บข้อมูลวิ
   await p.close();
 }
 
+console.log('\n═══ 12) [V.1.6.36 · ใบ HUB] ตัวหารปนยุคฝั่งหน้าครู — ป้าย · ตัวหารรายคน · ส่งออก · เกียรติบัตร ═══');
+{
+  /* ต้องฉีด students ด้วย — ชุดกลาง S2 ปิดใช้งาน แถว 130 ของเขาจะถูก achRows กรองทิ้ง
+     (พฤติกรรมถูก: เด็กปิดใช้งานไม่ควรขับป้าย — เทสต์แรกที่ลืมข้อนี้แดง 4 ข้อพร้อมกัน) */
+  const { p, calls } = await open({ achieve: F.achieveMixed, students: F.studentsAllOn });
+
+  /* (1) การ์ดสรุปหน้าแรก: ป้ายขึ้น + ระบุเฉพาะเกมที่ปนจริง */
+  const warn = await p.evaluate(() =>
+    [...document.querySelectorAll('#content .note-warn')].map((e) => e.textContent).join(' || '));
+  ok('การ์ดสรุปขึ้นป้ายสองเกณฑ์ + บอกค่าเต็มทั้งสอง (130 และ 160)',
+    warn.includes('สองเกณฑ์คะแนนปนกัน') && warn.includes('เต็ม 130 และ 160'), warn.slice(0, 120));
+  ok('ป้ายระบุเฉพาะเกมที่ปน — เกม ข (เต็มเดียว) ต้องไม่ถูกพาดพิง',
+    warn.includes('กาญจนบุรี 2050') && !warn.includes('ภาค 2'), warn.slice(0, 120));
+
+  /* (2) กดช่วงคะแนน → % รายคนพกตัวหาร (แบบ :2881) */
+  await p.click('[data-ach-band]');
+  await sleep(250);
+  const names = await p.evaluate(() => {
+    const box = document.querySelector('[data-ach-names]');
+    return box ? box.textContent : '';
+  });
+  ok('รายชื่อรายคนโชว์ตัวหารข้าง % (มี "(เต็ม")', names.includes('(เต็ม '), names.slice(0, 100));
+
+  /* (3) แท็บเกียรติบัตร: ach80 ถูกปิด + สลับกลับ finish + บอกเหตุผล */
+  await p.goto(BASE + '/teacher.html#/room/' + F.R1);
+  await p.waitForFunction(() => !document.querySelector('#content .loading'), null, { timeout: 20000 });
+  await sleep(300);
+  await p.click('[data-tab="cert"]');
+  await sleep(400);
+  const cert = await p.evaluate(() => {
+    const sel = document.querySelector('[data-cert-rule]');
+    const o80 = sel ? [...sel.options].find((o) => o.value === 'ach80') : null;
+    return { has: !!sel, off: o80 ? o80.disabled : null, cur: sel ? sel.value : null,
+      note: [...document.querySelectorAll('#content .note-warn')].map((e) => e.textContent).join(' ') };
+  });
+  ok('ตัวเลือกเกณฑ์ 80 ถูก disabled จริง (ไม่ใช่แค่เตือน)', cert.has && cert.off === true, cert);
+  ok('เกณฑ์ที่ใช้อยู่ถอยกลับค่าเริ่มต้น finish ไม่ค้างที่ 80', cert.cur === 'finish', cert.cur);
+  ok('มีกล่องเหตุผล: ปิดชั่วคราว + ดิบเท่ากันได้ใบต่างกัน + ทางออก',
+    cert.note.includes('ปิดชั่วคราว') && cert.note.includes('คะแนนดิบเท่ากัน')
+    && cert.note.includes('เปิดหน้าห้องเรียนในเกม'), cert.note.slice(0, 150));
+
+  /* (4) ไฟล์ส่งออกผลสัมฤทธิ์พกคะแนนดิบ+คะแนนเต็ม */
+  await p.evaluate(() => {
+    window.__blob = null;
+    const orig = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = (b) => { window.__blob = b; return orig(b); };
+  });
+  await p.click('[data-export-room="' + F.R1 + '|ach"]');
+  await sleep(600);
+  const csv = await p.evaluate(async () => (window.__blob ? await window.__blob.text() : ''));
+  ok('CSV มีหัว "คะแนนดิบ" และ "คะแนนเต็ม"', csv.includes('คะแนนดิบ') && csv.includes('คะแนนเต็ม'), csv.split('\n')[0]);
+  ok('CSV เห็นตัวหารทั้งสองยุคจริง (160 และ 130 ในคอลัมน์)', csv.includes('160') && csv.includes('130'), '');
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+{
+  /* ตัวคุมลบ (negative control): สเกลเดียว → ไม่มีป้าย · ach80 เลือกได้ตามปกติ
+     — กันยามแดงตลอดกาล (ยามที่ไม่เคยเขียวคือยามที่ไม่มีใครเชื่อ) */
+  const { p } = await open({ achieve: F.achieveSpread });
+  const home = await p.evaluate(() => document.getElementById('content').textContent);
+  ok('สเกลเดียว: ไม่มีป้ายสองเกณฑ์', !home.includes('สองเกณฑ์คะแนนปนกัน'), '');
+  await p.goto(BASE + '/teacher.html#/room/' + F.R1);
+  await p.waitForFunction(() => !document.querySelector('#content .loading'), null, { timeout: 20000 });
+  await sleep(300);
+  await p.click('[data-tab="cert"]');
+  await sleep(400);
+  const st = await p.evaluate(() => {
+    const sel = document.querySelector('[data-cert-rule]');
+    const o80 = sel ? [...sel.options].find((o) => o.value === 'ach80') : null;
+    return { off: o80 ? o80.disabled : null, txt: o80 ? o80.textContent : '' };
+  });
+  ok('สเกลเดียว: เกณฑ์ 80 เปิดใช้ได้ ไม่ติดคำ "ปิดชั่วคราว"',
+    st.off === false && !st.txt.includes('ปิดชั่วคราว'), st);
+  await p.close();
+}
+
 await b.close(); srv.close();
 process.exit(ok.done());

@@ -138,7 +138,9 @@ export async function stub(page, opt = {}) {
     if (has('v_game_catalog')) return json(F.games);
     if (has('classrooms')) return json(F.rooms);
     if (has('schools')) return json([]);
-    if (has('students')) return json(inIds(F.students, 'classroom_id'));
+    /* [V.1.6.36] opt.students — เหตุเดียวกับ opt.achieve ข้างล่าง: ชุดกลางมีเด็กใช้งานจริง
+       ใน R1 คนเดียว (S2 ปิดใช้งาน) ⇒ เทสต์ที่ต้องการเด็ก active สองคนฉีดชุดของตัวเองแทน */
+    if (has('students')) return json(inIds(opt.students || F.students, 'classroom_id'));
     if (has('classroom_games')) return json(inIds(F.classroom_games, 'classroom_id'));
     if (has('student_game_progress')) return json(inIds(F.progress, 'student_id'));
     if (has('events')) return json([], 200, { 'content-range': '0-0/7' });

@@ -1477,6 +1477,26 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     { k: 'good', lo: 70, hi: 80,  name: 'ดี (70–79)',               c: 'var(--ach-good)' },
     { k: 'best', lo: 80, hi: 101, name: 'ดีเยี่ยม (80–100)',        c: 'var(--ach-best)' },
   ];
+
+  /* ══ [V.1.6.36 · ใบ HUB 2 ก.ย. — ตัวหารปนยุคฝั่งหน้าครู] ═══════════════
+     ใบผลชุดเก่าคิด % บนเต็ม 160 · ชุดใหม่บนเต็ม 130 (มติตัดบอส) — ตัวเลขที่
+     ตัวหารต่างกัน ห้ามเฉลี่ย/จัดช่วง/ตัดเกณฑ์รวมกันโดยไม่มีป้ายบอก
+     หน้าครูมีแถวใบผลอยู่ในมือแล้ว ⇒ ตรวจจากแถวตรง ๆ ไม่ต้องถามฐาน ไม่ต้องแก้ SQL
+     นับปน "ภายในเกมเดียวกัน" เท่านั้น — ข้ามเกมเพดานต่างกันได้โดยชอบ (กติกาเดียวกับ
+     scale_mixed ฝั่ง rpc_pub_summary ใน V.1.6.35 — สองหน้าต้องพูดเรื่องเดียวกัน) */
+  const achScalesOf = (rows) => Array.from(new Set(rows.filter((r) => r.max_score != null)
+    .map((r) => Number(r.max_score)))).sort((a, b) => a - b);
+  function achMixedGames(rows) {
+    const by = {};
+    rows.forEach((r) => { (by[r.game_name] = by[r.game_name] || []).push(r); });
+    return Object.keys(by).map((gn) => ({ game: gn, scales: achScalesOf(by[gn]) }))
+      .filter((x) => x.scales.length > 1);
+  }
+  /* ถ้อยคำลอกจากป้าย scale_mixed ใน dashboard.html — ครูกับคนดูหน้าสาธารณะต้องอ่านเจอประโยคเดียวกัน */
+  const achScaleNote = (mixed) => '⚠️ ช่วงนี้มีผลจากสองเกณฑ์คะแนนปนกันใน '
+    + mixed.map((x) => G.esc(x.game) + ' (เต็ม ' + x.scales.map((n) => G.fmt(n)).join(' และ ') + ')').join(' · ')
+    + ' — ตัวเลขเฉลี่ยและการจัดช่วงเทียบกันตรง ๆ ไม่ได้ '
+    + 'จนกว่าใบผลใหม่จะเข้าครบทั้งห้อง (ครูเปิดหน้าห้องเรียนในเกมหนึ่งครั้งเพื่อดันใบใหม่)';
   const achBandOf = (pct) => ACH_BANDS.find((b) => pct >= b.lo && pct < b.hi) || null;
 
   /* แถบการกระจาย — เลือกแบบนี้แทนกราฟค่าเฉลี่ยโดยตั้งใจ
@@ -1533,9 +1553,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       const avg = wp.length ? wp.reduce((t, r) => t + Number(r.percent), 0) / wp.length : null;
       const note = (g.find((r) => r.criteria_note) || {}).criteria_note;
       const legacy = g.filter((r) => r.is_legacy).length;
+      /* [V.1.6.36] ป้ายอยู่เหนือทั้งค่าเฉลี่ยและแถบช่วง — สองตัวที่พังพร้อมกันเมื่อสเกลปน */
+      const mixed = achMixedGames(g);
       return '<div class="card"><h3 style="margin:0 0 6px;font-size:15.5px">' + G.esc(gn) + '</h3>'
         + '<div class="muted small">' + g.length + ' คนมีผลสรุปจากเกม'
         + (legacy ? ' · ข้อมูลเก่าจากชีต ' + legacy + ' คน' : '') + '</div>'
+        + (mixed.length ? '<div class="note-warn" role="note">' + achScaleNote(mixed) + '</div>' : '')
         + (avg != null ? meter(avg) + '<div class="muted small">คะแนนเฉลี่ย ' + avg.toFixed(1) + '% ของคะแนนเต็ม</div>' : '')
         /* [V.1.6.21] การกระจาย — ค่าเฉลี่ยข้างบนบอกไม่ได้ว่าห้องกระจุกอยู่ตรงไหน */
         + achDistBar(g, gn)
@@ -1579,7 +1602,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       const nm = s ? ((s.first_name || '') + ' ' + (s.last_name || '')).trim() : '(ไม่พบชื่อ)';
       return '<span style="display:inline-block;margin:2px 8px 2px 0">'
         + (s && s.student_number ? G.esc(s.student_number) + '. ' : '')
-        + G.esc(nm) + ' <b>' + G.fmt(r.percent) + '%</b></span>';
+        + G.esc(nm) + ' <b>' + G.fmt(r.percent) + '%</b>'
+        /* [V.1.6.36] % รายคนต้องพกตัวหาร — ไม่งั้นเลขสองยุคเรียงติดกันดูเทียบกันได้ทั้งที่ไม่ได้ */
+        + (r.max_score != null ? '<span class="muted small"> (เต็ม ' + G.fmt(r.max_score) + ')</span>' : '')
+        + '</span>';
     }).join('');
     box.innerHTML = '<b style="color:' + band.c + '">' + G.esc(band.name) + '</b> — '
       + rows.length + ' คน<br>' + (names || '<span class="muted">ไม่มีรายชื่อ</span>');
@@ -2035,10 +2061,25 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const r = roomById(cid); if (!r) return '';
     const stu = studentsOf(cid).filter(isOn);
     const games = enabledGames(cid);
+    /* [V.1.6.36 · ใบ HUB ข้อ ③ — จุดเดียวที่พิมพ์ออกกระดาษ] เมื่อใบผลของห้องมีสองเต็มปน
+       ในเกมเดียวกัน เกณฑ์ "80 ขึ้นไป" ตัดสินไม่ได้: ดิบเท่ากันแต่ % คนละฐาน — ใบที่พิมพ์
+       ผิดเรียกคืนจากบ้านผู้ปกครองไม่ได้ ⇒ ปิดตัวเลือกพร้อมเหตุผล ไม่ใช่แค่เตือน
+       finish (ค่าเริ่มต้น) กับ lv5 ไม่ตัดสินจาก % ผลสัมฤทธิ์ จึงใช้ได้ตามปกติ */
+    const mixedCert = achMixedGames(achRows(cid));
+    const ach80Off = mixedCert.length > 0;
+    if (ach80Off && CERT_RULE === 'ach80') CERT_RULE = 'finish';
     const ruleSel = '<label class="small">เกณฑ์การได้รับ '
       + '<select data-cert-rule>' + CERT_RULES.map(([k, n]) =>
-          '<option value="' + k + '"' + (CERT_RULE === k ? ' selected' : '') + '>' + n + '</option>').join('')
-      + '</select></label>';
+          '<option value="' + k + '"' + (CERT_RULE === k ? ' selected' : '')
+          + (k === 'ach80' && ach80Off ? ' disabled' : '') + '>'
+          + n + (k === 'ach80' && ach80Off ? ' — ปิดชั่วคราว' : '') + '</option>').join('')
+      + '</select></label>'
+      + (ach80Off ? '<div class="note-warn" role="note" style="flex-basis:100%">'
+          + '🏅 เกณฑ์ "ผลสัมฤทธิ์ 80 ขึ้นไป" ถูกปิดชั่วคราว: ใบผลของห้องนี้มีสองเกณฑ์คะแนนปนกัน — '
+          + mixedCert.map((x) => G.esc(x.game) + ' (เต็ม ' + x.scales.map((n) => G.fmt(n)).join(' และ ') + ')').join(' · ')
+          + ' — นักเรียนคะแนนดิบเท่ากันจะได้/ไม่ได้ใบต่างกันตามวันที่ใบผลถูกเขียน '
+          + 'ซึ่งไม่ยุติธรรมกับผู้รับใบ · เกณฑ์ "จบเกม" และ "สมรรถนะระดับ 5" ใช้ได้ตามปกติ '
+          + '(ป้ายจะหายเองเมื่อใบผลใหม่เข้าครบทั้งห้อง — ครูเปิดหน้าห้องเรียนในเกมหนึ่งครั้งเพื่อดันใบใหม่)</div>' : '');
     let got = 0;
     const rows = stu.map((s) => {
       const cells = games.map((g) => {
@@ -2373,10 +2414,13 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       studentsOf(cid).forEach((s) => enabledGames(cid).forEach((g) => {
         const a = achOf(s.id, g.id); if (!a) return;
         const b = a.percent != null ? achBandOf(a.percent) : null;
+        /* [V.1.6.36 · ใบ HUB ข้อ 4] ไฟล์ที่ครูเอาไปคิดต่อต้องพกตัวหารไปด้วย —
+           % ลอย ๆ จากสองยุคปนกันจะถูกเฉลี่ยรวมใน Excel โดยไม่มีใครเตือน */
         body.push(stuCols(s).concat([g.name, a.percent != null ? Math.round(a.percent) : '',
+          a.score != null ? a.score : '', a.max_score != null ? a.max_score : '',
           b ? b.name : '', a.criteria_note || '', a.is_legacy ? 'ข้อมูลชุดเก่า' : '', xTime(a.computed_at)]));
       }));
-      return { head: STU_HEAD.concat(['เกม', 'คะแนน (%)', 'ช่วงคะแนน', 'เกณฑ์ที่เกมใช้', 'หมายเหตุ', 'คำนวณเมื่อ']), body };
+      return { head: STU_HEAD.concat(['เกม', 'คะแนน (%)', 'คะแนนดิบ', 'คะแนนเต็ม', 'ช่วงคะแนน', 'เกณฑ์ที่เกมใช้', 'หมายเหตุ', 'คำนวณเมื่อ']), body };
     } },
     comp: { th: 'สมรรถนะหลัก', make(cid) {
       const body = [];

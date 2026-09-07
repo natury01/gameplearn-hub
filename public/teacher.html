@@ -768,7 +768,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   /* แถบตัวกรอง — เลือกห้อง และ/หรือ เกม · มิติไหนมีตัวเลือกเดียวก็ไม่ต้องโชว์ ไม่มีอะไรให้เลือก
      cid ที่ส่งเข้ามา = ห้องที่หน้านั้นล็อกไว้แล้ว (หน้าห้อง) → ไม่ต้องมีช่องเลือกห้องอีก */
   function pickerBar(cid) {
-    const rooms = !cid && S.rooms.length >= 2;
+    /* [V.1.6.39 · ครูสั่ง "หน้าวิจัยต้องมีตัวกรองรายห้อง"] แท็บวิจัยเปิดมาเพื่อเทียบสองห้อง — จึงมีช่องเลือกห้อง
+       บนหน้าห้องด้วยเฉพาะแท็บนี้ (เลือกแล้วเด้งไปหน้าห้องนั้น แท็บค้างเดิม) · แท็บอื่นคงมติเดิม */
+    const jump = !!cid && TAB === 'research';
+    const rooms = (!cid || jump) && S.rooms.length >= 2;
     const glist = gamesInScope(cid || ROOM || null);
     const games = glist.length >= 2;
     if (!rooms && !games) return '';
@@ -776,12 +779,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let html = '<div class="card pickbar">';
     if (rooms) {
       html += '<label for="room-pick">ดูข้อมูลของ</label>'
-        + '<select id="room-pick">'
-        +   '<option value=""' + (ROOM === '' ? ' selected' : '') + '>ทุกห้องของฉัน ('
+        + '<select id="room-pick"' + (jump ? ' data-room-jump="1"' : '') + '>'
+        +   '<option value=""' + ((jump ? cid : ROOM) === '' ? ' selected' : '') + '>ทุกห้องของฉัน ('
         +     S.rooms.length + ' ห้อง)</option>'
         +   S.rooms.map((r) => '<option value="' + G.esc(r.id) + '"'
-            + (ROOM === r.id ? ' selected' : '') + '>' + G.esc(r.name)
-            + ' — นักเรียน ' + studentsOf(r.id).filter(isOn).length + ' คน</option>').join('')
+            + ((jump ? cid : ROOM) === r.id ? ' selected' : '') + '>' + G.esc(r.name)
+            + ' — นักเรียน ' + studentsOf(r.id).filter(isOn).length + ' คน'
+            /* [V.1.6.39] ห้องที่ยังไม่มีร่องรอยเล่นเลย ต้องบอกข้างชื่อ — กันเทียบห้องจบแล้วกับห้องยังไม่เริ่ม (ตัวหารปนยุค) */
+            + ((S.progress || []).some((p) => studentsOf(r.id).some((s) => s.id === p.student_id)) ? '' : ' · ยังไม่เริ่ม')
+            + '</option>').join('')
         + '</select>';
     }
     if (games) {
@@ -811,7 +817,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      ถ้าไม่ล้าง ครูจะเจอหน้าว่างเปล่าโดยที่ช่อง "เฉพาะเกม" ยังค้างชื่อเกมที่ห้องนี้ไม่มี */
   function bindPickers(redraw) {
     const rp = $('room-pick');
-    if (rp) rp.onchange = function () { ROOM = rp.value; GAME = ''; redraw(); };
+    if (rp) rp.onchange = function () {
+      if (rp.dataset.roomJump) { ROOM = rp.value; GAME = ''; location.hash = rp.value ? '#/room/' + rp.value : '#/'; return; }
+      ROOM = rp.value; GAME = ''; redraw();
+    };
     const gp = $('game-pick');
     if (gp) gp.onchange = function () { GAME = gp.value; redraw(); };
     /* [V.1.6.31 · A11] live region ถาวรนอกโซนวาด — อัปเดต textContent เท่านั้น
@@ -877,7 +886,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       html += certSection(cid);
     } else if (TAB === 'research') {
       /* [V.1.6.34 · D2] หน้ารวม: มีตัวกรองห้องอยู่แล้ว — เลือกห้องเมื่อไรก็ได้ตารางรายห้องทันที */
-      html += cid ? researchSection(cid)
+      /* [V.1.6.39] ครูที่มีห้องเดียว: แท็บวิจัยใช้ห้องนั้นเลย — ไม่สั่งให้เลือกจากแถบที่ไม่ได้ถูกวาด */
+      const rcid = cid || (S.rooms.length === 1 ? S.rooms[0].id : null);
+      html += rcid ? researchSection(rcid)
         : '<div class="card muted">แท็บข้อมูลวิจัยแสดงผลรายห้อง — เลือกห้องจากแถบ "กำลังดู" ด้านบน หรือเปิดจากหน้าห้องเรียน</div>';
     } else {
       html += pipeNote(achRows(cid).length > 0) + achSummaryCards(cid);
@@ -1139,11 +1150,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      ขึ้นสถานะตรง ๆ ว่า "รออะไร" — ห้ามช่องว่างเงียบ ห้ามเลขที่ไม่มีที่มา
      ⛔ ตามท้าย STD-008: ห้ามคำว่า "ครบทุกด้านย่อย" จนกว่าทะเบียนบังคับใช้
      ============================================================ */
-  /* กรอบ 22 องค์ประกอบจาก STD-008 (ร่าง 29 ส.ค. — รอเซ็นรับ) · st: have=มีหลักฐาน ·
+  /* กรอบ 22 องค์ประกอบ — ยึด Rubric ฉบับที่ ๓ ([PLAN] 7 ก.ย.) · STD-008 ยังเป็นร่างรอเซ็น · st: have=มีหลักฐาน ·
      wait=ช่องมีแต่หลักฐานยังไม่มี · build=ต้องสร้างช่อง · judge=รอชี้ขาดการจับคู่ */
   const RS22 = [
     ['SM', 'sm1', 'เห็นคุณค่าตนเอง',        'SM-A',   'wait'],
-    ['SM', 'sm2', 'เป้าหมายชีวิต',           'SM-C',   'wait'],
+    ['SM', 'sm2', 'เป้าหมายชีวิต',           'SM-C ✗ (จ2 ปฏิเสธ 7 ก.ย.)', 'wait'],
     ['SM', 'sm3', 'จัดการอารมณ์',            'SM-B',   'have'],
     ['SM', 'sm4', 'ภาวะวิกฤต',               null,     'build'],
     ['HT', 'ht1', 'คิดอย่างมีวิจารณญาณ',     'HT-CTC', 'have'],
@@ -1151,27 +1162,35 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     ['HT', 'ht3', 'คิดสร้างสรรค์',           'HT-CRT', 'have'],
     ['HT', 'ht4', 'คิดแก้ปัญหา',             'HT-PRB', 'have'],
     ['CM', 'cm1', 'รับสาร',                  'CM-A',   'have'],
-    ['CM', 'cm2', 'รับส่งสาร',               'CM-B',   'build'],
+    ['CM', 'cm2', 'รับส่งสาร',               'CM-B',   'flow'],
     ['CM', 'cm3', 'กลวิธีสื่อสาร',           'CM-C',   'have'],
-    ['TW', 'tw1', 'สมาชิกทีมที่ดี/ผู้นำ',    'TW-A',   'have'],
-    ['TW', 'tw2', 'ร่วมมือรวมพลัง',          'TW-B',   'have'],
-    ['TW', 'tw3', 'สัมพันธ์/จัดการขัดแย้ง',  'TW-C',   'have'],
-    ['CZ', 'cz1', 'ซื่อสัตย์',               null,     'build'],
+    ['TW', 'tw1', 'สมาชิกทีมที่ดี/ผู้นำ',    'teamStat per[].tasks', 'pipe'],
+    ['TW', 'tw2', 'ร่วมมือรวมพลัง',          'teamStat rescues/okAfterWrong', 'pipe'],
+    ['TW', 'tw3', 'สัมพันธ์/จัดการขัดแย้ง',  'teamStat v3 (เริ่ม 30 ส.ค.)', 'pipe'],
+    ['CZ', 'cz1', 'พลเมืองรู้เคารพสิทธิเสรีภาพ', 'CZ-B (4 ข้อ · จ2)', 'have'],
     ['CZ', 'cz2', 'รับผิดชอบ',               'CZ-A',   'have'],
     ['CZ', 'cz3', 'มีส่วนร่วม',              'CZ-C',   'have'],
-    ['CZ', 'cz4', 'สร้างการเปลี่ยนแปลง',     'SD?',    'judge'],
+    ['CZ', 'cz4', 'สร้างการเปลี่ยนแปลง',     'crit.SD (+3 ข้อ) · รอ [PLAN] เคาะบันได', 'have'],
     ['NS', 'ns1', 'เข้าใจปรากฏการณ์',        'NS-A',   'have'],
     ['NS', 'ns2', 'เชื่อมโยงคณิต-วิทย์',     'NS-B',   'have'],
     ['NS', 'ns3', 'รู้เท่าทันเทคโนโลยี',     null,     'build'],
     ['NS', 'ns4', 'คุณลักษณะคณิต-วิทย์',     null,     'judge']
   ];
   const RS_ST = { have: ['🟢 มีหลักฐานแล้ว', 'rs-ok'], wait: ['🟡 ช่องมี — หลักฐานยังไม่มี', 'rs-wait'],
-                  build: ['🔴 ต้องสร้างแหล่งใหม่', 'rs-none'], judge: ['🟡 รอชี้ขาดการจับคู่', 'rs-wait'] };
+                  build: ['🔴 ต้องสร้างแหล่งใหม่', 'rs-none'], judge: ['🟡 รอชี้ขาดการจับคู่', 'rs-wait'],
+                  /* [V.1.6.39 · ใบ HUB 7 ก.ย.] สองสถานะที่หน้าจอเคยพูดเกินจริง: TW เคยขึ้น 🟢 ทั้งที่ยังไม่มีเกณฑ์แปลง
+                     เป็นคะแนน (var twPct=null) · cm2 เคยขึ้น 🔴 ทั้งที่มีคีย์ CM-B ไหลจริง — [PLAN] เป็นผู้ชี้ขาด */
+                  pipe: ['🟠 มีหลักฐาน — ยังไม่มีเกณฑ์แปลงเป็นคะแนน', 'rs-wait'],
+                  flow: ['🟡 มีข้อมูลไหลเข้า — รอ [PLAN] ชี้ขาดว่านับเป็นหลักฐานได้หรือไม่', 'rs-wait'] };
   /* คีย์ด้านย่อยที่เกมส่งจริงใน sub_scores → รหัส Rubric — สองตระกูลตามแผนที่ STD-008 §๑:
      มิติ HT (CTC/STM/CRT/PRB) และรหัสทางการฝั่งโค้ด (SM-A…NS-B) · CZ-B/NS-C ยังไม่มีบ้านใน Rubric
      (ของค้นพบ §๒ ของ STD-008 — รอ [PLAN] ชี้ขาด จึงยังไม่จับคู่ที่นี่) */
+  /* [V.1.6.39] ของจริงในฐาน (ผลรอบสอง ก้อน G2 อ่านคีย์จาก sub_scores ตรง ๆ): สาย HT ส่งคีย์ 'HT-CTC' … มีคำนำหน้า —
+     แผนที่เดิมรับแค่ 'CTC' ⇒ หน้าวิจัยนับ ht1–ht4 เป็นศูนย์มา 9 วันทั้งที่เป็นด้านที่ข้อมูลมากที่สุด ([HUB] จับ)
+     · 'SM-C' → sm2 ถอดออกตามคำตัดสิน จ2 (SM-C ไม่ใช่หลักฐานของ sm2) · 'CZ-B' → cz1 ตาม จ2 */
   const RS_KEYMAP = { CTC: 'ht1', STM: 'ht2', CRT: 'ht3', PRB: 'ht4',
-    'SM-A': 'sm1', 'SM-B': 'sm3', 'SM-C': 'sm2', 'CM-A': 'cm1', 'CM-B': 'cm2', 'CM-C': 'cm3',
+    'HT-CTC': 'ht1', 'HT-STM': 'ht2', 'HT-CRT': 'ht3', 'HT-PRB': 'ht4', 'CZ-B': 'cz1',
+    'SM-A': 'sm1', 'SM-B': 'sm3', 'CM-A': 'cm1', 'CM-B': 'cm2', 'CM-C': 'cm3',
     'TW-A': 'tw1', 'TW-B': 'tw2', 'TW-C': 'tw3', 'CZ-A': 'cz2', 'CZ-C': 'cz3',
     'NS-A': 'ns1', 'NS-B': 'ns2' };
   function rsKey(k) {
@@ -1232,7 +1251,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       });
     });
     html += '<h2 class="section-title">ความครอบคลุม 22 องค์ประกอบ '
-      + '<span class="sub">กรอบจากทะเบียน STD-008 (ร่าง 29 ส.ค. — รอเซ็นรับ) · คอลัมน์ "ในห้องนี้" นับจากผลจริงที่เกมส่งรายด้านย่อย</span></h2>'
+      + '<span class="sub">กรอบยึด Rubric ฉบับที่ ๓ ([PLAN] 7 ก.ย. 2569) เป็นหลัก · STD-008 = ร่างที่ยังรอเซ็นรับ · คอลัมน์ "ในห้องนี้" นับจากผลจริงที่เกมส่งรายด้านย่อย</span></h2>'
       + '<div class="card table-scroll"><table class="gol"><thead><tr>'
       + '<th scope="col">ด้าน</th><th scope="col">องค์ประกอบ</th><th scope="col">คู่ในโค้ดเกม</th>'
       + '<th scope="col">สถานะแหล่งหลักฐาน (ทั้งระบบ)</th><th scope="col" class="num">ในห้องนี้ (คนที่มีผลรายองค์)</th></tr></thead><tbody>';
@@ -1247,7 +1266,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     });
     html += '</tbody></table></div>'
       + '<div class="panel-note small muted">ด้านที่เกมยังไม่ส่งผล "รายองค์ประกอบ" ขึ้นมา ไม่ได้แปลว่านักเรียนทำไม่ได้ (กฎ ก2)'
-      + ' — สถานะทั้งระบบมาจากการไล่โค้ด+ฐานจริง 29 ส.ค. · แผนปิดช่องว่างอยู่ใน <code>CODE_รายงานแนวทาง_ปิดองค์ประกอบว่าง8ตัว_2026-08-30.md</code> (รอครูเคาะ)</div>';
+      + ' — สถานะทั้งระบบอัปเดต 7 ก.ย. 2569 (Rubric ฉบับที่ ๓ + ผลรอบสี่จากฐานจริง) · มติครู 7 ก.ย.: cz1/cz4 มีแหล่งแล้ว · sm1 รับแล้ว · cm2/ns3/sm4 ยกไปหลัง 10 ก.ย. — ตัวเลขของช่องที่ยังไม่มีเกณฑ์จะไม่ถูกแทนด้วย 0</div>';
 
     /* ── D2.② + D2.⑤ — สองช่องที่เกณฑ์/ท่อยังมาไม่ถึง: บอกตรง ๆ ว่ารออะไร ── */
     html += '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));margin-top:10px">'
@@ -1255,9 +1274,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + 'มติ 29 ส.ค. เปลี่ยนโครงคะแนนเป็น ฐาน/ความชำนาญ/พัฒนาการ (B4) — เกมยังไม่เริ่มส่งสามค่านี้ '
       + 'แถบนี้จะขึ้นอัตโนมัติเมื่อรุ่นเกมที่ส่งค่าเริ่มใช้งานจริง · ระหว่างนี้ดูจำนวนรอบเล่นซ้ำในตารางล่างประกอบ</div></div>'
       + '<div class="card"><b>🎯 ร้อยละการผ่านเกณฑ์รายห้อง</b><div class="small muted" style="margin-top:4px">'
-      + 'เกณฑ์ผ่านสมรรถนะยังไม่ถูกเคาะ (รอผลสำรวจ <code>ขอครูรัน_94</code> ก้อน A7 — ครูเป็นผู้เคาะ) '
-      + 'ระหว่างนี้ดูการกระจายระดับด้านล่างแทน — เคาะเกณฑ์เมื่อไร ช่องนี้คำนวณได้ทันที</div>'
-      + rsLevelDist(dims, stu) + '</div></div>';
+      + '<b>เกณฑ์ผ่าน = ระดับ 5 ขึ้นไป</b> (ครูเคาะ 7 ก.ย. 2569) · ฐาน = ผู้เรียนที่มีผลด้านนั้น ไม่ใช่ทั้งห้อง (กฎ ก2) '
+      + '· ทุกร้อยละพกเศษ/ส่วน · ฐานต่ำกว่า 5 คนแสดงจำนวนอย่างเดียว</div>'
+      + rsLevelDist(dims, stu) + '</div>'
+      + rsAch70Card(cid, stu) + '</div>';
 
     /* ── D2.④ + D3 — รอบเล่นซ้ำ + ธงชวนดู ── */
     html += rsReplayBlock(cid, stu, dims);
@@ -1265,21 +1285,76 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   }
 
   /* การกระจายระดับรายด้าน (ก้อนตั้งต้นของ "ร้อยละผ่านเกณฑ์" — ยังไม่ตัดสินอะไร) */
+  /* [V.1.6.39 · ครูสั่ง 7 ก.ย. ผ่านใบ HUB] ทุกช่องระดับ = จำนวน (ร้อยละ) · ตัวหารเดียวทั้งแถว = "ฐาน" =
+     ผู้เรียนที่มีผลด้านนั้น (ห้าช่องรวม 100%) · "ไม่มีผลด้านนี้" อยู่นอกฐาน (แสดงจำนวนอย่างเดียว) ·
+     ฐาน < 5 ⇒ ไม่แสดง % (เส้นเดียวกับ head_n<5 ของหน้าสาธารณะ) · "ยังสรุปไม่ได้" ครบทั้งฐาน ⇒ ทั้งแถว
+     "หลักฐานไม่เพียงพอ" (ถ้อยคำมติครู 7 ก.ย.) ไม่พิมพ์ 0.0% สี่ช่อง — TW เข้าเงื่อนไขนี้ตราบใดที่ twPct=null ·
+     คอลัมน์ "ผ่านระดับ 5" = level ≥ 5 (ระดับ 6 นับด้วย) — เกณฑ์ครูเคาะ 7 ก.ย. */
   function rsLevelDist(dims, stu) {
     if (!dims.length) return '';
+    const pct = (n, base) => base >= 5 ? ' (' + (n / base * 100).toFixed(1) + '%)' : '';
     let h = '<table class="gol small" style="margin-top:8px"><thead><tr><th scope="col">ด้าน</th>'
+      + '<th scope="col" class="num">ฐาน</th>'
       + [6, 5, 4, 3].map((l) => '<th scope="col" class="num">ระดับ ' + l + '</th>').join('')
-      + '<th scope="col" class="num">ยังสรุปไม่ได้</th></tr></thead><tbody>';
+      + '<th scope="col" class="num">ยังสรุปไม่ได้</th><th scope="col" class="num">ผ่านระดับ 5</th>'
+      + '<th scope="col" class="num">ไม่มีผลด้านนี้</th></tr></thead><tbody>';
     COMP6.forEach(function (c) {
       const rs = dims.filter((r) => r.comp_code === c[0]);
-      if (!rs.length) return;
       const seen = new Set(); const latest = [];
       rs.forEach((r) => { if (!seen.has(r.student_id)) { seen.add(r.student_id); latest.push(r); } });
-      h += '<tr><td>' + G.esc(c[1]) + '</td>'
-        + [6, 5, 4, 3].map((l) => '<td class="num">' + latest.filter((r) => r.level === l).length + '</td>').join('')
-        + '<td class="num">' + latest.filter((r) => r.level == null).length + '</td></tr>';
+      const base = latest.length;
+      const none = stu.filter((s) => !seen.has(s.id)).length;
+      const cnt = (l) => latest.filter((r) => r.level === l).length;
+      const unk = latest.filter((r) => r.level == null).length;
+      const n5 = latest.filter((r) => r.level != null && r.level >= 5).length;
+      h += '<tr><td>' + G.esc(c[1]) + '</td><td class="num">' + base + '</td>';
+      if (!base) {
+        h += '<td colspan="6" class="muted small">ยังไม่มีผลด้านนี้ส่งขึ้นมา</td>';
+      } else if (unk === base) {
+        h += '<td colspan="6" class="small rs-insuff">หลักฐานไม่เพียงพอ — มีการเก็บข้อมูลด้านนี้แล้ว '
+          + 'แต่ยังไม่มีผู้เรียนที่ได้ระดับจากเกม (' + base + ' คน)</td>';
+      } else {
+        h += [6, 5, 4, 3].map((l) => '<td class="num">' + cnt(l) + pct(cnt(l), base) + '</td>').join('')
+          + '<td class="num">' + unk + pct(unk, base) + '</td>'
+          + '<td class="num"><b>' + n5 + '/' + base + '</b>' + pct(n5, base) + '</td>';
+      }
+      h += '<td class="num muted">' + none + '</td></tr>';
     });
-    return h + '</tbody></table>';
+    return h + '</tbody></table>'
+      + '<div class="muted small" style="margin-top:4px">ฐาน = ผู้เรียนที่มีผลด้านนั้น · ร้อยละปัดทศนิยม 1 ตำแหน่ง '
+      + 'ผลรวมแต่ละแถวอาจเป็น 99.9–100.1 · ฐานต่ำกว่า 5 คนแสดงจำนวนอย่างเดียว · "ไม่มีผลด้านนี้" นับจากทั้งห้อง คนละตัวหาร</div>';
+  }
+
+
+  /* [V.1.6.39 · ครูสั่ง 7 ก.ย. ข้อ 2] "ผู้เรียนทำแบบทดสอบได้ 70% ขึ้นไป กี่ % ของผู้เรียน" — นับรายคน (ครูเคาะ) ·
+     เกณฑ์ = ช่วง good+best ของ ACH_BANDS (lo 70 — ไม่ตั้งเส้นใหม่) · ฐาน = ผู้มีใบผล ไม่ใช่ทั้งห้อง (ก2) ·
+     บรรทัด "ยังไม่มีผล" ติดกันเสมอ · ป้าย ซ8 ถ้อยคำเดียวกับหน้าสาธารณะ (AUDIT ตรึง) · บรรทัดสอง = เฉพาะผู้เล่นครบ */
+  function rsAch70Card(cid, stu) {
+    const rows = achRows(cid).filter((r) => r.percent != null);
+    const best = {};
+    rows.forEach((r) => { const v = Number(r.percent); if (best[r.student_id] == null || v > best[r.student_id]) best[r.student_id] = v; });
+    const ids = Object.keys(best).filter((id) => stu.some((s) => s.id === id));
+    const base = ids.length, pass = ids.filter((id) => best[id] >= 70).length;
+    const none = stu.length - base;
+    const scales = Array.from(new Set(rows.map((r) => Number(r.max_score)).filter((n) => n))).sort((a, b) => a - b);
+    const done = new Set((S.progress || []).filter((p) => (p.progress_percent || 0) >= 100).map((p) => p.student_id));
+    const idsDone = ids.filter((id) => done.has(id));
+    const passDone = idsDone.filter((id) => best[id] >= 70).length;
+    const pc = (n, b) => b >= 5 ? (n / b * 100).toFixed(1) + '%' : n + ' คน';
+    let h = '<div class="card"><b>📝 ทำแบบทดสอบได้ 70% ขึ้นไป</b> <span class="small muted">(จากคะแนนเก็บของเกม'
+      + (scales.length === 1 ? ' เต็ม ' + G.fmt(scales[0]) : '') + ' · นับรายคน · ครูเคาะ 7 ก.ย. 2569)</span>';
+    if (!base) {
+      h += '<div class="small muted" style="margin-top:4px">ยังไม่มีใบผลของห้องนี้ส่งขึ้นมา</div>';
+    } else {
+      h += '<div style="margin-top:4px"><b style="font-size:20px">' + pc(pass, base) + '</b> '
+        + '<span class="small muted">(' + pass + ' จาก ' + base + ' คนที่มีผล' + (base < 5 ? ' — ฐานต่ำกว่า 5 คน ไม่แสดงร้อยละ' : '') + ')</span></div>'
+        + '<div class="small muted">ยังไม่มีผล ' + none + ' คน จาก ' + stu.length + ' คนในห้อง</div>'
+        + (idsDone.length ? '<div class="small" style="margin-top:4px">เฉพาะผู้เล่นครบทุกด่าน: <b>' + pc(passDone, idsDone.length) + '</b> '
+            + '<span class="muted">(' + passDone + '/' + idsDone.length + ')</span></div>' : '');
+    }
+    h += '<div class="muted small" style="margin-top:6px">ℹ️ คะแนนเก็บคิดจากคะแนนเต็ม' + (scales.length === 1 ? ' ' + G.fmt(scales[0]) : 'ของเกม')
+      + ' เสมอ — ผู้เรียนที่ยังเล่นไม่ครบทุกด่านจะอยู่ในช่วงคะแนนล่าง ไม่ได้หมายความว่าทำได้ไม่ดี</div></div>';
+    return h;
   }
 
   /* [D3 + B6] รอบเล่นซ้ำรายคน + ธง "ชวนครูเข้าไปดู" — สัญญาณให้ช่วย ไม่ใช่เครื่องตัดสิน

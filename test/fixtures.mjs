@@ -121,6 +121,23 @@ export const compDims = [
     evidence: 'game', decided_by: 'system', system_score: 64, criteria_note: null },
 ];
 
+/* [V.1.6.39] ชุดสำหรับแท็บวิจัยโดยเฉพาะ (opt.compDims): คีย์จริงแบบที่ฐานส่ง — 'HT-CTC' มีคำนำหน้า ·
+   'CZ-B' → cz1 · 'SM-C' ต้องไม่นับเข้า sm2 อีก · TW ทุกแถว level null ⇒ แถว "หลักฐานไม่เพียงพอ" */
+export const compDimsRS = compDims.concat([
+  { student_id: S1, classroom_id: R1, comp_code: 'CZ', game_name: 'กาญจนบุรี 2050',
+    score: 61, level: 4, level_label: 'กำลังพัฒนา', sub_scores: { 'CZ-B': 50, 'CZ-A': 62 },
+    evidence: 'game', decided_by: 'system', system_score: 61, criteria_note: null },
+  { student_id: S1, classroom_id: R1, comp_code: 'SM', game_name: 'กาญจนบุรี 2050',
+    score: 58, level: 5, level_label: 'สามารถ', sub_scores: { 'SM-C': 40, 'SM-B': 90 },
+    evidence: 'game', decided_by: 'system', system_score: 58, criteria_note: null },
+  { student_id: S1, classroom_id: R1, comp_code: 'HOT', game_name: 'กาญจนบุรี 2050',
+    score: 72, level: 5, level_label: 'สามารถ', sub_scores: { 'HT-CTC': 60, 'HT-PRB': 80 },
+    evidence: 'game', decided_by: 'system', system_score: 72, criteria_note: null },
+  { student_id: S1, classroom_id: R1, comp_code: 'TW', game_name: 'กาญจนบุรี 2050',
+    score: null, level: null, level_label: null, sub_scores: null,
+    evidence: 'scored', decided_by: 'game', system_score: null, criteria_note: 'บทเรียนชุดนี้ยังไม่มีด่านที่วัดด้านนี้โดยตรง' },
+]);
+
 export const comp = [
   { student_id: S1, classroom_id: R1, game_code: 'kanchanaburi2050', game_name: 'กาญจนบุรี 2050',
     game_version: 'V.7.99', total: 72, level: 5, ctc: 70, stm: 74, crt: 68, prb: 71,

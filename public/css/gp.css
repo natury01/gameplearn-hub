@@ -1164,3 +1164,8 @@ input[type=number], input[inputmode="numeric"] { min-height: 26px; }
   :root:not([data-theme="light"]) .note-warn { background: #2c2617; border-color: #8a6d1f; }
 }
 [data-theme="dark"] .note-warn { background: #2c2617; border-color: #8a6d1f; }
+
+/* [V.1.6.39] แถวที่ทั้งฐานยังสรุปไม่ได้ — ถ้อยคำแทนตัวเลข */
+.rs-insuff { color: #7a5b00; font-style: italic; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rs-insuff { color: #e2b84a; } }
+:root[data-theme="dark"] .rs-insuff { color: #e2b84a; }

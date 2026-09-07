@@ -528,8 +528,10 @@ console.log('═══ 10) [V.1.6.34 · D2] แท็บข้อมูลวิ
     !rs.main.includes('ครบทุกด้านย่อย'), '');
   ok('ก2: ช่องที่ยังไม่มีผล บอกเหตุ ไม่ใช่ช่องว่างเงียบ',
     /ยังไม่มีผลรายองค์ส่งขึ้นมา|ไม่ได้แปลว่านักเรียนทำไม่ได้/.test(rs.main), '');
-  ok('สองช่องที่รอเกณฑ์/ท่อ ประกาศตรง ๆ ว่ารออะไร (B4 · ขอครูรัน_94/A7)',
-    rs.main.includes('ขอครูรัน_94') && /B4/.test(rs.main), '');
+  ok('[V.1.6.39] เกณฑ์ผ่านประกาศตรง ๆ ว่าครูเคาะแล้ว (ระดับ 5 · 7 ก.ย.) และช่อง B4 ยังบอกว่ารอ',
+    rs.main.includes('เกณฑ์ผ่าน = ระดับ 5') && rs.main.includes('ครูเคาะ 7 ก.ย.') && /B4/.test(rs.main), '');
+  ok('[V.1.6.39] ไม่มีหมายเหตุหมดอายุค้าง (รอครูเคาะ · รอผลสำรวจ 94 · 29 ส.ค.)',
+    !/รอครูเคาะ|รอผลสำรวจ|ฐานจริง 29 ส\.ค\.|ร่าง 29 ส\.ค\./.test(rs.main), '');
   ok('รอบเล่นซ้ำถูกกำกับว่า "ไม่ใช่ตัววัดการเรียนรู้" (บทเรียนไทล์ที่ถูกถอด)',
     rs.main.includes('ไม่ใช่ตัววัดการเรียนรู้'), '');
   ok('ธงชวนดูใช้ภาษา "ชวนช่วย" ไม่ใช่ตัดสิทธิ์', /ชวน(ครูเข้าไป)?ดู|ไม่ใช้ตัดสิทธิ์/.test(rs.main), '');
@@ -616,6 +618,40 @@ console.log('\n═══ 12) [V.1.6.36 · ใบ HUB] ตัวหารปน�
   });
   ok('สเกลเดียว: เกณฑ์ 80 เปิดใช้ได้ ไม่ติดคำ "ปิดชั่วคราว"',
     st.off === false && !st.txt.includes('ปิดชั่วคราว'), st);
+  await p.close();
+}
+
+console.log('\n═══ 13) [V.1.6.39 · ใบ HUB 7 ก.ย. ×3] หน้าวิจัย: คีย์ HT จริง · ถอน SM-C · %รายระดับ+ฐาน · การ์ด 70% · ตัวกรองห้อง ═══');
+{
+  const { p, calls } = await open({ compDims: F.compDimsRS }, '#/room/' + F.R1);
+  await p.click('[data-tab="research"]');
+  await sleep(350);
+  const st = await p.evaluate(() => {
+    const rows = [...document.querySelectorAll('tr.rs-ok, tr.rs-wait, tr.rs-none')];
+    const cell = (code) => { const r = rows.find((x) => x.textContent.includes(code)); return r ? r.textContent : ''; };
+    const lvTable = [...document.querySelectorAll('table.gol.small')].map((tb) => tb.textContent).join(' || ');
+    return { ht1: cell('ht1'), cz1: cell('cz1'), sm2: cell('sm2'), tw1: cell('tw1'), cm2: cell('cm2'),
+      lv: lvTable, main: document.getElementById('page-main').textContent,
+      pick: !!document.getElementById('room-pick'), jump: !!document.querySelector('#room-pick[data-room-jump]'),
+      selVal: (document.getElementById('room-pick') || {}).value };
+  });
+  ok('🔴 คีย์ HT-CTC (มีคำนำหน้า) ถูกนับเข้า ht1 แล้ว — ไม่ใช่ศูนย์', /1\/\d+/.test(st.ht1), st.ht1.slice(-30));
+  ok('cz1 = มีหลักฐาน (CZ-B → cz1) และมีเลขคน', st.cz1.includes('มีหลักฐานแล้ว') && /1\/\d+/.test(st.cz1), st.cz1.slice(-40));
+  ok('⛔ sm2 ไม่นับ SM-C อีกแล้ว (จ2 ปฏิเสธ) — ต้องว่างอย่างซื่อสัตย์', st.sm2.includes('ยังไม่มีผลรายองค์') && st.sm2.includes('ปฏิเสธ'), st.sm2.slice(-60));
+  ok('tw1 สถานะ 🟠 มีหลักฐานแต่ยังไม่มีเกณฑ์ (ไม่ใช่ 🟢)', st.tw1.includes('ยังไม่มีเกณฑ์แปลงเป็นคะแนน') && !st.tw1.includes('🟢'), st.tw1.slice(0, 60));
+  ok('cm2 บอกว่ารอ [PLAN] ชี้ขาด ไม่ใช่ "ต้องสร้างแหล่งใหม่"', st.cm2.includes('รอ [PLAN]') && !st.cm2.includes('ต้องสร้างแหล่งใหม่'), '');
+  ok('ตารางระดับมีคอลัมน์ ฐาน + ผ่านระดับ 5 + ไม่มีผลด้านนี้', /ฐาน/.test(st.lv) && /ผ่านระดับ 5/.test(st.lv) && /ไม่มีผลด้านนี้/.test(st.lv), '');
+  ok('⛔ TW ทั้งฐานสรุปไม่ได้ → ทั้งแถว "หลักฐานไม่เพียงพอ" ไม่พิมพ์ 0.0%', st.lv.includes('หลักฐานไม่เพียงพอ') && !st.lv.includes('0 (0.0%)'), '');
+  ok('ฐาน < 5 → ไม่แสดง % (fixtures 1 คน) แต่มีเศษ/ส่วน', !/\(\d+\.\d%\)/.test(st.lv) && /1\/1/.test(st.lv), st.lv.slice(0, 120));
+  ok('การ์ด "ทำแบบทดสอบได้ 70% ขึ้นไป" มี + บอกฐาน + ป้ายคะแนนเต็มเสมอ', st.main.includes('70% ขึ้นไป') && /จาก \d+ คนที่มีผล/.test(st.main) && st.main.includes('ไม่ได้หมายความว่าทำได้ไม่ดี'), '');
+  ok('หัวตารางยึด Rubric ฉบับที่ ๓', st.main.includes('Rubric ฉบับที่ ๓'), '');
+  ok('ตัวกรองห้องโผล่บนแท็บวิจัยของหน้าห้อง (แบบเด้ง) และเลือกห้องปัจจุบันอยู่', st.pick && st.jump && st.selVal === F.R1, st.selVal);
+  await p.click('[data-tab="ach"]'); await sleep(250);
+  ok('แท็บอื่นของหน้าห้องไม่มีช่องเลือกห้อง (มติเดิมคงอยู่)', await p.evaluate(() => !document.getElementById('room-pick')), '');
+  await p.click('[data-tab="research"]'); await sleep(250);
+  await p.selectOption('#room-pick', F.R2); await sleep(400);
+  ok('เลือกห้องอื่นจากแท็บวิจัย → เด้งไปหน้าห้องนั้น (แท็บค้างเดิม)', await p.evaluate(() => location.hash) === '#/room/' + F.R2, await p.evaluate(() => location.hash));
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
   await p.close();
 }
 

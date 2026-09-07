@@ -138,6 +138,15 @@ export const compDimsRS = compDims.concat([
     evidence: 'scored', decided_by: 'game', system_score: null, criteria_note: 'บทเรียนชุดนี้ยังไม่มีด่านที่วัดด้านนี้โดยตรง' },
 ]);
 
+/* [V.1.6.40] แถวสอบด่าน 8 — S1 มีเลขครั้ง: ครั้งที่ 1 = 25 (ผ่าน 21) แม้ครั้งที่ 2 ได้ 30 · S2 ไร้เลขครั้ง: แถวแรกตามเวลา 15 (ไม่ผ่าน) 🚩 noAtt
+   ⇒ ผ่าน 1 จาก 2 คนที่สอบแล้ว · ธง 1/2 · ⛔ ถ้าอ่านค่าสูงสุดหรือ _boss จะได้ 2/2 — เทสต์นี้กันไว้ */
+export const eventsBoss = [
+  { student_id: S1, game_id: G1, kind: 'boss', score: 25, raw: { attemptNo: '1' }, created_at: '2026-08-20T09:00:00Z' },
+  { student_id: S1, game_id: G1, kind: 'boss', score: 30, raw: { attemptNo: '2' }, created_at: '2026-08-21T09:00:00Z' },
+  { student_id: S2, game_id: G1, kind: 'boss', score: 15, raw: {}, created_at: '2026-08-20T10:00:00Z' },
+  { student_id: S2, game_id: G1, kind: 'boss', score: 28, raw: {}, created_at: '2026-08-22T10:00:00Z' },
+];
+
 export const comp = [
   { student_id: S1, classroom_id: R1, game_code: 'kanchanaburi2050', game_name: 'กาญจนบุรี 2050',
     game_version: 'V.7.99', total: 72, level: 5, ctc: 70, stm: 74, crt: 68, prb: 71,

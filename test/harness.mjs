@@ -143,7 +143,8 @@ export async function stub(page, opt = {}) {
     if (has('students')) return json(inIds(opt.students || F.students, 'classroom_id'));
     if (has('classroom_games')) return json(inIds(F.classroom_games, 'classroom_id'));
     if (has('student_game_progress')) return json(inIds(F.progress, 'student_id'));
-    if (has('events')) return json([], 200, { 'content-range': '0-0/7' });
+    /* [V.1.6.40] opt.events — ฉีดแถว events (เช่น kind=boss) ให้การ์ดผลสัมฤทธิ์จากแบบทดสอบ */
+    if (has('events')) return opt.events ? json(inIds(opt.events, 'student_id')) : json([], 200, { 'content-range': '0-0/7' });
     if (has('v_classroom_game_summary')) return json(inIds(F.summary, 'classroom_id'));
     if (has('v_student_achievement')) {
       if (opt.has43 === false) return gone();

@@ -205,8 +205,10 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
         /* ป้ายค่าวางถัดจาก "ปลายที่ไกลกว่า" ระหว่างแท่งกับขีดเปรียบเทียบเสมอ
            ไม่งั้นเวลาค่าทั้งสองใกล้กัน ตัวเลขจะไปทับขีดจนอ่านไม่ออก (เห็นตอนเปิดดูภาพจริง) */
         const tip = LW + Math.max(bw(r.v), r.cmp != null ? bw(r.cmp) : 0) + 10;
+        /* [V.1.6.40 · มติครู 8 ก.ย.] ค่าเฉลี่ยที่เผยแพร่ต้องแสดงตัวหารที่ใช้คำนวณเสมอ — บทเรียน 86.1 (นับหัว 57 เฉลี่ยจาก 2) */
         s += '<text x="' + tip + '" y="' + (y + 21) + '" fill="var(--ink)" font-size="13"'
-          + ' font-weight="600">' + r.v + (opt.unit || '') + '</text>';
+          + ' font-weight="600">' + r.v + (opt.unit || '') + '</text>'
+          + (r.vnote ? '<text x="' + tip + '" y="' + (y + 21) + '" dx="' + (String(r.v).length * 8 + 12) + '" fill="var(--muted)" font-size="11.5">' + esc(r.vnote) + '</text>' : '');
       } else {
         /* [V.1.6.37] แถวที่ไม่มีค่าบอกเหตุของตัวเองได้ (r.empty) — "หลักฐานไม่เพียงพอ" กับ
            "ยังไม่มีผลส่งขึ้นมา" เป็นคนละเรื่อง ต้องไม่ใช้ข้อความกลางประโยคเดียวแทนทั้งคู่ */
@@ -278,7 +280,7 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
     /* ---- ตัวเลขหัวเรื่อง ---- */
     html += '<div class="statrow">'
       + '<div class="stat"><b>' + (ach.avg_percent == null ? '—' : ach.avg_percent + '%') + '</b>'
-      +   '<span>ผลสัมฤทธิ์เฉลี่ย' + (ach.avg_all != null ? ' · ทั้งระบบ ' + ach.avg_all + '%' : '') + '</span></div>'
+      +   '<span>ผลสัมฤทธิ์เฉลี่ย' + (ach.avg_percent != null && ach.n != null ? ' (จาก ' + ach.n + ' ใบ)' : '') + (ach.avg_all != null ? ' · ทั้งระบบ ' + ach.avg_all + '%' : '') + '</span></div>'
       + '<div class="stat"><b>' + (s.n_students || 0) + '</b><span>นักเรียนที่มีผล</span></div>'
       + '<div class="stat"><b>' + (s.n_rooms || 0) + '</b><span>ห้องเรียน</span></div>'
       + '<div class="stat"><b>' + (s.n_schools || 0) + '</b><span>โรงเรียน</span></div>'
@@ -427,6 +429,7 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
     const cm = comps.map((c) => ({ label: c.name || c.code, code: c.code,
       v: c.avg_score == null ? null : Number(c.avg_score),
       cmp: c.avg_all == null ? null : Number(c.avg_all),
+      vnote: c.avg_score == null ? null : '(จาก ' + (c.n_students || 0) + ' คน)',
       empty: c.avg_score == null ? compEmpty(c) : null,
       note: (c.n_students || 0) + ' คน' }));
     const anyCmp = cm.some((x) => x.cmp != null);

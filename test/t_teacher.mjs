@@ -636,14 +636,17 @@ console.log('\n═══ 13) [V.1.6.39 · ใบ HUB 7 ก.ย. ×3] หน้�
       selVal: (document.getElementById('room-pick') || {}).value };
   });
   ok('🔴 คีย์ HT-CTC (มีคำนำหน้า) ถูกนับเข้า ht1 แล้ว — ไม่ใช่ศูนย์', /1\/\d+/.test(st.ht1), st.ht1.slice(-30));
-  ok('cz1 = มีหลักฐาน (CZ-B → cz1) และมีเลขคน', st.cz1.includes('มีหลักฐานแล้ว') && /1\/\d+/.test(st.cz1), st.cz1.slice(-40));
+  ok('cz1 = ✅ แปลงเป็นระดับได้ (CZ-B → cz1) และมีเลขคน', st.cz1.includes('แปลงเป็นระดับได้') && /1\/\d+/.test(st.cz1), st.cz1.slice(-40));
   ok('⛔ sm2 ไม่นับ SM-C อีกแล้ว (จ2 ปฏิเสธ) — ต้องว่างอย่างซื่อสัตย์', st.sm2.includes('ยังไม่มีผลรายองค์') && st.sm2.includes('ปฏิเสธ'), st.sm2.slice(-60));
   ok('tw1 สถานะ 🟠 มีหลักฐานแต่ยังไม่มีเกณฑ์ (ไม่ใช่ 🟢)', st.tw1.includes('ยังไม่มีเกณฑ์แปลงเป็นคะแนน') && !st.tw1.includes('🟢'), st.tw1.slice(0, 60));
-  ok('cm2 บอกว่ารอ [PLAN] ชี้ขาด ไม่ใช่ "ต้องสร้างแหล่งใหม่"', st.cm2.includes('รอ [PLAN]') && !st.cm2.includes('ต้องสร้างแหล่งใหม่'), '');
+  ok('cm2 = 🔴 ยังไม่มีเครื่องมือวัด + บอกว่าคีย์ CM-B ไหลจริง รอ [PLAN] (PLAN 23:2x)', st.cm2.includes('ยังไม่มีเครื่องมือวัด') && st.cm2.includes('รอ [PLAN]'), '');
+  ok('[V.1.6.40] ทะเบียนตรึง ✅6 · 🔴4 ตาม PLAN 23:2x (ห้ามใช้เลขชุดอื่น)', await p.evaluate(() => ({ ok: document.querySelectorAll('tr.rs-ok').length, none: document.querySelectorAll('tr.rs-none').length })).then((c) => c.ok === 6 && c.none === 4), await p.evaluate(() => [document.querySelectorAll('tr.rs-ok').length, document.querySelectorAll('tr.rs-none').length]));
   ok('ตารางระดับมีคอลัมน์ ฐาน + ผ่านระดับ 5 + ไม่มีผลด้านนี้', /ฐาน/.test(st.lv) && /ผ่านระดับ 5/.test(st.lv) && /ไม่มีผลด้านนี้/.test(st.lv), '');
   ok('⛔ TW ทั้งฐานสรุปไม่ได้ → ทั้งแถว "หลักฐานไม่เพียงพอ" ไม่พิมพ์ 0.0%', st.lv.includes('หลักฐานไม่เพียงพอ') && !st.lv.includes('0 (0.0%)'), '');
   ok('ฐาน < 5 → ไม่แสดง % (fixtures 1 คน) แต่มีเศษ/ส่วน', !/\(\d+\.\d%\)/.test(st.lv) && /1\/1/.test(st.lv), st.lv.slice(0, 120));
-  ok('การ์ด "ทำแบบทดสอบได้ 70% ขึ้นไป" มี + บอกฐาน + ป้ายคะแนนเต็มเสมอ', st.main.includes('70% ขึ้นไป') && /จาก \d+ คนที่มีผล/.test(st.main) && st.main.includes('ไม่ได้หมายความว่าทำได้ไม่ดี'), '');
+  ok('[V.1.6.40] การ์ดผลสัมฤทธิ์ = แบบทดสอบหลังเรียน (ด่าน 8 เต็ม 30) ไม่ใช่คะแนนเก็บ 130', st.main.includes('ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน') && !st.main.includes('ทำแบบทดสอบได้ 70% ขึ้นไป'), '');
+  ok('[V.1.6.40] จัดหน้า 3 ชั้น: สรุปอยู่บนสุด → รายคน → ตาราง 22 องค์พับใน <details>', (() => { const a = st.main.indexOf('ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน'), b = st.main.indexOf('ระดับพร้อมจำนวนหลักฐาน'), c = st.main.indexOf('ความครอบคลุม 22'); return a > -1 && a < b && b < c; })(), '');
+  ok('[V.1.6.40] ตาราง 22 องค์อยู่ใน details (พับได้ ไม่หาย)', await p.evaluate(() => !!document.querySelector('details.rs-ref table.gol')), '');
   ok('หัวตารางยึด Rubric ฉบับที่ ๓', st.main.includes('Rubric ฉบับที่ ๓'), '');
   ok('ตัวกรองห้องโผล่บนแท็บวิจัยของหน้าห้อง (แบบเด้ง) และเลือกห้องปัจจุบันอยู่', st.pick && st.jump && st.selVal === F.R1, st.selVal);
   await p.click('[data-tab="ach"]'); await sleep(250);
@@ -651,6 +654,39 @@ console.log('\n═══ 13) [V.1.6.39 · ใบ HUB 7 ก.ย. ×3] หน้�
   await p.click('[data-tab="research"]'); await sleep(250);
   await p.selectOption('#room-pick', F.R2); await sleep(400);
   ok('เลือกห้องอื่นจากแท็บวิจัย → เด้งไปหน้าห้องนั้น (แท็บค้างเดิม)', await p.evaluate(() => location.hash) === '#/room/' + F.R2, await p.evaluate(() => location.hash));
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+
+console.log('\n═══ 14) [V.1.6.40] ปุ่มอัปเดตผลจากเกม (this.TIMEOUT) · ผลสัมฤทธิ์ = คะแนนสอบครั้งแรก ═══');
+{
+  const { p, calls } = await open({ events: F.eventsBoss, students: F.studentsAllOn }, '#/room/' + F.R1);
+  /* (1) _ensureFrame ของจริงต้องได้ iframe — เดิม this.TIMEOUT undefined ⇒ ปฏิเสธใน 0 ms ทุกครั้ง */
+  const fr = await p.evaluate(async () => {
+    const t0 = performance.now();
+    try { const f = await window.GameRefresh._ensureFrame(location.origin + '/support.html'); return { ok: f && f.tagName === 'IFRAME', ms: Math.round(performance.now() - t0), to: window.GameRefresh.FRAME_TIMEOUT }; }
+    catch (e) { return { ok: false, err: String(e) }; }
+  });
+  ok('🔴 _ensureFrame เปิด iframe จริงสำเร็จ (บั๊ก this.TIMEOUT ตั้งแต่ .36 ปิดแล้ว)', fr.ok === true, fr);
+  ok('FRAME_TIMEOUT เป็นตัวเลข ≥ 15000 (เครื่องครูช้ากว่าเครื่องพัฒนา)', typeof fr.to === 'number' && fr.to >= 15000, fr.to);
+  /* ตัวคุมลบ: ถ้าเพดานเป็น 0 ต้องปฏิเสธจริง (พิสูจน์ว่าเทสต์ข้อบนแดงได้) */
+  const neg = await p.evaluate(async () => {
+    const keep = window.GameRefresh.FRAME_TIMEOUT; window.GameRefresh.FRAME_TIMEOUT = 1; window.GameRefresh.cleanup();
+    try { await window.GameRefresh._ensureFrame(location.origin + '/standards.html?x=' + Date.now()); return 'resolved'; }
+    catch (e) { return 'rejected'; } finally { window.GameRefresh.FRAME_TIMEOUT = keep; window.GameRefresh.cleanup(); }
+  });
+  ok('ตัวคุมลบ: เพดาน 1 ms → ปฏิเสธ (ยามไม่ได้เขียวตลอดกาล)', neg === 'rejected', neg);
+  /* (2) กดปุ่มกับเกมที่ URL ข้ามโดเมน → เหตุผลต้องอ่านออก ไม่ใช่ 'อัปเดตไม่สำเร็จ' ลอย ๆ */
+  await p.click('#gr-go'); await sleep(1500);
+  const msg = await p.evaluate(() => (document.getElementById('gr-msg') || {}).textContent || '');
+  ok('เหตุผลที่ล้มบอกขั้นที่ล้ม (เกมข้ามโดเมน → ข้อความบอกเหตุ) ไม่ใช่ "อัปเดตไม่สำเร็จ" ลอย ๆ', (msg.includes('ยังไม่ได้ตั้งที่อยู่หน้าครูของเกม') || msg.includes('ยังไม่ได้เปิดเกมที่รองรับ')) && !/อัปเดตไม่สำเร็จ\s*$/.test(msg.trim()), msg.slice(0, 160));
+  /* (3) การ์ดผลสัมฤทธิ์ = fst จาก events */
+  await p.click('[data-tab="research"]'); await sleep(900);
+  const bc = await p.evaluate(() => (document.querySelector('[id^="rs-boss70-"]') || {}).textContent || '');
+  ok('นับจากคะแนนสอบครั้งแรก: ผ่าน 1 จาก 2 คนที่สอบแล้ว (S1 ครั้งแรก 25 ผ่าน · S2 แถวแรก 15 ไม่ผ่าน — ไม่ใช่ค่าสูงสุด)', /1 จาก 2 คนที่สอบแล้ว/.test(bc), bc.slice(0, 200));
+  ok('🚩 ธงกลุ่มไร้เลขครั้ง 1 จาก 2 (มติ 1 ก.ย. — ห้ามกลืนรวมเงียบ)', /🚩 1 จาก 2 คน ใช้ลำดับเวลา/.test(bc), '');
+  ok('บรรทัด "ยังไม่ได้ทำแบบทดสอบ" ติดตัวเลข', /ยังไม่ได้ทำแบบทดสอบ 0 คน จาก 2 คนในห้อง/.test(bc), '');
+  ok('ฐาน < 5 → แสดงจำนวน ไม่แสดง % · ป้าย ซ8 (เต็ม 130) ไม่อยู่ในการ์ดนี้แล้ว', /1 คน/.test(bc) && !bc.includes('ไม่ได้หมายความว่าทำได้ไม่ดี') && bc.includes('เพดาน 21'), '');
   ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
   await p.close();
 }

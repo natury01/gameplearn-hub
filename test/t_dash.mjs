@@ -377,5 +377,18 @@ console.log('═══ 10) [V.1.6.37 · ซ9+ซ8] สามสถานะข�
   await p.close();
 }
 
+console.log('\n═══ 11) [V.1.6.40 · มติครู 8 ก.ย.] ค่าเฉลี่ยทุกด้านต้องพก "(จาก n คน)" ═══');
+{
+  const p = await b.newPage(); await stub(p);
+  await p.goto(BASE + '/dashboard.html'); await sleep(900);
+  const st = await p.evaluate(() => {
+    const svgs = [...document.querySelectorAll('svg')].map((s) => s.textContent).join(' || ');
+    return { hasN: /\(จาก \d+ คน\)/.test(svgs), main: document.body.textContent };
+  });
+  ok('แท่งสมรรถนะแสดงตัวหารข้างค่าเฉลี่ย "(จาก n คน)"', st.hasN, '');
+  ok('หัวเรื่องผลสัมฤทธิ์เฉลี่ยบอกจำนวนใบที่ใช้เฉลี่ย', /\(จาก \d+ ใบ\)/.test(st.main), '');
+  await p.close();
+}
+
 await b.close(); srv.close();
 process.exit(ok.done());

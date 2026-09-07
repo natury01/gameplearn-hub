@@ -387,6 +387,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
        แล้วยังต้องไล่ยิงใบรายงานผลทีละคนอีก (เว้นจังหวะ 120ms/คน) */
     ACK_TIMEOUT: 9000,
     DONE_TIMEOUT: 60000,
+    /* [V.1.6.40 · ใบ HUB 7 ก.ย. ดึก] เดิม _ensureFrame ใช้ this.TIMEOUT ซึ่ง**ไม่มีอยู่** ⇒ setTimeout(fn, undefined) = 0 ms
+       ⇒ ปฏิเสธก่อน iframe โหลดเสร็จทุกครั้ง — ปุ่ม "อัปเดตผลจากเกม" และซิงก์อัตโนมัติล้มเงียบมาตั้งแต่ .36
+       เครื่องครูในโรงเรียนบูต iframe ช้ากว่าเครื่องพัฒนา — ตั้ง 15 วิ ไม่ต่ำกว่านี้ */
+    FRAME_TIMEOUT: 15000,
     _frame: null,
     _busy: false,
     /* หน้าครูของเกม อยู่ใต้ path ของเกมบนโดเมนเดียวกัน */
@@ -413,12 +417,16 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         f.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px';
         f.setAttribute('aria-hidden', 'true');
         f.setAttribute('title', 'ตัวช่วยอัปเดตผลจากเกม (ไม่แสดงผล)');
-        f.onload = () => res(f);
-        f.onerror = () => rej(new Error('เปิดหน้าครูของเกมไม่ได้'));
+        let t = null;
+        f.onload = () => { clearTimeout(t); res(f); };
+        f.onerror = () => { clearTimeout(t); rej(new Error('เปิดหน้าครูของเกมไม่ได้')); };
         f.src = url;
         document.body.appendChild(f);
         this._frame = f;
-        setTimeout(() => rej(new Error('เปิดหน้าครูของเกมไม่ทันเวลา')), this.TIMEOUT);
+        /* ยาม: ค่าคงที่ที่ป้อน setTimeout ต้องเป็นตัวเลข — undefined เงียบสองชั้นคือต้นเหตุของบั๊กนี้ */
+        const ms = Number(this.FRAME_TIMEOUT);
+        if (!(ms > 0)) { rej(new Error('FRAME_TIMEOUT ไม่ใช่ตัวเลข')); return; }
+        t = setTimeout(() => rej(new Error('เปิดหน้าครูของเกมไม่ทันเวลา')), ms);
       });
     },
     /* สั่งอัปเดตหนึ่งห้อง — คืน {ok, why} เสมอ ไม่โยน error ออกไปให้หน้าจอพัง
@@ -538,8 +546,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           if (r && r.ver) noteGameVersion(g, r.ver);
           if (r && r.ok) okAny = true;
         }
-      } catch (e) { /* เงียบ — นี่คืองานเบื้องหลัง ห้ามทำให้หน้าจอครูพัง */ }
+      } catch (e) { /* ไม่เด้ง — งานเบื้องหลัง · แต่ต้องไม่เงียบสนิท (บรรทัดล่าง) */ }
       finally { GameRefresh.cleanup(); GameRefresh._busy = false; }
+      /* [V.1.6.40] ล้มติดกัน ≥2 ครั้ง → บอกครูหนึ่งบรรทัดบนแถบ ไม่เด้ง — เดิมล้มทุกครั้งมา 4 รุ่นโดยไม่มีใครรู้ */
+      this._fails = this._fails || {};
+      this._fails[cid] = okAny ? 0 : (this._fails[cid] || 0) + 1;
+      if (!okAny && this._fails[cid] >= 2) {
+        const m = $('gr-msg');
+        if (m) m.textContent = 'ซิงก์อัตโนมัติไม่สำเร็จติดกัน ' + this._fails[cid] + ' ครั้ง — กดปุ่มอัปเดตเอง หรือเปิดหน้าห้องเรียนในเกมหนึ่งครั้ง';
+      }
       if (okAny && typeof onDone === 'function') { try { await onDone(); } catch (e) {} }
       return okAny;
     },
@@ -1148,40 +1163,43 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      [V.1.6.34 · ครูสั่ง 30 ส.ค. ข้อ 4 + สเปก D2 ของ [PLAN]] แท็บ "🔬 ข้อมูลวิจัย" รายห้อง
      หลักการ ก2 คุมทั้งแท็บ: แสดงเฉพาะสิ่งที่ระบบมีจริง ณ ตอนนี้ · ส่วนที่เกณฑ์/ท่อยังไม่มา
      ขึ้นสถานะตรง ๆ ว่า "รออะไร" — ห้ามช่องว่างเงียบ ห้ามเลขที่ไม่มีที่มา
-     ⛔ ตามท้าย STD-008: ห้ามคำว่า "ครบทุกด้านย่อย" จนกว่าทะเบียนบังคับใช้
+     ⛔ ห้ามคำว่า "ครบทุกด้านย่อย" — ผูกกับข้อเท็จจริง (วัดได้ 18 จาก 22 · แปลงเป็นระดับได้ 6) ไม่ผูกกับสถานะเอกสาร
+        (STD-008 v2.0 บังคับใช้แล้ว 7 ก.ย. — ข้อห้ามยังอยู่ตราบใดที่ตัวเลขยังเป็นเช่นนี้)
      ============================================================ */
   /* กรอบ 22 องค์ประกอบ — ยึด Rubric ฉบับที่ ๓ ([PLAN] 7 ก.ย.) · STD-008 ยังเป็นร่างรอเซ็น · st: have=มีหลักฐาน ·
      wait=ช่องมีแต่หลักฐานยังไม่มี · build=ต้องสร้างช่อง · judge=รอชี้ขาดการจับคู่ */
   const RS22 = [
-    ['SM', 'sm1', 'เห็นคุณค่าตนเอง',        'SM-A',   'wait'],
-    ['SM', 'sm2', 'เป้าหมายชีวิต',           'SM-C ✗ (จ2 ปฏิเสธ 7 ก.ย.)', 'wait'],
-    ['SM', 'sm3', 'จัดการอารมณ์',            'SM-B',   'have'],
-    ['SM', 'sm4', 'ภาวะวิกฤต',               null,     'build'],
-    ['HT', 'ht1', 'คิดอย่างมีวิจารณญาณ',     'HT-CTC', 'have'],
-    ['HT', 'ht2', 'คิดเชิงระบบ',             'HT-STM', 'have'],
-    ['HT', 'ht3', 'คิดสร้างสรรค์',           'HT-CRT', 'have'],
-    ['HT', 'ht4', 'คิดแก้ปัญหา',             'HT-PRB', 'have'],
-    ['CM', 'cm1', 'รับสาร',                  'CM-A',   'have'],
-    ['CM', 'cm2', 'รับส่งสาร',               'CM-B',   'flow'],
-    ['CM', 'cm3', 'กลวิธีสื่อสาร',           'CM-C',   'have'],
-    ['TW', 'tw1', 'สมาชิกทีมที่ดี/ผู้นำ',    'teamStat per[].tasks', 'pipe'],
-    ['TW', 'tw2', 'ร่วมมือรวมพลัง',          'teamStat rescues/okAfterWrong', 'pipe'],
-    ['TW', 'tw3', 'สัมพันธ์/จัดการขัดแย้ง',  'teamStat v3 (เริ่ม 30 ส.ค.)', 'pipe'],
-    ['CZ', 'cz1', 'พลเมืองรู้เคารพสิทธิเสรีภาพ', 'CZ-B (4 ข้อ · จ2)', 'have'],
-    ['CZ', 'cz2', 'รับผิดชอบ',               'CZ-A',   'have'],
-    ['CZ', 'cz3', 'มีส่วนร่วม',              'CZ-C',   'have'],
-    ['CZ', 'cz4', 'สร้างการเปลี่ยนแปลง',     'crit.SD (+3 ข้อ) · รอ [PLAN] เคาะบันได', 'have'],
-    ['NS', 'ns1', 'เข้าใจปรากฏการณ์',        'NS-A',   'have'],
-    ['NS', 'ns2', 'เชื่อมโยงคณิต-วิทย์',     'NS-B',   'have'],
-    ['NS', 'ns3', 'รู้เท่าทันเทคโนโลยี',     null,     'build'],
-    ['NS', 'ns4', 'คุณลักษณะคณิต-วิทย์',     null,     'judge']
+    ['SM', 'sm1', 'การเห็นคุณค่าในตนเอง',                      'ความแม่นของการประเมินตนเอง (ครูเคาะ 7 ก.ย.) — ยังไม่คำนวณ', 'partial'],
+    ['SM', 'sm2', 'การมีเป้าหมายในชีวิต',                       'ไม่มีเครื่องมือวัด — SM-C ≠ sm2 (จ2 ปฏิเสธ 7 ก.ย.)', 'build'],
+    ['SM', 'sm3', 'การจัดการอารมณ์และความเครียด',                'SM-B · SM-C (เล่นซ้ำดีขึ้น — เข้าระดับ 5 ได้ครึ่งเดียว)', 'partial'],
+    ['SM', 'sm4', 'การจัดการปัญหาและภาวะวิกฤต',                  'เซ็นเซอร์มีในโค้ด ยังไม่ต่อท่อ — หลัง 10 ก.ย.', 'build'],
+    ['HT', 'ht1', 'การคิดอย่างมีวิจารณญาณ',                     'HT-CTC (27 ข้อ) + ภารกิจ + กาญ EE·PA', 'partial'],
+    ['HT', 'ht2', 'การคิดเชิงระบบ',                             'HT-STM (17 ข้อ) + ภารกิจ + กาญ ST', 'partial'],
+    ['HT', 'ht3', 'การคิดสร้างสรรค์',                           'HT-CRT (6 ข้อ) + ปิล๊อก + กาญ CD', 'partial'],
+    ['HT', 'ht4', 'การคิดแก้ปัญหา',                             'HT-PRB (9 ข้อ) + ภารกิจด่าน 6 + กาญ PD (SD ย้ายไป cz4)', 'partial'],
+    ['CM', 'cm1', 'การรับสารอย่างมีสติและถอดรหัส',                'CM-A (9 ข้อ)', 'partial'],
+    ['CM', 'cm2', 'การรับส่งสารบนพื้นฐานความเข้าใจฯ',             'CM-B — คีย์ไหลจริง แต่ยังไม่ถูกรับเป็นหลักฐาน · รอ [PLAN] ชี้ขาด', 'build'],
+    ['CM', 'cm3', 'การเลือกใช้กลวิธีการสื่อสารฯ',                 'คำตอบเขียน 3 ข้อ กาญ 2050 · เพดานระดับ 4', 'have'],
+    ['TW', 'tw1', 'เป็นสมาชิกที่ดีและมีภาวะผู้นำ',                'teamStat per[].tasks (~13 คน)', 'pipe'],
+    ['TW', 'tw2', 'กระบวนการทำงานร่วมมือรวมพลังฯ',                'teamStat idleGaps20s · okAfterWrong (ตัด rescues — ADR-014)', 'pipe'],
+    ['TW', 'tw3', 'สร้างความสัมพันธ์และจัดการความขัดแย้ง',         'teamStat undoPeerCorrect · fixAfterPeerWrong (v3 เริ่ม 30 ส.ค.)', 'pipe'],
+    ['CZ', 'cz1', 'พลเมืองรู้เคารพสิทธิเสรีภาพ',                  'CZ-B 4 ข้อ (q7_19 q8_4 qh_11 q7_15 · จ2)', 'have'],
+    ['CZ', 'cz2', 'พลเมืองรับผิดชอบต่อบทบาทหน้าที่',              'CZ-A (6 ข้อ)', 'partial'],
+    ['CZ', 'cz3', 'พลเมืองมีส่วนร่วมอย่างมีวิจารณญาณ',            'CZ-C (5 ข้อ) — SD ตัดออกแล้ว', 'have'],
+    ['CZ', 'cz4', 'พลเมืองผู้สร้างการเปลี่ยนแปลง',                'กาญ SD (ระดับ 5–6) + ข้อสอบ 3 ข้อ (ระดับ 3–4) · รอ [PLAN] เคาะบันได', 'have'],
+    ['NS', 'ns1', 'เข้าใจปรากฏการณ์บนโลกและในเอกภพ',              'NS-A (7 ข้อ)', 'have'],
+    ['NS', 'ns2', 'เชื่อมโยงคณิต-วิทย์ เพื่ออยู่ร่วมกับธรรมชาติฯ', 'NS-B · ด่าน 4 · ปิล๊อก · mg2 · กาญ ST (ไม่รับ NS-C)', 'have'],
+    ['NS', 'ns3', 'การสร้าง ใช้ และรู้เท่าทันวิทยาการเทคโนโลยี',    'ไม่มี — หลัง 10 ก.ย.', 'build'],
+    ['NS', 'ns4', 'การมีคุณลักษณะทางคณิต-วิทย์',                 'ปิล๊อก telemetry', 'partial']
   ];
-  const RS_ST = { have: ['🟢 มีหลักฐานแล้ว', 'rs-ok'], wait: ['🟡 ช่องมี — หลักฐานยังไม่มี', 'rs-wait'],
-                  build: ['🔴 ต้องสร้างแหล่งใหม่', 'rs-none'], judge: ['🟡 รอชี้ขาดการจับคู่', 'rs-wait'],
-                  /* [V.1.6.39 · ใบ HUB 7 ก.ย.] สองสถานะที่หน้าจอเคยพูดเกินจริง: TW เคยขึ้น 🟢 ทั้งที่ยังไม่มีเกณฑ์แปลง
-                     เป็นคะแนน (var twPct=null) · cm2 เคยขึ้น 🔴 ทั้งที่มีคีย์ CM-B ไหลจริง — [PLAN] เป็นผู้ชี้ขาด */
-                  pipe: ['🟠 มีหลักฐาน — ยังไม่มีเกณฑ์แปลงเป็นคะแนน', 'rs-wait'],
-                  flow: ['🟡 มีข้อมูลไหลเข้า — รอ [PLAN] ชี้ขาดว่านับเป็นหลักฐานได้หรือไม่', 'rs-wait'] };
+  /* [V.1.6.40] สถานะตาม STD-008 v2.0 (บังคับใช้ 7 ก.ย.) = Rubric ฉบับที่ ๓ · ตรึง ✅6 · 🟡12 · 🔴4 ([PLAN] 23:2x) ห้ามใช้เลขชุดอื่น
+     ✅ แปลงเป็นระดับได้ · 🟡 มีแหล่ง/หลักฐาน แต่ยังแปลงเป็นระดับไม่ครบหรือยังไม่มีเกณฑ์ · 🔴 ยังไม่มีเครื่องมือวัด */
+  const RS_ST = { have: ['✅ แปลงเป็นระดับได้', 'rs-ok'],
+                  partial: ['🟡 มีแหล่ง — ยังแปลงเป็นระดับไม่ครบ/ยังไม่คำนวณ', 'rs-wait'],
+                  pipe: ['🟡 มีหลักฐาน — ยังไม่มีเกณฑ์แปลงเป็นคะแนน', 'rs-wait'],
+                  build: ['🔴 ยังไม่มีเครื่องมือวัด', 'rs-none'],
+                  wait: ['🟡 ช่องมี — หลักฐานยังไม่มี', 'rs-wait'], judge: ['🟡 รอชี้ขาดการจับคู่', 'rs-wait'],
+                  flow: ['🟡 มีข้อมูลไหลเข้า — รอ [PLAN] ชี้ขาด', 'rs-wait'] };
   /* คีย์ด้านย่อยที่เกมส่งจริงใน sub_scores → รหัส Rubric — สองตระกูลตามแผนที่ STD-008 §๑:
      มิติ HT (CTC/STM/CRT/PRB) และรหัสทางการฝั่งโค้ด (SM-A…NS-B) · CZ-B/NS-C ยังไม่มีบ้านใน Rubric
      (ของค้นพบ §๒ ของ STD-008 — รอ [PLAN] ชี้ขาด จึงยังไม่จับคู่ที่นี่) */
@@ -1206,6 +1224,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const subst  = dimAll.filter((r) => r.evidence === 'self_report');       /* ▲ ค่าทดแทน (ประเมินตนเอง) */
     const stu = studentsOf(cid).filter(isOn);
     let html = '';
+
+    /* [V.1.6.40 · ครูสั่ง 7 ก.ย. "หน้าวิจัยไม่สะอาดตา ข้อความผู้พัฒนาเยอะ"] จัดสามชั้น — ย้าย ไม่ลบ:
+       ชั้น 1 สรุป (ผลสัมฤทธิ์จากแบบทดสอบ · สมรรถนะ 6 ด้านรายระดับ) · ชั้น 2 รายคน · ชั้น 3 <details> สำหรับตรวจสอบ
+       (ทะเบียน 22 องค์ + ที่มา + B4) — กรรมการกดเปิดได้ ไม่หายจากหน้า */
+    html += '<h2 class="section-title">สรุปห้องนี้ <span class="sub">ตัวเลขทุกตัวพกฐาน (เศษ/ส่วน) · ฐานต่ำกว่า 5 คนแสดงจำนวน</span></h2>'
+      + '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))">'
+      + rsBoss70Card(cid, stu)
+      + '<div class="card"><b>📊 สมรรถนะ 6 ด้าน — สัดส่วนแต่ละระดับ</b> <span class="small muted">เกณฑ์ผ่าน = ระดับ 5 ขึ้นไป (ครูเคาะ 7 ก.ย. 2569)</span>'
+      + rsLevelDist(dims, stu) + '</div></div>';
 
     /* ── D2.① ระดับ + จำนวนหลักฐานในเซลล์เดียว — "สามารถ (3 ชิ้น)" ── */
     html += '<h2 class="section-title">ระดับพร้อมจำนวนหลักฐาน '
@@ -1240,6 +1267,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       html += '</tbody></table></div>';
     }
 
+    /* ── D2.④ + D3 — รอบเล่นซ้ำ + ธงชวนดู (ชั้น 2) ── */
+    html += rsReplayBlock(cid, stu, dims);
+
+    /* ── ชั้น 3 · สำหรับตรวจสอบ/อ้างอิง — พับเก็บ ── */
+    html += '<details class="card rs-ref" style="margin-top:12px"><summary style="cursor:pointer"><b>📋 รายละเอียดสำหรับตรวจสอบ</b> '
+      + '<span class="small muted">ทะเบียน 22 องค์ประกอบ · ที่มาของตัวเลข · แถบพัฒนาการ (B4)</span></summary>';
     /* ── D2.③ ตารางความครอบคลุม 22 องค์ประกอบของห้องนี้ ── */
     const liveCnt = {};
     dims.forEach(function (r) {
@@ -1268,19 +1301,15 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + '<div class="panel-note small muted">ด้านที่เกมยังไม่ส่งผล "รายองค์ประกอบ" ขึ้นมา ไม่ได้แปลว่านักเรียนทำไม่ได้ (กฎ ก2)'
       + ' — สถานะทั้งระบบอัปเดต 7 ก.ย. 2569 (Rubric ฉบับที่ ๓ + ผลรอบสี่จากฐานจริง) · มติครู 7 ก.ย.: cz1/cz4 มีแหล่งแล้ว · sm1 รับแล้ว · cm2/ns3/sm4 ยกไปหลัง 10 ก.ย. — ตัวเลขของช่องที่ยังไม่มีเกณฑ์จะไม่ถูกแทนด้วย 0</div>';
 
-    /* ── D2.② + D2.⑤ — สองช่องที่เกณฑ์/ท่อยังมาไม่ถึง: บอกตรง ๆ ว่ารออะไร ── */
     html += '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));margin-top:10px">'
       + '<div class="card"><b>📈 แถบพัฒนาการ (ฐาน → ความชำนาญ)</b><div class="small muted" style="margin-top:4px">'
       + 'มติ 29 ส.ค. เปลี่ยนโครงคะแนนเป็น ฐาน/ความชำนาญ/พัฒนาการ (B4) — เกมยังไม่เริ่มส่งสามค่านี้ '
-      + 'แถบนี้จะขึ้นอัตโนมัติเมื่อรุ่นเกมที่ส่งค่าเริ่มใช้งานจริง · ระหว่างนี้ดูจำนวนรอบเล่นซ้ำในตารางล่างประกอบ</div></div>'
-      + '<div class="card"><b>🎯 ร้อยละการผ่านเกณฑ์รายห้อง</b><div class="small muted" style="margin-top:4px">'
-      + '<b>เกณฑ์ผ่าน = ระดับ 5 ขึ้นไป</b> (ครูเคาะ 7 ก.ย. 2569) · ฐาน = ผู้เรียนที่มีผลด้านนั้น ไม่ใช่ทั้งห้อง (กฎ ก2) '
-      + '· ทุกร้อยละพกเศษ/ส่วน · ฐานต่ำกว่า 5 คนแสดงจำนวนอย่างเดียว</div>'
-      + rsLevelDist(dims, stu) + '</div>'
-      + rsAch70Card(cid, stu) + '</div>';
-
-    /* ── D2.④ + D3 — รอบเล่นซ้ำ + ธงชวนดู ── */
-    html += rsReplayBlock(cid, stu, dims);
+      + 'แถบนี้จะขึ้นอัตโนมัติเมื่อรุ่นเกมที่ส่งค่าเริ่มใช้งานจริง</div></div>'
+      + '<div class="card"><b>วิธีนับ</b><div class="small muted" style="margin-top:4px">'
+      + 'ฐานของสมรรถนะ = ผู้เรียนที่มีผลด้านนั้น ไม่ใช่ทั้งห้อง (กฎ ก2: ไม่มีหลักฐาน ≠ ระดับต่ำ) · ร้อยละปัดทศนิยม 1 ตำแหน่ง ผลรวมแต่ละแถวอาจเป็น 99.9–100.1 '
+      + '· ฐานต่ำกว่า 5 คนแสดงจำนวนอย่างเดียว (เส้นเดียวกับหน้าสาธารณะ) · "ไม่มีผลด้านนี้" นับจากทั้งห้อง คนละตัวหาร '
+      + '· ผลสัมฤทธิ์ = คะแนนสอบครั้งแรกของด่าน 8 (มติครู 29 ส.ค. · ทาง ข 1 ก.ย.) ไม่ใช่คะแนนเก็บ 130 และไม่ใช่คะแนนที่กดเพดานสอบซ่อม</div></div>'
+      + '</div></details>';
     return html;
   }
 
@@ -1321,40 +1350,70 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       h += '<td class="num muted">' + none + '</td></tr>';
     });
     return h + '</tbody></table>'
-      + '<div class="muted small" style="margin-top:4px">ฐาน = ผู้เรียนที่มีผลด้านนั้น · ร้อยละปัดทศนิยม 1 ตำแหน่ง '
-      + 'ผลรวมแต่ละแถวอาจเป็น 99.9–100.1 · ฐานต่ำกว่า 5 คนแสดงจำนวนอย่างเดียว · "ไม่มีผลด้านนี้" นับจากทั้งห้อง คนละตัวหาร</div>';
+      + '<div class="muted small" style="margin-top:4px">ฐาน = ผู้มีผลด้านนั้น · ร้อยละอาจรวมได้ 99.9–100.1 (ปัดเศษ) · วิธีนับเต็มอยู่ใน "รายละเอียดสำหรับตรวจสอบ" ด้านล่าง</div>';
   }
 
 
-  /* [V.1.6.39 · ครูสั่ง 7 ก.ย. ข้อ 2] "ผู้เรียนทำแบบทดสอบได้ 70% ขึ้นไป กี่ % ของผู้เรียน" — นับรายคน (ครูเคาะ) ·
-     เกณฑ์ = ช่วง good+best ของ ACH_BANDS (lo 70 — ไม่ตั้งเส้นใหม่) · ฐาน = ผู้มีใบผล ไม่ใช่ทั้งห้อง (ก2) ·
-     บรรทัด "ยังไม่มีผล" ติดกันเสมอ · ป้าย ซ8 ถ้อยคำเดียวกับหน้าสาธารณะ (AUDIT ตรึง) · บรรทัดสอง = เฉพาะผู้เล่นครบ */
-  function rsAch70Card(cid, stu) {
-    const rows = achRows(cid).filter((r) => r.percent != null);
-    const best = {};
-    rows.forEach((r) => { const v = Number(r.percent); if (best[r.student_id] == null || v > best[r.student_id]) best[r.student_id] = v; });
-    const ids = Object.keys(best).filter((id) => stu.some((s) => s.id === id));
-    const base = ids.length, pass = ids.filter((id) => best[id] >= 70).length;
-    const none = stu.length - base;
-    const scales = Array.from(new Set(rows.map((r) => Number(r.max_score)).filter((n) => n))).sort((a, b) => a - b);
-    const done = new Set((S.progress || []).filter((p) => (p.progress_percent || 0) >= 100).map((p) => p.student_id));
-    const idsDone = ids.filter((id) => done.has(id));
-    const passDone = idsDone.filter((id) => best[id] >= 70).length;
+  /* [V.1.6.40 · ครูสั่ง 7 ก.ย. ข้อ 2 + ใบ AUDIT 8 ก.ย. 00:1x] "ผลสัมฤทธิ์ 70%" = แบบทดสอบหลังเรียน (ด่าน 8 · เต็ม 30)
+     ⛔ ไม่ใช่คะแนนเก็บ 130 (การ์ด .39 เดิม — 76.0% นั้นไม่ใช่เลขสอบ) และ ⛔ ไม่ใช่ unit_scores._boss (ค่านั้นกดเพดานสอบซ่อม 21
+     = คะแนนที่เด็กได้รับ ไม่ใช่คะแนนวิจัย) ⇒ อ่านจาก events kind='boss' แล้วลอกสูตร clsBossScore() ตรงตัว:
+       มีแถวที่เลขครั้งเป็นตัวเลข ⇒ fst = max(score) ของครั้งที่ 1 · ไม่มีเลขครั้งเลย ⇒ แถวแรกตามเวลา 🚩 noAtt
+     เกณฑ์ fst ≥ 21 (70% ของ 30 — BOSS_BEST_IDS ตายตัว 30 ข้อ เลข 21 มีจริง) · ฐาน = ผู้สอบแล้ว · "ยังไม่ได้ทำแบบทดสอบ" ติดตัวเลขเสมอ
+     อ่านอย่างเดียว ไม่เขียนฐาน · โหลดแยกหลังวาด (ไม่หน่วงทั้งหน้า) */
+  const BOSS_FULL = 30, BOSS_PASS = 21;
+  function rsBoss70Card(cid, stu) {
+    const id = 'rs-boss70-' + (cid || 'all');
+    setTimeout(function () { rsBoss70Load(id, cid, stu); }, 0);
+    return '<div class="card" id="' + id + '"><b>📝 ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน</b> '
+      + '<span class="small muted">(ด่าน 8 ปีศาจข้อสอบ · เต็ม ' + BOSS_FULL + ' · คะแนนสอบครั้งแรก)</span>'
+      + '<div class="small muted rs-boss-body" style="margin-top:4px">กำลังอ่านผลสอบ…</div></div>';
+  }
+  const bossAtt = (e) => { const a = e && e.raw && e.raw.attemptNo; const n = Number(a); return (a != null && a !== '' && !isNaN(n)) ? n : null; };
+  async function rsBoss70Load(id, cid, stu) {
+    const box = document.getElementById(id); if (!box) return;
+    const body = box.querySelector('.rs-boss-body');
+    const ids = stu.map((s) => s.id);
+    if (!ids.length) { body.textContent = 'ยังไม่มีนักเรียนในห้องนี้'; return; }
+    let evs = [];
+    try {
+      evs = await G.get('/rest/v1/events?kind=eq.boss&select=student_id,game_id,score,raw,created_at'
+        + '&student_id=in.(' + ids.join(',') + ')&order=created_at');
+    } catch (e) { body.textContent = 'อ่านผลสอบไม่ได้ในขณะนี้ — โหลดหน้าใหม่แล้วลองอีกครั้ง'; return; }
+    evs = (evs || []).filter((e) => e && e.student_id && e.score != null && (!GAME || e.game_id === GAME));
+    const by = {};
+    evs.forEach((e) => { const k = e.student_id + '|' + e.game_id; (by[k] = by[k] || []).push(e); });
+    const per = Object.keys(by).map(function (k) {
+      const rows = by[k];                                  /* เรียงตาม created_at จากฐานแล้ว */
+      const numbered = rows.filter((e) => bossAtt(e) != null);
+      let fst = null, noAtt = false;
+      if (numbered.length) {
+        const f1 = numbered.filter((e) => bossAtt(e) === 1);
+        fst = f1.length ? Math.max.apply(null, f1.map((e) => Number(e.score))) : null;
+      } else { noAtt = true; fst = Number(rows[0].score); }
+      return { sid: rows[0].student_id, gid: rows[0].game_id, fst, noAtt };
+    });
+    const gids = Array.from(new Set(per.map((r) => r.gid)));
+    if (!gids.length) { body.innerHTML = 'ยังไม่มีผู้เรียนคนใดทำแบบทดสอบหลังเรียน (ยังไม่ได้ทำ ' + stu.length + ' คน จาก ' + stu.length + ' คนในห้อง)'; return; }
     const pc = (n, b) => b >= 5 ? (n / b * 100).toFixed(1) + '%' : n + ' คน';
-    let h = '<div class="card"><b>📝 ทำแบบทดสอบได้ 70% ขึ้นไป</b> <span class="small muted">(จากคะแนนเก็บของเกม'
-      + (scales.length === 1 ? ' เต็ม ' + G.fmt(scales[0]) : '') + ' · นับรายคน · ครูเคาะ 7 ก.ย. 2569)</span>';
-    if (!base) {
-      h += '<div class="small muted" style="margin-top:4px">ยังไม่มีใบผลของห้องนี้ส่งขึ้นมา</div>';
-    } else {
-      h += '<div style="margin-top:4px"><b style="font-size:20px">' + pc(pass, base) + '</b> '
-        + '<span class="small muted">(' + pass + ' จาก ' + base + ' คนที่มีผล' + (base < 5 ? ' — ฐานต่ำกว่า 5 คน ไม่แสดงร้อยละ' : '') + ')</span></div>'
-        + '<div class="small muted">ยังไม่มีผล ' + none + ' คน จาก ' + stu.length + ' คนในห้อง</div>'
-        + (idsDone.length ? '<div class="small" style="margin-top:4px">เฉพาะผู้เล่นครบทุกด่าน: <b>' + pc(passDone, idsDone.length) + '</b> '
-            + '<span class="muted">(' + passDone + '/' + idsDone.length + ')</span></div>' : '');
-    }
-    h += '<div class="muted small" style="margin-top:6px">ℹ️ คะแนนเก็บคิดจากคะแนนเต็ม' + (scales.length === 1 ? ' ' + G.fmt(scales[0]) : 'ของเกม')
-      + ' เสมอ — ผู้เรียนที่ยังเล่นไม่ครบทุกด่านจะอยู่ในช่วงคะแนนล่าง ไม่ได้หมายความว่าทำได้ไม่ดี</div></div>';
-    return h;
+    let h = '';
+    gids.forEach(function (gid) {
+      const g = gameById(gid); const rs = per.filter((r) => r.gid === gid);
+      const tested = rs.filter((r) => r.fst != null);
+      const n = tested.length, pass = tested.filter((r) => r.fst >= BOSS_PASS).length;
+      const noAttN = tested.filter((r) => r.noAtt).length;
+      const noFirst = rs.length - n;                       /* มีเลขครั้งแต่ไม่พบครั้งที่ 1 ในฐาน */
+      const sat = new Set(rs.map((r) => r.sid));
+      const notYet = stu.filter((s) => !sat.has(s.id)).length;
+      h += (gids.length > 1 ? '<div class="small"><b>' + G.esc(g ? g.name : gid) + '</b></div>' : '')
+        + '<div><b style="font-size:20px">' + pc(pass, n) + '</b> <span class="small muted">(' + pass + ' จาก ' + n + ' คนที่สอบแล้ว'
+        + (n < 5 ? ' — ฐานต่ำกว่า 5 คน ไม่แสดงร้อยละ' : '') + ')</span></div>'
+        + '<div class="small muted">ยังไม่ได้ทำแบบทดสอบ ' + notYet + ' คน จาก ' + stu.length + ' คนในห้อง</div>'
+        + (noAttN ? '<div class="small">🚩 ' + noAttN + ' จาก ' + n + ' คน ใช้ลำดับเวลาแทนเลขครั้ง (แถวยุคแรกไม่มีเลขครั้ง — มติ 1 ก.ย.)</div>' : '')
+        + (noFirst ? '<div class="small muted">อีก ' + noFirst + ' คนมีเลขครั้งแต่ไม่พบครั้งที่ 1 ในฐาน — ไม่นับ</div>' : '');
+    });
+    h += '<div class="muted small" style="margin-top:6px">เกณฑ์ ' + BOSS_PASS + ' จาก ' + BOSS_FULL + ' คะแนน (70%) · ใช้คะแนนสอบครั้งแรกล้วน ไม่มีการสอบซ้ำปน '
+      + '· คะแนนที่ผู้เรียนได้รับ (สอบซ่อมได้ เพดาน ' + BOSS_PASS + ') เป็นคนละค่ากับตัวเลขนี้</div>';
+    body.className = 'rs-boss-body'; body.style.marginTop = '4px'; body.innerHTML = h;
   }
 
   /* [D3 + B6] รอบเล่นซ้ำรายคน + ธง "ชวนครูเข้าไปดู" — สัญญาณให้ช่วย ไม่ใช่เครื่องตัดสิน
@@ -2925,7 +2984,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
          ตัวโมดูลคือ GameRefresh ด้านบน · เกมต้องเป็นรุ่นที่มีบล็อก R22-P2 ขึ้นไป */
       + '<div class="card" id="gr-bar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0">'
       +   '<div style="flex:1;min-width:220px"><b>ผลจากเกม</b>'
-      +     '<div class="muted small" id="gr-msg">ระบบอัปเดตผลจากเกมให้อัตโนมัติเมื่อมีการเล่นใหม่ — ปุ่มนี้ไว้สั่งเองเมื่ออยากบังคับ</div></div>'
+      +     '<div class="muted small" id="gr-msg">ระบบจะพยายามอัปเดตผลจากเกมให้เมื่อมีการเล่นใหม่ — ถ้าตัวเลขไม่ขยับ กดปุ่มนี้ หรือเปิดหน้าห้องเรียนในเกมหนึ่งครั้ง</div></div>'
       +   '<button class="btn btn-sm btn-primary" id="gr-go">🔄 อัปเดตผลจากเกม</button>'
       + '</div>'
       + pickerBar(cid)
@@ -3074,7 +3133,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           : w === 'room-not-mine' ? 'เกมไม่พบห้องนี้ในบัญชีครู'
           : w === 'demo' ? 'เกมอยู่ในโหมดตัวอย่าง จึงไม่ส่งผลจริง'
           : w === 'timeout' ? 'เกมทำงานนานเกินไป — ลองใหม่อีกครั้ง'
-          : 'อัปเดตไม่สำเร็จ';
+          /* [V.1.6.40] สามรหัสที่เคยตกมาเป็น 'อัปเดตไม่สำเร็จ' ลอย ๆ — ครูอ่านไม่ออกว่าล้มที่ขั้นไหน */
+          : w === 'frame' ? 'เปิดหน้าครูของเกมไม่ได้ — ลองใหม่อีกครั้ง หรือเปิดหน้าห้องเรียนในเกมโดยตรงหนึ่งครั้ง'
+          : w === 'no-url' ? 'ยังไม่ได้ตั้งที่อยู่หน้าครูของเกมนี้ (dashboard_url/launch_url ต้องอยู่โดเมนเดียวกัน)'
+          : w === 'postMessage' ? 'ส่งคำสั่งเข้าหน้าเกมไม่ได้ — โหลดหน้านี้ใหม่แล้วลองอีกครั้ง'
+          : 'อัปเดตไม่สำเร็จ' + (w ? ' (' + w + ')' : '');
         /* รายงานให้ครบทุกเกม — เดิมถ้ามีเกมใดสำเร็จ เกมที่ล้มจะหายไปเงียบ ๆ */
         const okList = done.filter((d) => d.r.ok);
         const bad = done.filter((d) => !d.r.ok);

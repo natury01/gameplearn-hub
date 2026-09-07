@@ -238,7 +238,7 @@ as $fn$
                         where x.game_code = s.game_code and x.comp_code = s.comp_code)
   ),
   dim_all as (
-    select d.comp_code, d.score from public.v_student_comp_dims d
+    select d.student_id, d.comp_code, d.score from public.v_student_comp_dims d
      join public.v_pub_rooms r on r.classroom_id = d.classroom_id
      where d.evidence <> 'self_report'
        and d.score is not null
@@ -306,7 +306,9 @@ as $fn$
       /* [V.1.6.35] ค่าเฉลี่ย/การกระจายของกลุ่มเล็ก < 5 คน ถูกยามกดเป็น null/[] — รูปเดียวกับ breakdown */
       'avg_percent', case when (select n from head) < 5 then null
                           else (select round(avg(percent)::numeric, 1) from ach) end,
-      'avg_all',     (select round(avg(percent)::numeric, 1) from ach_all),
+      /* [V.1.6.38] เส้นเทียบผลสัมฤทธิ์ทั้งระบบก็อยู่ใต้ยาม < 5 เดียวกัน (กติกาเดียว ไม่มีข้อยกเว้นเงียบ) */
+      'avg_all',     case when (select count(*) from ach_all) < 5 then null
+                          else (select round(avg(percent)::numeric, 1) from ach_all) end,
       'dist', case when (select n from head) < 5 then '[]'::jsonb else
               (select coalesce(jsonb_agg(jsonb_build_object('band', b.band, 'label', b.label, 'n', b.n)
                                          order by b.ord), '[]'::jsonb)
@@ -349,7 +351,11 @@ as $fn$
                              case when (select n from head) < 5
                                     or (select count(distinct d.student_id) from dim_ok d where d.comp_code = v.code) < 5 then null
                                   else (select round(avg(d.score)::numeric, 1) from dim_ok d where d.comp_code = v.code) end as avg_score,
-                             (select round(avg(a.score)::numeric, 1) from dim_all a where a.comp_code = v.code) as avg_all,
+                             /* [V.1.6.38 · ตรวจปลายทาง .37] เส้นเทียบ "ทั้งระบบ" ต้องอยู่ใต้ยามกลุ่มเล็กเดียวกัน —
+                                ของจริง: TW ทั้งระบบ = เด็ก 2 คนห้องทดสอบ (ภาค 2) เฉลี่ย 86.1 โผล่เป็นขีดเทียบบนหน้าสาธารณะ
+                                ทั้งที่ค่าเฉลี่ยกลุ่มถูกกดแล้ว · ผู้ได้ระดับทั้งระบบ < 5 คน ⇒ null */
+                             case when (select count(distinct a.student_id) from dim_all a where a.comp_code = v.code) < 5 then null
+                                  else (select round(avg(a.score)::numeric, 1) from dim_all a where a.comp_code = v.code) end as avg_all,
                              case when exists (select 1 from dim_ok d where d.comp_code = v.code) then 'ok'
                                   when exists (select 1 from dim d where d.comp_code = v.code) then 'insufficient'
                                   else 'none' end as status,

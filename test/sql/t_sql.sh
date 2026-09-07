@@ -1060,11 +1060,24 @@ n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->'ach'->'dist'->0->>'n'); r
 ok "ช่วงดีเยี่ยม (80-100) นับได้ 2 คน (88 และ 90)" "$n" "2"
 n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_summary()->'comps'); rollback;")
 ok "⭐ คืนสมรรถนะครบ 6 ด้านเสมอ ไม่ใช่เฉพาะด้านที่มีข้อมูล" "$n" "6"
-n=$($Q -c "begin; $AS_ANON select (select c->>'avg_all' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='HOT'); rollback;")
-ok "ค่าเฉลี่ยด้านการคิดขั้นสูงถูก ((82+60+44)/3 = 62.0) — อ่านจาก avg_all (เส้นเทียบทั้งระบบ)" "$n" "62.0"
-# [V.1.6.37] ค่าเฉลี่ยของกลุ่ม (avg_score) ถูกยามรายด้านกด: ผู้ได้ระดับ HOT แค่ 3 คน < 5 ⇒ ต้อง null พร้อมเหตุใน note
+# [V.1.6.37/.38] ยามกลุ่มเล็กรายด้าน: HOT มีผู้ได้ระดับ 3 คน < 5 ⇒ ทั้ง avg_score (กลุ่ม) และ avg_all (ทั้งระบบ) ต้อง NULL
 n=$($Q -c "begin; $AS_ANON select coalesce((select c->>'avg_score' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='HOT'),'NULL'); rollback;")
 ok "⭐ ยามกลุ่มเล็กรายด้าน: HOT มีผู้ได้ระดับ 3 คน → avg_score ของกลุ่มเป็น NULL" "$n" "NULL"
+n=$($Q -c "begin; $AS_ANON select coalesce((select c->>'avg_all' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='HOT'),'NULL'); rollback;")
+ok "⭐ [V.1.6.38] เส้นเทียบทั้งระบบ (avg_all) อยู่ใต้ยามเดียวกัน — 3 คน → NULL (บทเรียน TW 86.1 จากเด็ก 2 คนภาค 2)" "$n" "NULL"
+# เติมผู้เรียนอีก 2 คนให้ครบ 5 → ค่าเฉลี่ยต้องคำนวณถูก (82+60+44+90+74)/5 = 70.0 ทั้งสองค่า แล้วถอนออก
+$Q -c "insert into students (id, classroom_id, first_name, last_name, is_active) values
+   ('eeeeeeee-0000-4000-8000-000000000001','55555555-5555-4555-8555-000000000002','เด็ก','สี่',true),
+   ('eeeeeeee-0000-4000-8000-000000000002','55555555-5555-4555-8555-000000000002','เด็ก','ห้า',true);
+  insert into competency_dim_results (student_id, game_id, run_id, comp_code, score, level, evidence) values
+   ('eeeeeeee-0000-4000-8000-000000000001','44444444-4444-4444-8444-444444444441','live','HOT',90,6,'scored'),
+   ('eeeeeeee-0000-4000-8000-000000000002','44444444-4444-4444-8444-444444444441','live','HOT',74,5,'scored');" >/dev/null
+n=$($Q -c "begin; $AS_ANON select (select c->>'avg_score' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='HOT'); rollback;")
+ok "ค่าเฉลี่ยด้านการคิดขั้นสูงถูกเมื่อครบ 5 คน ((82+60+44+90+74)/5 = 70.0)" "$n" "70.0"
+n=$($Q -c "begin; $AS_ANON select (select c->>'avg_all' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='HOT'); rollback;")
+ok "avg_all ทั้งระบบเปิดเมื่อครบ 5 คน = 70.0" "$n" "70.0"
+$Q -c "delete from competency_dim_results where student_id in ('eeeeeeee-0000-4000-8000-000000000001','eeeeeeee-0000-4000-8000-000000000002');
+  delete from students where id in ('eeeeeeee-0000-4000-8000-000000000001','eeeeeeee-0000-4000-8000-000000000002');" >/dev/null
 n=$($Q -c "begin; $AS_ANON select (select c->>'note' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='HOT'); rollback;")
 okc "ยามรายด้านบอกเหตุ (น้อยกว่า 5 คน) ไม่ใช่ขีดเฉย" "$n" "น้อยกว่า 5 คน"
 n=$($Q -c "begin; $AS_ANON select coalesce((select c->>'avg_score' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='CM'),'ว่าง'); rollback;")

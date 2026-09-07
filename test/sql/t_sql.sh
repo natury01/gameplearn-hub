@@ -1060,8 +1060,13 @@ n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->'ach'->'dist'->0->>'n'); r
 ok "ช่วงดีเยี่ยม (80-100) นับได้ 2 คน (88 และ 90)" "$n" "2"
 n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_summary()->'comps'); rollback;")
 ok "⭐ คืนสมรรถนะครบ 6 ด้านเสมอ ไม่ใช่เฉพาะด้านที่มีข้อมูล" "$n" "6"
-n=$($Q -c "begin; $AS_ANON select (select c->>'avg_score' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='HOT'); rollback;")
-ok "ค่าเฉลี่ยด้านการคิดขั้นสูงถูก ((82+60+44)/3 = 62.0)" "$n" "62.0"
+n=$($Q -c "begin; $AS_ANON select (select c->>'avg_all' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='HOT'); rollback;")
+ok "ค่าเฉลี่ยด้านการคิดขั้นสูงถูก ((82+60+44)/3 = 62.0) — อ่านจาก avg_all (เส้นเทียบทั้งระบบ)" "$n" "62.0"
+# [V.1.6.37] ค่าเฉลี่ยของกลุ่ม (avg_score) ถูกยามรายด้านกด: ผู้ได้ระดับ HOT แค่ 3 คน < 5 ⇒ ต้อง null พร้อมเหตุใน note
+n=$($Q -c "begin; $AS_ANON select coalesce((select c->>'avg_score' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='HOT'),'NULL'); rollback;")
+ok "⭐ ยามกลุ่มเล็กรายด้าน: HOT มีผู้ได้ระดับ 3 คน → avg_score ของกลุ่มเป็น NULL" "$n" "NULL"
+n=$($Q -c "begin; $AS_ANON select (select c->>'note' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='HOT'); rollback;")
+okc "ยามรายด้านบอกเหตุ (น้อยกว่า 5 คน) ไม่ใช่ขีดเฉย" "$n" "น้อยกว่า 5 คน"
 n=$($Q -c "begin; $AS_ANON select coalesce((select c->>'avg_score' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='CM'),'ว่าง'); rollback;")
 ok "ด้านที่ยังไม่มีเกมวัด คืนค่าว่าง ไม่ใช่ 0 (0 แปลว่าเด็กทำไม่ได้ ซึ่งไม่จริง)" "$n" "ว่าง"
 n=$($Q -c "begin; $AS_ANON select (select c->>'n_students' from jsonb_array_elements(rpc_pub_summary()->'comps') c where c->>'code'='TW'); rollback;")
@@ -1315,11 +1320,62 @@ n=$($Q -c "select count(*) from information_schema.columns where table_schema='p
 ok "วิวรายวันเปิดช่อง source ให้หน้าผู้ดูแลใช้" "$n" "1"
 
 echo ""
+echo "═══ 14) [V.1.6.37 · ซ9] แถว score=null ห้ามนับหัว/ห้ามให้แถวเก่ามีคะแนนแทน · สามสถานะ · ป้ายรุ่นเก่า · full_marks ═══"
+# โลกจำลอง: HOT — SA คะแนน 82 รุ่นปัจจุบัน · SB คะแนน 60 รุ่นเก่า (computed_at เก่ากว่า) ⇒ ok · n_old_version = 1
+#            TW  — SA/SB/SC ส่ง score=null (เกมประกาศวัดไม่ได้) ⇒ insufficient · n_students 0 · n_rows 3
+#            SN  — SA 70 ⇒ ok · CM — ไม่มีแถว ⇒ none
+$Q -c "delete from competency_dim_results;
+  insert into competency_dim_results (student_id, game_id, run_id, comp_code, game_version, score, level, evidence, computed_at) values
+   ('$SA','$GID','live','HOT','V.7.99.71-IX2050-2569.100',82,6,'scored',now()),
+   ('$SB','$GID','live','HOT','V.7.99.50-IX2050-2569.80',60,4,'scored',now() - interval '20 days'),
+   ('$SA','$GID','live','TW','V.7.99.71-IX2050-2569.100',null,null,'scored',now()),
+   ('$SB','$GID','ht-old','TW','V.7.80.1',86,5,'scored',now() - interval '40 days'),
+   ('$SC','$GID','live','TW','V.7.99.71-IX2050-2569.100',null,null,'scored',now()),
+   ('$SA','$GID','live','SN','V.7.99.71-IX2050-2569.100',70,5,'scored',now());" >/dev/null
+# ⚠️ SB มีแถว TW รุ่นเก่า (V.7.80.1) คะแนน 86 และไม่เคยถูกใบใหม่ทับ — เคส "86.1 กลับมาได้" จากรีวิวปรปักษ์:
+#    รุ่นล่าสุดของเกม (SA/SC) สรุป TW ไม่ได้เลย ⇒ คะแนนรุ่นเก่าของ SB ถูกแทนที่แล้ว ห้ามนับ (แต่ยังติดป้าย n_old_version)
+n=$($Q -c "select (x->>'status')||'/'||(x->>'n_students')||'/'||(x->>'n_rows')||'/'||coalesce(x->>'avg_score','null') from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='TW';")
+ok "⭐ TW: status=insufficient · นับหัว 0 (ไม่ใช่ 3) · n_rows 3 · avg null — แถวรุ่นเก่า 86 ของ SB ไม่ยกขึ้นหน้า" "$n" "insufficient/0/3/null"
+n=$($Q -c "select x->>'n_old_version' from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='TW';")
+ok "⭐ TW ยังติดป้ายรุ่นเก่า 1 คน (SB) แม้ถูกกันออกจากค่าเฉลี่ย — ติดป้าย ไม่ลบ" "$n" "1"
+n=$($Q -c "select x->>'note' from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='TW';")
+okc "⭐ ถ้อยคำ TW = 'หลักฐานไม่เพียงพอ' (มติครู 7 ก.ย. — ไม่ใช่ 'ไม่มีการประเมิน')" "$n" "หลักฐานไม่เพียงพอ"
+n=$($Q -c "select (x->>'status')||'/'||(x->>'n_rows') from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='CM';")
+ok "CM ไม่มีแถวเลย: status=none · n_rows 0" "$n" "none/0"
+n=$($Q -c "select (x->>'status')||'/'||(x->>'n_students')||'/'||(x->>'n_old_version') from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='HOT';")
+ok "⭐ HOT: status=ok · 2 คน · ติดป้ายรุ่นเก่า 1 คน (SB) — ติดป้าย ไม่ตัด" "$n" "ok/2/1"
+n=$($Q -c "select x->>'n_old_version' from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='SN';")
+ok "SN รุ่นปัจจุบันล้วน: n_old_version 0" "$n" "0"
+n=$($Q -c "select count(*) from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x;")
+ok "comps ยังครบ 6 ด้านเสมอ (ด้านที่ไม่มีผลก็มีแถวพร้อมสถานะ)" "$n" "6"
+n=$($Q -c "select count(*) from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x ? 'status' and x ? 'n_rows' and x ? 'n_old_version';")
+ok "ทุกแถว comps มีคีย์ status/n_rows/n_old_version" "$n" "6"
+# breakdown ต้องนับหัวจากแถวมีคะแนนเท่านั้น (SA,SB) ไม่ใช่รวมคนที่มีแต่แถว null (SC)
+n=$($Q -c "select coalesce(sum((x->>'comp_students')::int),0) from jsonb_array_elements(rpc_pub_breakdown('classroom',null,null,null,null,null)) x;")
+ok "⭐ breakdown comp_students นับเฉพาะคนมีคะแนน = 2 (SC ที่มีแต่แถว null ไม่ถูกนับ)" "$n" "2"
+n=$($Q -c "select count(*) from jsonb_array_elements(rpc_pub_breakdown('classroom',null,null,null,null,null)) x where (x->'comp_by_dim') ? 'TW';")
+ok "breakdown comp_by_dim ไม่มีคีย์ TW (ไม่มีคะแนนจริง)" "$n" "0"
+# ซ8 — full_marks ต่อเกม (ทุกเกม ไม่รอปน)
+n=$($Q -c "select jsonb_array_length(rpc_pub_summary(null,null,null,null,null)->'full_marks');")
+ok "⭐ full_marks มีรายการต่อเกม (ไม่ว่าง)" "$n" "1"
+n=$($Q -c "select (x->>'max_score') from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'full_marks') x limit 1;")
+ok "full_marks บอกคะแนนเต็มจริงของใบ (100 ในชุดจำลอง)" "$n" "100"
+# คุมลบ: แถวใหม่ที่มีคะแนนกลับมา ⇒ TW กลายเป็น ok ทันที (ป้ายไม่ค้าง)
+$Q -c "insert into competency_dim_results (student_id, game_id, run_id, comp_code, game_version, score, level, evidence, computed_at) values
+   ('$SA','$GID','ht-subdim-2569a','TW','V.7.99.71-IX2050-2569.100',64,4,'scored',now() + interval '1 minute');" >/dev/null
+n=$($Q -c "select (x->>'status')||'/'||(x->>'n_students') from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='TW';")
+ok "คุมลบ: รุ่นล่าสุดสรุป TW ได้แล้ว 1 คน → ด้านเลิกถูกกัน · แถวรุ่นเก่าของ SB กลับมานับ (ไม่ได้ตัดรุ่นเก่าทิ้งทั้งหมด) → ok/2" "$n" "ok/2"
+n=$($Q -c "select x->>'n_old_version' from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='TW';")
+ok "คุมลบ: และ SB ยังติดป้ายรุ่นเก่า 1 คน — ครูเห็นว่าค่ามาจากรุ่นไหน" "$n" "1"
+$Q -c "delete from competency_dim_results where run_id='ht-subdim-2569a';" >/dev/null
+
+echo ""
 # [V.1.6.7] บรรทัดสุดท้ายต้องเป็น X/Y เสมอ (STD-006 ข้อ 1)
 # ยามพื้น: ถ้าจำนวนข้อลดฮวบ แปลว่ามีหมวดหนึ่ง "ไม่ได้รัน" (เช่นไฟล์ SQL หาย แล้วกิ่งนั้นถูกข้าม)
 # ซึ่งจะไม่มีข้อตกให้เห็นเลย — เป็นรูปแบบ "ตายเงียบ" ที่ STD-006 ข้อ 1 ตั้งมาเพื่อกัน
 # ฐาน ณ V.1.6.7 = 184 ข้อ (ผ่าน ok/okc) · อีกราว 26 ข้อเป็น echo ตรงในหมวด 0 ไม่ถูกนับ
-FLOOR=255   # [V.1.6.35] +20 ข้อ (ยามกลุ่มเล็ก summary · p_room · สองสเกล per-game · ชื่อไม่อยู่ในมือ · ลายเซ็นเดียว · rooms ใน filters) · ของจริง 256 เผื่อ 1 แบบเดิม
+FLOOR=268   # [V.1.6.37] +13 ข้อ (ซ9 สามสถานะ · น้ำหนักหัวเฉพาะมีคะแนน · ป้ายรุ่นเก่า · full_marks · คุมลบ) · ของจริง 269 เผื่อ 1
+# FLOOR=255   # [V.1.6.35] +20 ข้อ (ยามกลุ่มเล็ก summary · p_room · สองสเกล per-game · ชื่อไม่อยู่ในมือ · ลายเซ็นเดียว · rooms ใน filters) · ของจริง 256 เผื่อ 1 แบบเดิม
             # [V.1.6.27] +19 ข้อจากหมวด 8b (F4 ท่อจริง 9 ตัว + ยาม + สิทธิ์)
             # (ผู้ตรวจหักล้าง 25 ส.ค. จับได้ว่าค้าง 212 ทั้งที่ของจริง 221 — หมวดหายทั้งหมวดยามไม่ฟ้อง)
 if [ "$_nchk" -lt "$FLOOR" ]; then

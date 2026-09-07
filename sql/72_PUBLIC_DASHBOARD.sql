@@ -191,6 +191,7 @@ as $fn$
       select d.student_id from public.v_student_comp_dims d
         join room r on r.classroom_id = d.classroom_id
        where d.evidence <> 'self_report'
+         and d.score is not null           -- [V.1.6.37] คนที่มีแต่แถวไร้คะแนนไม่ใช่ "คนมีผล" — ห้ามใช้ปลดยามกลุ่มเล็ก (ตรงกับ head_n ของ breakdown)
          and (p_game is null or d.game_code = p_game)) u
   ),
   ach_all as (   -- ทุกโรงเรียน (ไม่กรองโรงเรียน/ชั้น/ปี) — เส้นเทียบ
@@ -204,10 +205,43 @@ as $fn$
      where d.evidence <> 'self_report'
        and (p_game is null or d.game_code = p_game)
   ),
+  /* [V.1.6.37 · ซ9 — ใบ AUDIT 7 ก.ย. "86.1 มาจากไหน"] แยก "มีแถว" ออกจาก "มีคะแนน"
+     เกมส่ง score = null เมื่อประกาศว่าด้านนั้นวัดไม่ได้ (gpComp: noAssess) — แถวนั้นต้องไม่ถูกนับ
+     เป็นหัวผู้เรียนที่มีผล และห้ามให้แถวเก่าที่มีคะแนน (รุ่นก่อนเปลี่ยนสูตร) ยกตัวเลขขึ้นหน้าแทน
+     · dim_ok = แถวที่มีคะแนนจริงเท่านั้น — ทุกค่าเฉลี่ย/จำนวนคนของ comps อ่านจากนี่
+     · latest_ver = รุ่นเกมของใบล่าสุดในขอบเขต — ใช้ "ติดป้าย" แถวที่คะแนนมาจากรุ่นก่อนหน้า
+       (ติดป้าย ไม่ตัดทิ้ง — มติ [PLAN]: แถวเก่าเป็นหลักฐานของวงจรปรับปรุง ห้ามลบ ห้ามซ่อนเงียบ) */
+  dim_scored as (                       -- แถวที่มีคะแนนจริง ทุกรุ่น — ใช้ติดป้าย n_old_version
+    select d.* from dim d where d.score is not null
+  ),
+  latest_ver as (                       -- รุ่นของใบล่าสุดต่อเกม (ไม่นับแถวที่ไม่ระบุรุ่น · เสมอกัน = รุ่นชื่อมากกว่า)
+    select distinct on (d.game_code) d.game_code, d.game_version
+      from dim d
+     where d.game_version is not null
+     order by d.game_code, d.computed_at desc, d.game_version desc
+  ),
+  /* [V.1.6.37 · รีวิวปรปักษ์ข้อ 1] ด้านที่รุ่นเกมล่าสุดในขอบเขต "ไม่มีแถวใดสรุประดับได้"
+     (ทุกแถวรุ่นล่าสุดของด้านนั้น score เป็น null) ⇒ คะแนนจากรุ่นก่อนหน้าคือหลักฐานที่ถูกแทนที่แล้ว —
+     กันออกจาก n_students/avg/status แต่ยังนับใน n_rows และ n_old_version (ติดป้าย ไม่ลบ — [PLAN] · HUB ทาง ก)
+     ไม่ตัดรุ่นเก่าทั้งหมดทิ้ง: เกมออกรุ่นย่อยถี่ ห้องที่ยังไม่ได้เปิดรุ่นใหม่ต้องไม่หายจากค่าเฉลี่ยทุกด้าน */
+  dim_superseded as (
+    select d.game_code, d.comp_code
+      from dim d
+      join latest_ver lv on lv.game_code = d.game_code
+                        and d.game_version = lv.game_version
+     group by d.game_code, d.comp_code
+    having count(d.score) = 0
+  ),
+  dim_ok as (
+    select s.* from dim_scored s
+     where not exists (select 1 from dim_superseded x
+                        where x.game_code = s.game_code and x.comp_code = s.comp_code)
+  ),
   dim_all as (
     select d.comp_code, d.score from public.v_student_comp_dims d
      join public.v_pub_rooms r on r.classroom_id = d.classroom_id
      where d.evidence <> 'self_report'
+       and d.score is not null
        and (p_game is null or d.game_code = p_game)
   ),
   units as (
@@ -282,17 +316,50 @@ as $fn$
                        union all select 3, '60-69',  'พอใช้ (60–69)',      count(*) filter (where percent >= 60 and percent < 70) from ach
                        union all select 4, '50-59',  'ผ่านเกณฑ์ (50–59)',  count(*) filter (where percent >= 50 and percent < 60) from ach
                        union all select 5, '0-49',   'ต้องช่วยเหลือ (ต่ำกว่า 50)', count(*) filter (where percent < 50) from ach) b) end),
+    /* [V.1.6.37 · ซ8] คะแนนเต็มของใบผลต่อเกม (ทุกเกม ไม่ใช่เฉพาะตอนปน) — หน้าเว็บใช้เขียนป้าย
+       "คะแนนคิดจากคะแนนเต็ม N เสมอ ผู้เรียนที่ยังเล่นไม่ครบทุกด่านจะอยู่ช่วงล่าง" โดยไม่ต้องรู้เลข 130 เอง */
+    'full_marks', coalesce((select jsonb_agg(jsonb_build_object(
+                     'game', f.game_name, 'game_code', f.game_code, 'max_score', f.max_score, 'n', f.n)
+                   order by f.game_code, f.max_score)
+        from (select game_code, min(game_name) as game_name, max_score, count(*) as n
+                from ach where max_score is not null      -- ใบที่ไม่บอกคะแนนเต็ม = ไม่มีตัวหารให้อ้าง ห้ามพิมพ์ "= null"
+               group by game_code, max_score) f), '[]'::jsonb),
+    /* [V.1.6.37 · ซ9] comps อ่านคน/ค่าเฉลี่ยจาก dim_ok (มีคะแนนจริง) · แถวที่ score เป็น null นับเป็น n_rows
+       status: ok = มีคะแนน · insufficient = มีการเก็บแต่ยังไม่มีผู้เรียนได้ระดับ (มติครู 7 ก.ย.: ต้องบอกว่า
+       "หลักฐานไม่เพียงพอ" ไม่ใช่ "ไม่มีการประเมิน") · none = ไม่มีแถวเลย
+       n_old_version: คนที่คะแนนมาจากรุ่นเกมก่อนหน้าใบล่าสุด — ป้ายให้เห็น ไม่ตัด */
     'comps', (select coalesce(jsonb_agg(jsonb_build_object(
                        'code', c.code, 'name', c.name,
-                       'n_students', c.n_students, 'avg_score', c.avg_score,
-                       'avg_all', c.avg_all) order by c.ord), '[]'::jsonb)
+                       'n_students', c.n_students, 'n_rows', c.n_rows,
+                       'avg_score', c.avg_score, 'avg_all', c.avg_all,
+                       'status', c.status,
+                       'note', case
+                                 when c.status = 'insufficient' then 'หลักฐานไม่เพียงพอ — มีการเก็บข้อมูลด้านนี้แล้ว แต่ยังไม่มีผู้เรียนที่ได้ระดับจากเกม'
+                                 when c.status = 'none' then 'ยังไม่มีผลสรุปด้านนี้ส่งขึ้นมา'
+                                 /* [รีวิวปรปักษ์ข้อ 2] ยามกลุ่มเล็กต้องคุมรายด้านด้วย — ด้านที่มีผู้ได้ระดับ 1-4 คน ค่าเฉลี่ยเท่ากับคะแนนรายคน */
+                                 when c.n_students < 5 then 'ผู้เรียนที่ได้ระดับด้านนี้น้อยกว่า 5 คน — ไม่แสดงค่าเฉลี่ย เพื่อไม่ให้ระบุตัวผู้เรียนได้'
+                                 else null end,
+                       'n_old_version', c.n_old_version) order by c.ord), '[]'::jsonb)
                 from (select v.ord, v.code,
                              coalesce((select min(d.comp_name) from dim d where d.comp_code = v.code), v.nm) as name,
-                             (select count(distinct d.student_id) from dim d where d.comp_code = v.code) as n_students,
-                             /* [V.1.6.35] ยามกลุ่มเล็ก — ค่าเฉลี่ยรายด้านของกลุ่ม < 5 คน ระบุตัวได้เท่าค่าเฉลี่ยรวม */
-                             case when (select n from head) < 5 then null
-                                  else (select round(avg(d.score)::numeric, 1) from dim d where d.comp_code = v.code) end as avg_score,
-                             (select round(avg(a.score)::numeric, 1) from dim_all a where a.comp_code = v.code) as avg_all
+                             (select count(distinct d.student_id) from dim_ok d where d.comp_code = v.code) as n_students,
+                             (select count(distinct d.student_id) from dim d where d.comp_code = v.code) as n_rows,
+                             /* [V.1.6.35] ยามกลุ่มเล็ก — ค่าเฉลี่ยรายด้านของกลุ่ม < 5 คน ระบุตัวได้เท่าค่าเฉลี่ยรวม
+                                [V.1.6.37] และคุมรายด้าน: ผู้ได้ระดับด้านนั้น < 5 คน ก็ไม่แสดง (กติกาเดิม 5 ไม่ตั้งเลขใหม่) */
+                             case when (select n from head) < 5
+                                    or (select count(distinct d.student_id) from dim_ok d where d.comp_code = v.code) < 5 then null
+                                  else (select round(avg(d.score)::numeric, 1) from dim_ok d where d.comp_code = v.code) end as avg_score,
+                             (select round(avg(a.score)::numeric, 1) from dim_all a where a.comp_code = v.code) as avg_all,
+                             case when exists (select 1 from dim_ok d where d.comp_code = v.code) then 'ok'
+                                  when exists (select 1 from dim d where d.comp_code = v.code) then 'insufficient'
+                                  else 'none' end as status,
+                             /* นับจาก dim_scored (ไม่ใช่ dim_ok) — ด้านที่ถูกกันออกก็ยังต้องขึ้นป้ายว่ามีแถวรุ่นเก่ากี่คน
+                                · แถวไม่ระบุรุ่น (LEGACY) ไม่นับเป็น "รุ่นเก่า" เพราะครูล้างด้วยการเปิดห้องเรียนไม่ได้ */
+                             (select count(distinct d.student_id) from dim_scored d
+                                join latest_ver lv on lv.game_code = d.game_code
+                               where d.comp_code = v.code
+                                 and d.game_version is not null
+                                 and d.game_version <> lv.game_version) as n_old_version
                         from (values (1,'SM','การจัดการตนเอง'), (2,'HOT','การคิดขั้นสูง'),
                                      (3,'CM','การสื่อสาร'), (4,'TW','การรวมพลังทำงานเป็นทีม'),
                                      (5,'CZ','การเป็นพลเมืองที่เข้มแข็ง'),
@@ -350,12 +417,31 @@ as $fn$
      where (p_game is null or a.game_code = p_game)
   ),
   dim as (
-    /* [V.1.6.8] เติม comp_code — ใช้แตกค่าเฉลี่ยรายด้าน (comp_by_dim) */
+    /* [V.1.6.8] เติม comp_code — ใช้แตกค่าเฉลี่ยรายด้าน (comp_by_dim)
+       [V.1.6.37 · ซ9] กติกาเดียวกับ dim_ok ของ rpc_pub_summary ทุกข้อ — ไม่งั้นตารางรายห้องกับหัวเรื่อง
+       จะพูดคนละเลข: (ก) เฉพาะแถวที่มีคะแนนจริง (ข) ด้านที่รุ่นล่าสุดของเกมสรุประดับไม่ได้เลย
+       คะแนนจากรุ่นก่อนหน้าถือว่าถูกแทนที่แล้ว ไม่นับ (ติดป้ายที่ summary ไม่ลบ) */
     select d.student_id, d.score, d.game_code, d.comp_code, r.*
       from public.v_student_comp_dims d
       join room r on r.classroom_id = d.classroom_id
      where d.evidence <> 'self_report'
+       and d.score is not null
        and (p_game is null or d.game_code = p_game)
+       and not exists (
+         select 1
+           from (select distinct on (x.game_code) x.game_code, x.game_version
+                   from public.v_student_comp_dims x
+                   join room rr on rr.classroom_id = x.classroom_id
+                  where x.evidence <> 'self_report' and x.game_version is not null
+                    and (p_game is null or x.game_code = p_game)
+                  order by x.game_code, x.computed_at desc, x.game_version desc) lv
+           join public.v_student_comp_dims y
+             on y.game_code = lv.game_code and y.game_version = lv.game_version
+            and y.comp_code = d.comp_code and y.evidence <> 'self_report'
+           join room r2 on r2.classroom_id = y.classroom_id
+          where lv.game_code = d.game_code
+          group by lv.game_code
+         having count(y.score) = 0)
   ),
   keyed as (
     select case lower(coalesce(p_group, 'school'))
@@ -444,7 +530,9 @@ as $fn$
            'comp_by_dim', case when a.head_n < 5 then '{}'::jsonb else
                            (select coalesce(jsonb_object_agg(x.comp_code, x.s), '{}'::jsonb)
                               from (select d.comp_code, round(avg(d.score)::numeric, 1) as s
-                                      from dkeyed d where d.k = a.k group by d.comp_code) x) end,
+                                      from dkeyed d where d.k = a.k group by d.comp_code
+                                    /* [V.1.6.37] ยามกลุ่มเล็กรายด้าน — เกณฑ์เดียวกับ summary */
+                                    having count(distinct d.student_id) >= 5) x) end,
            'comp_students', (select count(distinct d.student_id) from dkeyed d where d.k = a.k))
          /* เรียงตามชื่อ ไม่ใช่ตามคะแนน — ครูตัดสินว่าไม่จัดอันดับโรงเรียน */
          order by a.label), '[]'::jsonb)

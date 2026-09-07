@@ -269,14 +269,19 @@ export const pubSummary = {
            { band: '60-69', label: 'พอใช้ (60–69)', n: 3 },
            { band: '50-59', label: 'ผ่านเกณฑ์ (50–59)', n: 2 },
            { band: '0-49', label: 'ต้องช่วยเหลือ (ต่ำกว่า 50)', n: 2 }] },
+  /* [V.1.6.37 · ซ9] สามสถานะจริงของฐาน: TW = เกมส่ง score null ให้ 12 คน (insufficient — ห้ามอ่านว่า
+     "ไม่มีการประเมิน") · CM = ไม่มีแถวเลย (none) · ที่เหลือ ok · n_old_version = 0 ทุกด้านในชุดปกติ */
   comps: [
-    { code: 'SM', name: 'การจัดการตนเอง', n_students: 9, avg_score: 71.2, avg_all: 68.0 },
-    { code: 'HOT', name: 'การคิดขั้นสูง', n_students: 12, avg_score: 62.0, avg_all: 64.5 },
-    { code: 'CM', name: 'การสื่อสาร', n_students: 0, avg_score: null, avg_all: null },
-    { code: 'TW', name: 'การรวมพลังทำงานเป็นทีม', n_students: 0, avg_score: null, avg_all: null },
-    { code: 'CZ', name: 'การเป็นพลเมืองที่เข้มแข็ง', n_students: 5, avg_score: 55.4, avg_all: 57.1 },
-    { code: 'SN', name: 'การอยู่ร่วมกับธรรมชาติและวิทยาการอย่างยั่งยืน', n_students: 7, avg_score: 70.0, avg_all: 66.2 },
+    { code: 'SM', name: 'การจัดการตนเอง', n_students: 9, n_rows: 9, avg_score: 71.2, avg_all: 68.0, status: 'ok', note: null, n_old_version: 0 },
+    { code: 'HOT', name: 'การคิดขั้นสูง', n_students: 12, n_rows: 12, avg_score: 62.0, avg_all: 64.5, status: 'ok', note: null, n_old_version: 0 },
+    { code: 'CM', name: 'การสื่อสาร', n_students: 0, n_rows: 0, avg_score: null, avg_all: null, status: 'none', note: 'ยังไม่มีผลสรุปด้านนี้ส่งขึ้นมา', n_old_version: 0 },
+    { code: 'TW', name: 'การรวมพลังทำงานเป็นทีม', n_students: 0, n_rows: 12, avg_score: null, avg_all: null, status: 'insufficient',
+      note: 'หลักฐานไม่เพียงพอ — มีการเก็บข้อมูลด้านนี้แล้ว แต่ยังไม่มีผู้เรียนที่ได้ระดับจากเกม', n_old_version: 0 },
+    { code: 'CZ', name: 'การเป็นพลเมืองที่เข้มแข็ง', n_students: 5, n_rows: 5, avg_score: 55.4, avg_all: 57.1, status: 'ok', note: null, n_old_version: 0 },
+    { code: 'SN', name: 'การอยู่ร่วมกับธรรมชาติและวิทยาการอย่างยั่งยืน', n_students: 7, n_rows: 7, avg_score: 70.0, avg_all: 66.2, status: 'ok', note: null, n_old_version: 0 },
   ],
+  /* [V.1.6.37 · ซ8] คะแนนเต็มต่อเกม (ทุกเกม) — หน้าเว็บใช้เขียนป้ายตัวหารใต้กราฟการกระจาย */
+  full_marks: [{ game: 'กาญจนบุรี 2050', game_code: 'kanchanaburi2050', max_score: 130, n: 12 }],
   /* [V.1.6.31 · ข้อ C] รูปใหม่ตาม SQL 88: แถวติด game/game_code · ชื่อช่องภาค 1 มี "(เต็ม N)"
      ภาค 2 ไม่มี (ของจริงเป็นแบบนี้ — ผู้ตรวจหักล้างเปิดซิปทั้งสองเกมยืนยัน)
      ⇒ ชุดนี้บังคับให้ทางเดิน "กราฟ %" + "คอลัมน์เกม" + "ตารางช่องไร้เพดาน" ถูกรันจริงในเทสต์ */

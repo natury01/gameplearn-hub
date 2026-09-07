@@ -340,5 +340,42 @@ console.log('═══ 9) [V.1.6.35] ตัวกรองห้อง + ยา�
   await p.close();
 }
 
+console.log('═══ 10) [V.1.6.37 · ซ9+ซ8] สามสถานะของด้าน · ป้ายรุ่นเก่า · ป้ายตัวหารใต้กราฟ ═══');
+{
+  const { p, calls } = await open();
+  const svg = await p.evaluate(() => document.getElementById('content').textContent);
+  /* ซ9 — กราฟ: TW (insufficient) กับ CM (none) ต้องพูดคนละประโยค */
+  ok('TW ที่เกมส่ง score=null ขึ้น "หลักฐานไม่เพียงพอ" ไม่ใช่ "ยังไม่มีผลสรุป"',
+    svg.includes('หลักฐานไม่เพียงพอ'), '');
+  ok('CM ที่ไม่มีแถวเลย ยังขึ้น "ยังไม่มีผลสรุปด้านนี้ส่งขึ้นมา"',
+    svg.includes('ยังไม่มีผลสรุปด้านนี้ส่งขึ้นมา'), '');
+  ok('ท้ายการ์ดอธิบายว่า insufficient = เก็บแล้ว 12 คน แต่ยังไม่มีผู้ได้ระดับ — ไม่ใช่ศูนย์',
+    /หลักฐานไม่เพียงพอ[^]*12 คน[^]*ไม่ใช่ศูนย์/.test(svg), '');
+  ok('ชุดปกติ (ไม่มีแถวรุ่นเก่า) ต้องไม่มีป้ายเตือนรุ่นเกมก่อนหน้า',
+    !svg.includes('มาจากรุ่นเกมก่อนหน้า'), '');
+  /* ซ8 — ป้ายตัวหารใต้กราฟการกระจาย อ่านเลขจาก full_marks ไม่พิมพ์ตายตัว */
+  ok('ป้าย ซ8 ใต้กราฟ: บอกว่าคิดจากคะแนนเต็มของเกมเสมอ + เลข 130 จากฐาน + "ไม่ได้หมายความว่าทำได้ไม่ดี"',
+    svg.includes('คะแนนเต็มของเกมเสมอ') && svg.includes('= 130') && svg.includes('ไม่ได้หมายความว่าทำได้ไม่ดี'), '');
+  /* โหมดตาราง — คอลัมน์ค่าเฉลี่ยใช้สถานะเดียวกัน */
+  await p.click('#tg-table');
+  await sleep(400);
+  const tb = await p.evaluate(() => [...document.querySelectorAll('table tr')].map((r) => r.textContent));
+  const twRow = tb.find((r) => r.includes('การรวมพลังทำงานเป็นทีม')) || '';
+  const cmRow = tb.find((r) => r.includes('การสื่อสาร')) || '';
+  ok('ตาราง: แถว TW = "หลักฐานไม่เพียงพอ" · แถว CM = "ยังไม่มีผลสรุป"',
+    twRow.includes('หลักฐานไม่เพียงพอ') && cmRow.includes('ยังไม่มีผลสรุปด้านนี้ส่งขึ้นมา'), { twRow, cmRow });
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+{
+  /* ป้ายแถวรุ่นเก่า — ติดป้าย ไม่ตัด (มติ [PLAN]) */
+  const { p, calls } = await open({ oldVersion: true });
+  const t = await p.evaluate(() => [...document.querySelectorAll('.note-warn')].map((e) => e.textContent).join(' | '));
+  ok('HOT มี 3 คนจากรุ่นก่อนหน้า → ป้ายเตือนขึ้น พร้อมทางออก (เปิดหน้าห้องเรียนคำนวณใหม่)',
+    t.includes('มาจากรุ่นเกมก่อนหน้า') && t.includes('การคิดขั้นสูง 3 คน') && t.includes('เปิดหน้าห้องเรียน'), t);
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+
 await b.close(); srv.close();
 process.exit(ok.done());

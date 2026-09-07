@@ -221,6 +221,13 @@ export async function stub(page, opt = {}) {
             comps: (F.pubSummary.comps || []).map((c) => Object.assign({}, c, { avg_score: null })),
           }));
         }
+        /* [V.1.6.37] โหมดแถวรุ่นเก่าปน — เปิดด้วย opt.oldVersion: HOT มี 3 คนที่คะแนนมาจากรุ่นก่อนหน้า */
+        if (opt.oldVersion) {
+          return json(Object.assign({}, F.pubSummary, {
+            comps: (F.pubSummary.comps || []).map((c) => c.code === 'HOT'
+              ? Object.assign({}, c, { n_old_version: 3 }) : c),
+          }));
+        }
         /* [V.1.6.35] โหมดสองสเกลปน — เปิดด้วย opt.mixedScale */
         if (opt.mixedScale) {
           return json(Object.assign({}, F.pubSummary, {

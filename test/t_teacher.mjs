@@ -2,6 +2,7 @@
    (ข้อ 3.2 · 3.3 · 3.4 · 3.5 · 3.7) */
 import { chromium, serve, stub, login, reporter, realErrors, launchOpts } from './harness.mjs';
 import * as F from './fixtures.mjs';
+import fs from 'fs';
 
 const PORT = 8932, BASE = 'http://localhost:' + PORT;
 const srv = await serve(PORT);
@@ -703,7 +704,9 @@ console.log('\n═══ 14) [V.1.6.40] ปุ่มอัปเดตผลจ�
   /* (3) [V.1.6.42 · ใบ AUDIT/PLAN 8 ก.ย.] การ์ดผลสัมฤทธิ์อ่าน unit_scores._boss_first ช่องเดียว — ไม่อ่าน events ไม่คำนวณเอง */
   await p.click('[data-tab="research"]'); await sleep(900);
   const bc = await p.evaluate(() => (document.querySelector('[id^="rs-boss70-"]') || {}).textContent || '');
-  ok('⭐ อ่านจากช่องคะแนนครั้งแรกที่เกมส่ง: ผ่าน 1 จาก 2 คน (S1 = 25 ผ่าน · S5B ใบ .80 ครั้งแรก 0 จริง = นับเป็น 0 ไม่ผ่าน) — S2 ใบเก่าไม่มีช่อง ไม่ถูกเดา', /1 คน \(1 จาก 2 คนที่มีคะแนนสอบครั้งแรก/.test(bc), bc.slice(0, 200));
+  ok('⭐ อ่านจากช่องที่เกมส่ง: ผ่าน 1 จาก 2 คนที่มีคะแนนในช่อง (S1 = 25 ผ่าน · S5B ใบ .80 ครั้งแรก 0 จริง = นับเป็น 0 ไม่ผ่าน) — S2 ใบเก่าไม่มีช่อง ไม่ถูกเดา', /1 คน ของผู้ที่มีคะแนนในช่อง \(1 จาก 2 คน/.test(bc), bc.slice(0, 300));
+  ok('⭐ [.45 · ครูสั่ง ข้อ 1] ตัวหลัก = ของทั้งห้อง ไม่ตัดใคร: 20.0% (1 จาก 5 คน) — สองตัวหารขึ้นคู่กันเสมอ', /20\.0% ของทั้งห้อง \(1 จาก 5 คน — ไม่ตัดใคร\)/.test(bc), bc.slice(0, 300));
+  ok('⭐ [.45 · ครูสั่ง ข้อ 1] บรรทัด "ยังไม่มีผลสอบ n คน" ติดกัน (5 − 2 = 3) และป้ายบอกว่าเกมใช้ค่าสูงสุดของแถวครั้งที่ 1 (P-CODE-12)', /ยังไม่มีผลสอบ 3 คน/.test(bc) && /คะแนนสูงสุด/.test(bc) && !/คนที่มีคะแนนสอบครั้งแรก/.test(bc), bc.slice(0, 400));
   ok('⭐ ใบเก่าก่อน .79 ขึ้น "รอใบผลรุ่นใหม่ 1 คน" — ไม่ถอยไปคำนวณจาก events (กติกา AUDIT)', /รอใบผลรุ่นใหม่ 1 คน/.test(bc), bc.slice(0, 300));
   ok('⭐ ใบภาค 2 ที่มี _boss_first 30 ไม่ถูกนับ (ถ้าหลุดจะเป็น 2 จาก 2)', !/2 จาก 2/.test(bc), bc.slice(0, 200));
   ok('การ์ดไม่ยิงอ่าน events อีก (เลิกมีสามที่คิดเลขเดียวกัน)', !calls.some((c) => /\/rest\/v1\/events\?kind=eq\.boss/.test(c.url || String(c))), calls.filter((c) => /events/.test(c.url || String(c))).length);
@@ -711,9 +714,51 @@ console.log('\n═══ 14) [V.1.6.40] ปุ่มอัปเดตผลจ�
   ok('⭐ [.44 · คำชี้ขาด AUDIT] ใบ .79 ที่ _boss_first = 0 ∧ _boss = 21 (S3B) + ใบ .80 ที่ไม่มีคีย์ (S4B) → "ไม่ทราบคะแนนครั้งที่ 1 · 2 คน (ยืนยันจาก events…)" ไม่เข้าฐาน', /ไม่ทราบคะแนนครั้งที่ 1 · 2 คน \(ยืนยันจาก events/.test(bc), bc.slice(0, 400));
   ok('⭐ [.44] ถ้อยคำบนจอไม่มีคำว่า "ได้ 0"/"ระบุครั้งแรก 0" (ตามคำชี้ขาด)', !/ระบุครั้งแรก 0|ได้ 0/.test(bc), bc.slice(0, 400));
   ok('⭐ [.44] ใบ .80 ไม่มีคีย์ ไม่ถูกจัดเป็น "รอใบผลรุ่นใหม่" (ยังคงเป็น 1 คน = S2 ใบ .76)', /รอใบผลรุ่นใหม่ 1 คน/.test(bc), bc.slice(0, 400));
-  ok('ฐาน < 5 → แสดงจำนวน ไม่แสดง % · หัวการ์ดบอกว่าเกมเป็นผู้คิด', /1 คน/.test(bc) && /เกมเป็นผู้คิด/.test(bc) && !/\d+\.\d%/.test(bc), bc.slice(0, 120));  /* (70%) ในเชิงอรรถไม่ใช่ค่าเฉลี่ย — ค่าเฉลี่ยมีทศนิยมเสมอ */
+  ok('ฐาน < 5 → แสดงจำนวน ไม่แสดง % (ฝั่งผู้มีคะแนน n=2) · ฝั่งทั้งห้อง n=5 แสดง % ได้ · หัวการ์ดบอกว่าเกมเป็นผู้คิด', /1 คน ของผู้ที่มีคะแนนในช่อง \(1 จาก 2 คน — ฐานต่ำกว่า 5 คน ไม่แสดงร้อยละ\)/.test(bc) && /เกมเป็นผู้คิด/.test(bc) && (bc.match(/\d+\.\d%/g) || []).length === 1, bc.slice(0, 160));  /* (70%) ในเชิงอรรถไม่ใช่ค่าเฉลี่ย — ค่าเฉลี่ยมีทศนิยมเสมอ */
   ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
   await p.close();
+}
+
+console.log('\n═══ 15) [V.1.6.45] ครูสั่ง 4 ข้อ 8 ก.ย. เย็น: ช่องเพื่อนอ่านคีย์จริง · เกียรติบัตร space-between · หน้าวิจัย 1:2 + ชื่อด้านสั้น ═══');
+{
+  const { p, calls } = await open({ events: F.eventsPeer, compDims: F.compDimsRS, students: F.studentsAllOn }, '#/room/' + F.R1);
+  await p.click('[data-tab="cmp"]'); await sleep(900);
+  const peer = await p.evaluate((sid) => {
+    const a = document.querySelector('table.cmptable a[href="#/student/' + sid + '"]'); const tr = a && a.closest('tr');
+    if (!tr) return { none: true };
+    const heads = Array.from(document.querySelectorAll('table.cmptable thead tr:first-child th')).slice(2).map((x) => x.textContent.trim());
+    const cells = Array.from(tr.querySelectorAll('td')).slice(2);
+    const byDim = {};
+    cells.forEach((td, k) => {
+      const chip = Array.from(td.querySelectorAll('.cmpchip')).find((c) => /^เพื่อน:/.test(c.getAttribute('title') || ''));
+      byDim[heads[k]] = chip ? chip.getAttribute('title') : null;
+    });
+    const note = (document.querySelector('.cmp-peer-note') || {}).textContent || '';
+    return { none: false, byDim, note };
+  }, F.S1);
+  ok('⭐ [ข้อ 2] ช่องเพื่อน "ทำงานเป็นทีม" อ่าน peerTeam/peerRole/peerListen จากเพื่อน 2 คน → เฉลี่ย 3.33 → ระดับ 5 (เดิมว่างเพราะหา raw.TW)',
+    !peer.none && peer.byDim['ทำงานเป็นทีม'] === 'เพื่อน: ระดับ 5', peer.byDim);
+  ok('⭐ [ข้อ 2] ด้านที่มีคีย์ V.7.80 (peerHT = 2) → ระดับ 4 · ด้านที่ไม่มีคีย์ (SM/CM/CZ/NS) = – ไม่เดา',
+    !peer.none && peer.byDim['คิดขั้นสูง'] === 'เพื่อน: ระดับ 4'
+      && ['จัดการตนเอง', 'สื่อสาร', 'พลเมือง', 'ธรรมชาติ'].every((k) => /ยังไม่มีข้อมูล/.test(peer.byDim[k] || 'ยังไม่มีข้อมูล')), peer.byDim);
+  ok('[ข้อ 2] ป้ายบอกว่าเพื่อนประเมินทีม 3 ข้อทุกรุ่น อีก 5 ด้านเฉพาะ V.7.80 ขึ้นไป และช่องว่างไม่ใช่ศูนย์', /ทำงานเป็นทีม 3 ข้อ/.test(peer.note) && /V\.7\.80/.test(peer.note) && /ไม่ใช่ศูนย์/.test(peer.note), peer.note.slice(0, 160));
+  await p.click('[data-tab="research"]'); await sleep(900);
+  const rs = await p.evaluate(() => {
+    const top = document.querySelector('.rs-top');
+    const cols = top ? getComputedStyle(top).gridTemplateColumns.trim().split(/\s+/) : [];
+    const first = Array.from(document.querySelectorAll('table.rs-lv tbody tr td:first-child')).map((x) => x.textContent.trim());
+    return { has: !!top, cols, w: window.innerWidth, first };
+  });
+  ok('⭐ [ข้อ 4] ชั้นสรุปหน้าวิจัยเป็น 2 คอลัมน์ (การ์ด 1 ส่วน · ตาราง 2 ส่วน) บนจอกว้าง', rs.has && rs.cols.length === 2 && parseFloat(rs.cols[1]) > parseFloat(rs.cols[0]) * 1.5, rs);
+  ok('[ข้อ 4] คอลัมน์ "ด้าน" ใช้ชื่อสั้น (C6_SHORT) ไม่ใช่ชื่อเต็ม', rs.first.length > 0 && rs.first.every((x) => x.length <= 14), rs.first);
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+{
+  /* [ข้อ 3] เกียรติบัตรเปิดหน้าต่างใหม่ด้วย document.write — ตรวจที่ซอร์สสตริง CSS โดยตรง */
+  const src = fs.readFileSync(new URL('../public/teacher.html', import.meta.url), 'utf8');
+  ok('⭐ [ข้อ 3] .in ของเกียรติบัตรมี justify-content:space-between และ .sign เลิก margin-top:auto (ที่ว่างไม่กองเป็นก้อนเดียว)',
+    /\.in\{[^}]*justify-content:space-between[^}]*\}/.test(src) && !/\.sign\{margin-top:auto/.test(src) && /\.sign\{margin-top:0/.test(src));
 }
 
 await b.close(); srv.close();

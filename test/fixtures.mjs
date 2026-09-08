@@ -174,6 +174,13 @@ export const achieveBossFirst = [
     unit_scores: { '1': 8, _boss: 30, _boss_first: 30 }, criteria_note: null, is_legacy: false },
 ];
 
+/* [V.1.6.45] เพื่อนประเมิน — คีย์จริงของเกม: TW 3 ข้อ (ทุกรุ่น) + 5 ด้าน ด้านละ 1 ข้อ (V.7.80+) หน้า 0–4
+   S1: เพื่อน 2 คนประเมิน · TW = (4+3+4 + 3+3+3)/6 = 3.33 → ระดับ 5 · HT = 2 → ระดับ 4 · SM/CM/CZ/NS ไม่มีคีย์ → – */
+export const eventsPeer = [
+  { student_id: S1, game_id: G1, kind: 'peer', score: 3, raw: { peerBy: 'p-1', peerTeam: 4, peerRole: 3, peerListen: 4, peerHT: 2 }, created_at: '2026-08-20T09:00:00Z' },
+  { student_id: S1, game_id: G1, kind: 'peer', score: 3, raw: { peerBy: 'p-2', peerTeam: 3, peerRole: 3, peerListen: 3 }, created_at: '2026-08-21T09:00:00Z' },
+];
+
 export const eventsBoss = [
   { student_id: S1, game_id: G1, kind: 'boss', score: 25, raw: { attemptNo: '1' }, created_at: '2026-08-20T09:00:00Z' },
   { student_id: S1, game_id: G1, kind: 'boss', score: 30, raw: { attemptNo: '2' }, created_at: '2026-08-21T09:00:00Z' },

@@ -1243,7 +1243,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
        ชั้น 1 สรุป (ผลสัมฤทธิ์จากแบบทดสอบ · สมรรถนะ 6 ด้านรายระดับ) · ชั้น 2 รายคน · ชั้น 3 <details> สำหรับตรวจสอบ
        (ทะเบียน 22 องค์ + ที่มา + B4) — กรรมการกดเปิดได้ ไม่หายจากหน้า */
     html += '<h2 class="section-title">สรุปห้องนี้ <span class="sub">ตัวเลขทุกตัวพกฐาน (เศษ/ส่วน) · ฐานต่ำกว่า 5 คนแสดงจำนวน</span></h2>'
-      + '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))">'
+      /* [V.1.6.45 · ครูสั่ง ข้อ 4] การ์ดผลสัมฤทธิ์สั้น ตารางระดับกว้าง — ให้ 1:2 บนจอกว้าง (css .rs-top) แทน auto-fit ที่แบ่งครึ่งเท่ากัน */
+      + '<div class="grid rs-top">'
       + rsBoss70Card(cid, stu)
       + '<div class="card"><b>📊 สมรรถนะ 6 ด้าน — สัดส่วนแต่ละระดับ</b> <span class="small muted">เกณฑ์ผ่าน = ระดับ 5 ขึ้นไป (ครูเคาะ 7 ก.ย. 2569)</span>'
       + rsLevelDist(dims, stu) + '</div></div>';
@@ -1359,7 +1360,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       const cnt = (l) => latest.filter((r) => r.level === l).length;
       const unk = latest.filter((r) => r.level == null).length;
       const n5 = latest.filter((r) => r.level != null && r.level >= 5).length;
-      h += '<tr><td style="white-space:normal;overflow-wrap:anywhere">' + G.esc(c[1]) + '</td><td class="num">' + base + '</td>';
+      h += '<tr><td style="white-space:normal;overflow-wrap:anywhere" title="' + G.esc(c[1]) + '">' + G.esc(C6_SHORT[c[0]] || c[1]) + '</td><td class="num">' + base + '</td>';
       if (!base) {
         h += '<td colspan="6" class="muted small">ยังไม่มีผลด้านนี้ส่งขึ้นมา</td>';
       } else if (unk === base) {
@@ -1421,23 +1422,35 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const waiting = list.filter((x) => x.fst == null && x.hasBoss && !x.unknownFirst).length;   /* ใบเก่าก่อน .79 — มี _boss แต่ไม่มี _boss_first */
     const notYet = stu.length - list.filter((x) => x.hasBoss).length;
     const pc = (x, y) => y >= 5 ? (x / y * 100).toFixed(1) + '%' : x + ' คน';
+    const total = stu.length, noScore = total - n;   /* ยังไม่มีผลสอบในช่อง = ทั้งห้อง − ผู้มีคะแนน (ยังไม่ทำ + รอใบใหม่ + ไม่ทราบครั้งที่ 1) */
     let body;
     if (!n && !waiting && !zeroDef) {
-      body = 'ยังไม่มีผู้เรียนคนใดทำแบบทดสอบหลังเรียน (ยังไม่ได้ทำ ' + notYet + ' คน จาก ' + stu.length + ' คนในห้อง)';
+      body = 'ยังไม่มีผู้เรียนคนใดทำแบบทดสอบหลังเรียน (ยังไม่ได้ทำ ' + notYet + ' คน จาก ' + total + ' คนในห้อง)';
     } else {
-      body = '<div><b style="font-size:20px">' + pc(pass, n) + '</b> <span class="small muted">(' + pass + ' จาก ' + n
-        + ' คนที่มีคะแนนสอบครั้งแรก' + (n < 5 ? ' — ฐานต่ำกว่า 5 คน ไม่แสดงร้อยละ' : '') + ')</span></div>'
-        + '<div class="small muted">ยังไม่ได้ทำแบบทดสอบ ' + notYet + ' คน จาก ' + stu.length + ' คนในห้อง</div>'
-        + (waiting ? '<div class="small">⏳ รอใบผลรุ่นใหม่ ' + waiting + ' คน — ใบผลของกลุ่มนี้ส่งจากเกมรุ่นก่อน V.7.99.79 ยังไม่มีช่องคะแนนครั้งแรก'
-                   + ' · เปิดหน้าครูในเกมหนึ่งครั้ง แล้วกด 🔄 อัปเดตผลจากเกม</div>' : '')
-        + (zeroDef ? '<div class="small">❔ ไม่ทราบคะแนนครั้งที่ 1 · ' + zeroDef + ' คน (ยืนยันจาก events: ฐานไม่มีบันทึกการสอบครั้งที่ 1 ของกลุ่มนี้)'
-                   + ' — ไม่นับเข้าฐาน และไม่นับเป็นคะแนนศูนย์</div>' : '');
+      /* [V.1.6.45 · ครูสั่ง 8 ก.ย. เย็น ผ่าน HUB ข้อ 1] ⛔ ห้ามขึ้นร้อยละตัวเดียวลอย ๆ — สองตัวหารพร้อมป้ายเสมอ
+         ① ของทั้งห้อง (ตัวหาร = นักเรียนทั้งหมด ไม่ตัดใคร — ตัวเลขที่ครูสั่งให้เป็นหลัก)
+         ② ของผู้ที่มีคะแนนในช่อง (ตัวหาร = คนที่เกมส่งค่ามา) + บรรทัด "ยังไม่มีผลสอบ n คน" ติดกันเสมอ
+         ป้ายพูดตามที่เกมคำนวณจริง ไม่ใช้คำว่า "ครั้งแรก" ลอย ๆ (ดูหมายเหตุท้ายการ์ด · P-CODE-12 8 ก.ย.) */
+      body = '<div><b style="font-size:20px">' + pc(pass, total) + '</b> <span class="small muted">ของทั้งห้อง (' + pass + ' จาก ' + total + ' คน — ไม่ตัดใคร'
+          + (total < 5 ? ' · ฐานต่ำกว่า 5 คน ไม่แสดงร้อยละ' : '') + ')</span></div>'
+        + '<div><b style="font-size:16px">' + pc(pass, n) + '</b> <span class="small muted">ของผู้ที่มีคะแนนในช่อง (' + pass + ' จาก ' + n + ' คน'
+          + (n < 5 ? ' — ฐานต่ำกว่า 5 คน ไม่แสดงร้อยละ' : '') + ')</span></div>'
+        + '<div class="small"><b>ยังไม่มีผลสอบ ' + noScore + ' คน</b> — ยังไม่ได้ทำแบบทดสอบ ' + notYet + ' คน จาก ' + total + ' คนในห้อง'
+        + (waiting ? ' · ⏳ รอใบผลรุ่นใหม่ ' + waiting + ' คน — ใบผลของกลุ่มนี้ส่งจากเกมรุ่นก่อน V.7.99.79 ยังไม่มีช่องคะแนนครั้งแรก'
+                   + ' · เปิดหน้าครูในเกมหนึ่งครั้ง แล้วกด 🔄 อัปเดตผลจากเกม' : '')
+        + (zeroDef ? ' · ❔ ไม่ทราบคะแนนครั้งที่ 1 · ' + zeroDef + ' คน (ยืนยันจาก events: ฐานไม่มีบันทึกการสอบครั้งที่ 1 ของกลุ่มนี้)'
+                   + ' — ไม่นับเข้าฐาน และไม่นับเป็นคะแนนศูนย์' : '')
+        + '</div>';
     }
     return '<div class="card" id="rs-boss70-' + (cid || 'all') + '"><b>📝 ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน</b> '
-      + '<span class="small muted">(ด่าน 8 ปีศาจข้อสอบ · เต็ม ' + BOSS_FULL + ' · คะแนนสอบครั้งแรก — เกมเป็นผู้คิด เว็บกลางอ่านอย่างเดียว)</span>'
+      + '<span class="small muted">(ด่าน 8 ปีศาจข้อสอบ · เต็ม ' + BOSS_FULL + ' · ช่อง "คะแนนครั้งที่ 1" — เกมเป็นผู้คิด เว็บกลางอ่านอย่างเดียว)</span>'
       + '<div class="rs-boss-body small" style="margin-top:4px">' + body + '</div>'
-      + '<div class="muted small" style="margin-top:6px">เกณฑ์ ' + BOSS_PASS + ' จาก ' + BOSS_FULL + ' คะแนน (70%) · อ่านจากช่อง "คะแนนสอบครั้งแรก" ในใบผลที่เกมส่ง (ภาค 1 เท่านั้น) '
-      + '· คะแนนที่ผู้เรียนได้รับ (สอบซ่อมได้ เพดาน ' + BOSS_PASS + ') เป็นคนละค่า ไม่ใช้ในงานวิจัย</div></div>';
+      + '<div class="muted small" style="margin-top:6px">เกณฑ์ ' + BOSS_PASS + ' จาก ' + BOSS_FULL + ' คะแนน (70%) · อ่านจากช่อง "คะแนนครั้งที่ 1" (_boss_first) ในใบผลที่เกมส่ง (ภาค 1 เท่านั้น) '
+      + '· คะแนนที่ผู้เรียนได้รับ (สอบซ่อมได้ เพดาน ' + BOSS_PASS + ') เป็นคนละค่า ไม่ใช้ในงานวิจัย'
+      /* [V.1.6.45 · รอบสิบ 8 ก.ย. 20:1x · P-CODE-12] เกม .80 ใส่ช่องนี้ด้วย max ของแถวที่เลขครั้ง = 1 และคนหนึ่งมีแถวเช่นนั้นได้หลายแถว (ป.4/1 14/15 คน)
+         ⇒ ป้ายต้องพูดตามที่คำนวณจริง จนกว่า AUDIT+PLAN เคาะนิยาม — เว็บกลางไม่แก้ตัวเลข แก้เฉพาะป้าย */
+      + '<br>⚠️ เกมรุ่น V.7.99.80 ใส่ช่องนี้ด้วย<b>คะแนนสูงสุด</b>ในบรรดาแถวสอบที่เกมนับเป็น "ครั้งที่ 1" — ตรวจพบ 8 ก.ย. ว่าผู้เรียนหนึ่งคนมีแถวเช่นนั้นได้หลายแถว'
+      + ' ⇒ นิยาม "คะแนนสอบครั้งแรก" อยู่ระหว่างการเคาะ (AUDIT+PLAN) · ตัวเลขการ์ดนี้ยังไม่ใช้ในเล่ม</div></div>';
   }
 
   /* [D3 + B6] รอบเล่นซ้ำรายคน + ธง "ชวนครูเข้าไปดู" — สัญญาณให้ช่วย ไม่ใช่เครื่องตัดสิน
@@ -2346,8 +2359,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + 'body{margin:0;font-family:"Sarabun","Noto Sans Thai",system-ui,sans-serif;color:#3b2f14}'
       + '.cert{width:297mm;height:209mm;box-sizing:border-box;page-break-after:always;position:relative;'
       +   'display:flex;background:#fffdf5;-webkit-print-color-adjust:exact;print-color-adjust:exact;overflow:hidden}'
-      + '.in{flex:1;text-align:center;display:flex;flex-direction:column;position:relative;z-index:1}'
-      + '.sign{margin-top:auto;font-size:15px}.sign b{display:block;font-size:18px;margin-top:1mm}'
+      /* [V.1.6.45 · ครูสั่ง 8 ก.ย. ข้อ 3] space-between กระจายช่องว่างทั้งใบ — เดิม .sign ใช้ margin-top อัตโนมัติ กินที่ว่างทั้งหมด
+         ไปกองเป็นก้อนเดียวเหนือลายเซ็น (ครูเห็นช่องว่างก้อนใหญ่กลางใบ) */
+      + '.in{flex:1;text-align:center;display:flex;flex-direction:column;justify-content:space-between;position:relative;z-index:1}'
+      + '.sign{margin-top:0;font-size:15px}.sign b{display:block;font-size:18px;margin-top:1mm}'
       + '.sigline{display:block;width:50mm;margin:6mm auto 0;border-bottom:0.4mm solid currentColor;opacity:.75}'
       /* ── ภาค 1: ภาพพื้นเต็มใบ (กรอบทองอยู่ในภาพแล้ว — ไม่วาดซ้อน ตามโค้ดเกม) ── */
       + '.k1{background:url("' + base + 'img/cert-bg-kan1.jpg") center/cover no-repeat #fffdf5}'
@@ -3029,6 +3044,10 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       /* [V.1.6.22 · ครูสั่ง] เทียบเกณฑ์ เกม/ครู/เพื่อน/ตนเอง */
       html += '<h2 class="section-title">เทียบเกณฑ์ '
         + '<span class="sub">เกม · ครู · เพื่อน · ตนเอง — ดูว่าสี่แหล่งเห็นตรงกันไหม</span></h2>'
+        /* [V.1.6.45 · ครูสั่ง ข้อ 2] บอกตรง ๆ ว่าเพื่อนประเมินด้านไหนได้บ้าง — ช่องว่างในด้านอื่นคือ "ยังไม่ได้ประเมิน" ไม่ใช่ศูนย์ */
+        + '<div class="card small cmp-peer-note" style="margin-bottom:8px">👥 <b>เพื่อน</b> = แบบประเมินเพื่อนในเกม (หน้า 0–4 → ระดับ 3–6) · '
+        + '<b>ทำงานเป็นทีม 3 ข้อ</b> มีทุกรุ่น · อีก 5 ด้าน ด้านละ 1 ข้อ เฉพาะเกมรุ่น V.7.80 ขึ้นไป ⇒ ช่อง – ของเพื่อนในด้านอื่น = เพื่อนยังไม่ได้ประเมินด้านนั้น ไม่ใช่ศูนย์ · '
+        + '🧑‍🏫 <b>ครู</b> ให้คะแนนได้เองที่ปุ่ม "🧑‍🏫 ประเมิน" ท้ายแถวนักเรียนในตารางรายชื่อ (บันทึกแล้วเกมคำนวณระดับใหม่ให้)</div>'
         + '<div class="card table-scroll">' + compareTable(cid) + '</div>';
     } else if (TAB === 'comp') {
       html += comp6Section(cid) + comp6Table(cid) + compSection(cid);
@@ -3208,7 +3227,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   const C6_COLOR = { SM:'#0891b2', HOT:'#7c3aed', HT:'#7c3aed', CM:'#0ea5e9',
                      TW:'#16a34a', CZ:'#d97706', NS:'#059669' };
   const C6_SHORT = { SM:'จัดการตนเอง', HOT:'คิดขั้นสูง', HT:'คิดขั้นสูง', CM:'สื่อสาร',
-                     TW:'ทำงานเป็นทีม', CZ:'พลเมือง', NS:'ธรรมชาติ' };
+                     TW:'ทำงานเป็นทีม', CZ:'พลเมือง', NS:'ธรรมชาติ', SN:'ธรรมชาติ' };   /* [V.1.6.45] COMP6 ใช้ SN — เดิมไม่มีคีย์นี้ หัวตารางเทียบเกณฑ์จึงตกไปใช้ชื่อเต็มยาวสุด */
 
   /* ค่าที่จะโชว์ในช่องสมรรถนะของนักเรียนหนึ่งคน หนึ่งด้าน
      สามสถานะเดียวกับที่ V.1.6.17 วางไว้ — ต้องไม่ยุบกลับเป็นสองสถานะอีก */
@@ -3249,6 +3268,16 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     return Math.max(3, Math.min(6, Math.round(x) + 2));
   };
 
+  /* [V.1.6.45 · ครูสั่ง 8 ก.ย. เย็น ผ่าน HUB ข้อ 2] คีย์คะแนนเพื่อนที่เกมภาค 1 เขียนจริงในแถว events kind='peer' (raw)
+     — เว็บกลางเคยหา raw['TW'] ซึ่งเกมไม่เคยเขียน ⇒ ช่อง 👥 ว่างมาตลอด (.22–.44)
+     game.html PEER_Q  (ทุกรุ่น)      : peerTeam / peerRole / peerListen  → TW  (หน้า 0–4)
+     game.html PEER_Q2 (V.7.80 ขึ้นไป): peerHT · peerSM · peerCM · peerCZ · peerNS → ด้านละ 1 ข้อ (หน้า 0–4)
+     ไม่มีคีย์ของด้านนั้น = null (เพื่อนยังไม่ได้ประเมินด้านนั้น) ⛔ ไม่ใช่ 0 */
+  const PEER_KEYS = { TW: ['peerTeam', 'peerRole', 'peerListen'], HT: ['peerHT'], HOT: ['peerHT'],
+                      SM: ['peerSM'], CM: ['peerCM'], CZ: ['peerCZ'], NS: ['peerNS'], SN: ['peerNS'] };   /* COMP6 ใช้รหัส SN · ตารางสมรรถนะบางที่ใช้ NS */
+  /* หน้า 0–4 ของแบบประเมินเพื่อน → ระดับ 3–6 (0 = "แทบไม่เคย" เป็นคำตอบจริง ไม่ใช่ไม่มีข้อมูล ⇒ ไม่ทิ้ง · คุมพื้น 3) */
+  const peer36 = (avg) => Math.max(3, Math.min(6, Math.round(avg) + 2));
+
   /* ค่าของแต่ละแหล่งสำหรับนักเรียนหนึ่งคน หนึ่งด้าน — คืน null เมื่อไม่มีข้อมูล
      ⚠️ null (ไม่มีข้อมูล) ห้ามกลายเป็น 0 — "ยังไม่ประเมิน" ไม่ใช่ "ประเมินแล้วได้ศูนย์" */
   function cmpOf(sid, code) {
@@ -3272,16 +3301,22 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         if (vals.length) out.kru = to36(vals.reduce((a, b) => a + b, 0) / vals.length);
       }
 
-      /* เพื่อน: events kind='peer' เก็บเป็นคะแนนรวม ไม่ได้แยกรายด้านในทุกรุ่น
-         ⇒ ถ้า raw ไม่มีรายด้าน จะไม่เดาให้ — แสดงว่า "ไม่มีข้อมูลด้านนี้" ตรงไปตรงมา */
+      /* เพื่อน: [V.1.6.45] อ่านคีย์รายข้อที่เกมเขียนจริง (PEER_KEYS) — เฉลี่ยทุกข้อของด้านนั้นจากเพื่อนทุกคนที่ประเมิน
+         แล้วแปลง peer36 · คงทางเดิม raw[code] / raw.dims[code] ไว้เผื่อรุ่นที่ส่งรายด้านมาแล้ว · ไม่มีคีย์ = null ไม่เดา */
       const pr = (S.peer || []).filter((r) => r.student_id === sid);
       if (pr.length) {
-        const vals = pr.map(function (r) {
+        const keys = PEER_KEYS[code] || [];
+        const vals = [];
+        pr.forEach(function (r) {
           const raw = r.raw || {};
-          const v = raw[code] != null ? raw[code] : (raw.dims && raw.dims[code]);
-          return Number(v);
-        }).filter((x) => !isNaN(x) && x > 0);
-        if (vals.length) out.peer = to36(vals.reduce((a, b) => a + b, 0) / vals.length);
+          const direct = raw[code] != null ? raw[code] : (raw.dims && raw.dims[code]);
+          if (direct != null && direct !== '') { const d = Number(direct); if (!isNaN(d) && d > 0) vals.push(d); return; }
+          keys.forEach(function (k) {
+            if (raw[k] == null || raw[k] === '') return;
+            const v = Number(raw[k]); if (!isNaN(v) && v >= 0 && v <= 4) vals.push(v);
+          });
+        });
+        if (vals.length) out.peer = peer36(vals.reduce((a, b) => a + b, 0) / vals.length);
       }
     } catch (e) {}
     return out;

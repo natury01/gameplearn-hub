@@ -656,6 +656,9 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
 /* ท่อนแถบของ "ยังไม่สรุป" — เส้นประบอกว่าเป็นพื้นที่รอข้อมูล ไม่ใช่แท่งคะแนน
    (ผู้ตรวจหักล้างชี้: ถ้าปล่อยเป็นพื้นแถบเฉย ๆ ส่วนที่เหลือจะเป็นบล็อกสว่างไร้ป้ายในโหมดมืด) */
 .lvbar > div.nodata { background: var(--nodata); border: 1px dashed var(--muted); }
+/* [V.1.6.45] หน้าวิจัย ชั้นสรุป: การ์ดผลสัมฤทธิ์ 1 ส่วน · ตารางระดับ 2 ส่วน · จอแคบซ้อนกัน */
+.rs-top { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+@media (max-width: 960px) { .rs-top { grid-template-columns: 1fr; } }
 .lvpill { display: inline-block; min-width: 22px; padding: 1px 8px; border-radius: 999px;
   color: #fff; font-weight: 800; font-size: 12px; text-align: center; }
 

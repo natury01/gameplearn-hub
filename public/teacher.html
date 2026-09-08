@@ -928,6 +928,13 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   /** ส่วนสมรรถนะ — classroomId = null หมายถึงรวมทุกห้องของครู */
   function compSection(classroomId) {
     const fws = compFrameworks();
+    /* [V.1.6.43 · ใบ AUDIT 13:3x ข้อ 4] แหล่งข้อมูลของส่วนนี้ (v_classroom_item_summary ← v_student_item_profile) รวมทุกเกมต่อคน
+       ไม่มีมิติเกม ⇒ กรองรายเกมบนหน้าไม่ได้ · เดิมตอนเลือกเกมส่วนนี้ยังวาดเลขรวมทุกเกมโดยไม่บอก (ตัวแปร GAME ไม่ถูกอ่าน)
+       ⇒ เลือกเกมเมื่อไร ส่วนนี้บอกตรง ๆ แทนที่จะโชว์เลขที่ไม่ตรงกับตัวกรอง · แหล่งแยกเกม = งานฐาน (ซ23) */
+    if (GAME) {
+      return '<div class="card muted">สมรรถนะตามกรอบหลักสูตร: แหล่งข้อมูลส่วนนี้สรุปรวมทุกเกมต่อคน ยังแยกรายเกมไม่ได้ — '
+        + 'เลือก "ทุกเกม" เพื่อดูส่วนนี้ หรือดูรายเกมที่ "สมรรถนะหลัก 6 ด้าน"</div>';
+    }
     if (!fws.length) {
       return '<div class="card muted">ยังไม่มีข้อมูลสมรรถนะตามกรอบหลักสูตร — จะขึ้นเมื่อเกมส่งผลเข้ามา</div>';
     }
@@ -937,18 +944,20 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         const src = S.itemSummary.filter((x) => x.framework_code === f.code && x.item_code === it.item_code
           && (classroomId ? x.classroom_id === classroomId : true));
         // ถ่วงน้ำหนักด้วยจำนวนนักเรียนที่มีผล เพื่อให้ค่ารวมหลายห้องไม่บิด
-        let num = 0, den = 0, lvl = null;
+        let num = 0, den = 0, lnum = 0, lden = 0;
         src.forEach(function (x) {
           if (x.avg_percent != null) { num += Number(x.avg_percent) * (x.students_scored || 1); den += (x.students_scored || 1); }
-          if (x.avg_level != null) lvl = Number(x.avg_level);
+          /* [V.1.6.43 · ใบ AUDIT 13:3x] เดิม "แถวสุดท้ายชนะ" — ระดับกับร้อยละมาจากคนละวิธี · ตอนนี้ถ่วงน้ำหนักเหมือนกัน */
+          if (x.avg_level != null) { lnum += Number(x.avg_level) * (x.students_scored || 1); lden += (x.students_scored || 1); }
         });
+        const lvl = lden ? lnum / lden : null;
         const levelLabel = lvl == null ? null : levelToLabel(f, lvl);
         return { name: it.item_name, covered: it.games_covering > 0,
           sub: it.games_covering > 0 ? 'วัดโดย: ' + (it.game_names || []).join(', ') : null,
           percent: den ? num / den : null, level_label: levelLabel };
       });
       const uncovered = rows.filter((r) => !r.covered).length;
-      const note = 'ค่าเฉลี่ยของนักเรียนที่มีผล' + (classroomId ? 'ในห้องนี้' : 'ทุกห้องของคุณ')
+      const note = 'ค่าเฉลี่ยของนักเรียนที่มีผล' + (classroomId ? 'ในห้องนี้' : 'ทุกห้องของคุณ') + ' · รวมทุกเกมที่เคยเล่น (แหล่งข้อมูลนี้ไม่แยกเกม)'
         + (uncovered ? ' · ยังไม่มีเกมวัด ' + uncovered + ' ด้าน' : '');
       return compPanel(f.name_th, note, rows);
     }).join('')
@@ -1327,10 +1336,19 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   function rsLevelDist(dims, stu) {
     if (!dims.length) return '';
     const pct = (n, base) => base >= 5 ? ' (' + (n / base * 100).toFixed(1) + '%)' : '';
-    let h = '<table class="gol small" style="margin-top:8px"><thead><tr><th scope="col">ด้าน</th>'
+    /* [V.1.6.43 · มติครูจากภาพ 8 ก.ย. ข้อ 1/5 + กติกา AUDIT] คอลัมน์แรกกว้างและห่อคำ (ชื่อด้านไทยไม่มีช่องว่าง)
+       · "ผ่านระดับ 5" = ตัวเลขที่เล่มใช้ จึงอยู่ถัดจากฐานและเด่นที่สุด · ตัวเลขรายระดับเป็นป้ายสีตามระดับ (LV_COLOR_ON
+       ผ่านคอนทราสต์ 4.5:1 แล้ว · คงเลขในป้ายเพื่อตาบอดสี) · ช่อง "ยังสรุปไม่ได้"/"ไม่มีผล" ไม่มีสีระดับ (ว่าง ≠ ระดับต่ำ) */
+    const lvCell = (l, n, base) => n
+      ? '<span class="lvpill" style="background:' + (LV_COLOR_ON[l] || 'var(--lv3-on)') + ';color:#fff;min-width:22px;display:inline-block;text-align:center">' + n + '</span>'
+        + '<span class="small muted">' + pct(n, base) + '</span>'
+      : '<span class="muted">0</span>';
+    let h = '<div style="overflow-x:auto"><table class="gol small rs-lv" style="margin-top:8px;min-width:560px"><thead><tr>'
+      + '<th scope="col" style="width:30%;white-space:normal;overflow-wrap:anywhere">ด้าน</th>'
       + '<th scope="col" class="num">ฐาน</th>'
+      + '<th scope="col" class="num rs-pass5" style="background:var(--lv5-on);color:#fff">ผ่านระดับ 5</th>'
       + [6, 5, 4, 3].map((l) => '<th scope="col" class="num">ระดับ ' + l + '</th>').join('')
-      + '<th scope="col" class="num">ยังสรุปไม่ได้</th><th scope="col" class="num">ผ่านระดับ 5</th>'
+      + '<th scope="col" class="num">ยังสรุปไม่ได้</th>'
       + '<th scope="col" class="num">ไม่มีผลด้านนี้</th></tr></thead><tbody>';
     COMP6.forEach(function (c) {
       const rs = dims.filter((r) => r.comp_code === c[0]);
@@ -1341,20 +1359,20 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       const cnt = (l) => latest.filter((r) => r.level === l).length;
       const unk = latest.filter((r) => r.level == null).length;
       const n5 = latest.filter((r) => r.level != null && r.level >= 5).length;
-      h += '<tr><td>' + G.esc(c[1]) + '</td><td class="num">' + base + '</td>';
+      h += '<tr><td style="white-space:normal;overflow-wrap:anywhere">' + G.esc(c[1]) + '</td><td class="num">' + base + '</td>';
       if (!base) {
         h += '<td colspan="6" class="muted small">ยังไม่มีผลด้านนี้ส่งขึ้นมา</td>';
       } else if (unk === base) {
         h += '<td colspan="6" class="small rs-insuff">หลักฐานไม่เพียงพอ — มีการเก็บข้อมูลด้านนี้แล้ว '
           + 'แต่ยังไม่มีผู้เรียนที่ได้ระดับจากเกม (' + base + ' คน)</td>';
       } else {
-        h += [6, 5, 4, 3].map((l) => '<td class="num">' + cnt(l) + pct(cnt(l), base) + '</td>').join('')
-          + '<td class="num">' + unk + pct(unk, base) + '</td>'
-          + '<td class="num"><b>' + n5 + '/' + base + '</b>' + pct(n5, base) + '</td>';
+        h += '<td class="num rs-pass5" style="background:rgba(21,128,61,.10)"><b style="font-size:15px">' + n5 + '/' + base + '</b>' + pct(n5, base) + '</td>'
+          + [6, 5, 4, 3].map((l) => '<td class="num">' + lvCell(l, cnt(l), base) + '</td>').join('')
+          + '<td class="num">' + unk + pct(unk, base) + '</td>';
       }
       h += '<td class="num muted">' + none + '</td></tr>';
     });
-    return h + '</tbody></table>'
+    return h + '</tbody></table></div>'
       + '<div class="muted small" style="margin-top:4px">ฐาน = ผู้มีผลด้านนั้น · ร้อยละอาจรวมได้ 99.9–100.1 (ปัดเศษ) · วิธีนับเต็มอยู่ใน "รายละเอียดสำหรับตรวจสอบ" ด้านล่าง</div>';
   }
 
@@ -1366,59 +1384,53 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      เกณฑ์ fst ≥ 21 (70% ของ 30 — BOSS_BEST_IDS ตายตัว 30 ข้อ เลข 21 มีจริง) · ฐาน = ผู้สอบแล้ว · "ยังไม่ได้ทำแบบทดสอบ" ติดตัวเลขเสมอ
      อ่านอย่างเดียว ไม่เขียนฐาน · โหลดแยกหลังวาด (ไม่หน่วงทั้งหน้า) */
   const BOSS_FULL = 30, BOSS_PASS = 21;
+  /* [V.1.6.42 · ใบ AUDIT 8 ก.ย. 10:1x + PLAN 10:2x] ผลสัมฤทธิ์ = คะแนนสอบครั้งแรกที่ "เกม" คำนวณเอง
+     (clsBossScore ของภาค 1: อ่านเลขครั้งสองสะกด · เพดาน 30 · เห็นเฉพาะข้อมูลภาค 1) แล้วส่งขึ้นฐานเป็น
+     unit_scores._boss_first ตั้งแต่ V.7.99.79 ⇒ เว็บกลาง **อ่านช่องเดียว ไม่คำนวณเองอีก** (การ์ด .40–.41 เคยอ่าน events
+     แล้วลอกสูตร — ติดสามจุด: สะกด attemptNo เดียว · ไม่มีเพดาน · ไม่แยกภาค ⇒ เลข 86.1/59.4 รูปเดียวกัน)
+     ไม่มีช่อง ⇒ "รอใบผลรุ่นใหม่" ไม่ถอยไปคำนวณเอง · ใบภาค 2 (-p2-) ไม่นับ — คนละเครื่องมือวัด
+     หลัก: เกมเป็นเจ้าของเนื้อหา · เว็บกลางเป็นเจ้าของการแสดงผล · ตัวเลขหนึ่งตัวมีที่คำนวณเดียว */
   function rsBoss70Card(cid, stu) {
-    const id = 'rs-boss70-' + (cid || 'all');
-    setTimeout(function () { rsBoss70Load(id, cid, stu); }, 0);
-    return '<div class="card" id="' + id + '"><b>📝 ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน</b> '
-      + '<span class="small muted">(ด่าน 8 ปีศาจข้อสอบ · เต็ม ' + BOSS_FULL + ' · คะแนนสอบครั้งแรก)</span>'
-      + '<div class="small muted rs-boss-body" style="margin-top:4px">กำลังอ่านผลสอบ…</div></div>';
-  }
-  const bossAtt = (e) => { const a = e && e.raw && e.raw.attemptNo; const n = Number(a); return (a != null && a !== '' && !isNaN(n)) ? n : null; };
-  async function rsBoss70Load(id, cid, stu) {
-    const box = document.getElementById(id); if (!box) return;
-    const body = box.querySelector('.rs-boss-body');
-    const ids = stu.map((s) => s.id);
-    if (!ids.length) { body.textContent = 'ยังไม่มีนักเรียนในห้องนี้'; return; }
-    let evs = [];
-    try {
-      evs = await G.get('/rest/v1/events?kind=eq.boss&select=student_id,game_id,score,raw,created_at'
-        + '&student_id=in.(' + ids.join(',') + ')&order=created_at');
-    } catch (e) { body.textContent = 'อ่านผลสอบไม่ได้ในขณะนี้ — โหลดหน้าใหม่แล้วลองอีกครั้ง'; return; }
-    evs = (evs || []).filter((e) => e && e.student_id && e.score != null && (!GAME || e.game_id === GAME));
-    const by = {};
-    evs.forEach((e) => { const k = e.student_id + '|' + e.game_id; (by[k] = by[k] || []).push(e); });
-    const per = Object.keys(by).map(function (k) {
-      const rows = by[k];                                  /* เรียงตาม created_at จากฐานแล้ว */
-      const numbered = rows.filter((e) => bossAtt(e) != null);
-      let fst = null, noAtt = false;
-      if (numbered.length) {
-        const f1 = numbered.filter((e) => bossAtt(e) === 1);
-        fst = f1.length ? Math.max.apply(null, f1.map((e) => Number(e.score))) : null;
-      } else { noAtt = true; fst = Number(rows[0].score); }
-      return { sid: rows[0].student_id, gid: rows[0].game_id, fst, noAtt };
+    const sids = new Set(stu.map((s) => s.id));
+    const rows = (S.achieve || []).filter((r) => sids.has(r.student_id) && !isP2(r.game_version)
+      && r.unit_scores && typeof r.unit_scores === 'object');
+    const num = (v) => { const n = Number(v); return (v != null && v !== '' && !isNaN(n)) ? Math.max(0, Math.min(BOSS_FULL, n)) : null; };
+    const per = {};
+    rows.forEach((r) => {
+      const u = r.unit_scores; let f = num(u._boss_first); const bb = num(u._boss);
+      const cur = per[r.student_id] || { fst: null, hasBoss: false, zeroDefault: false };
+      /* [V.1.6.43 · รอบหก 8 ก.ย. · กฎ ก2] เกม .79 ส่ง _boss_first = 0 เป็นค่าตั้งต้นเมื่อไม่พบแถวสอบครั้งที่ 1
+         (clsBossScore ตั้ง fst=0) — "ไม่มีหลักฐาน ≠ 0" ⇒ ถ้า 0 แต่มีคะแนนสอบที่ได้รับ (>0) ถือว่า "ไม่ทราบครั้งที่ 1" ไม่เข้าฐาน
+         ไม่ใช่การคำนวณใหม่ — เป็นการอ่านค่าตั้งต้นให้ถูกความหมาย · หายเองเมื่อเกมส่ง null แทน 0 (ข13 · P-CODE-10) */
+      if (f === 0 && bb != null && bb > 0) { f = null; cur.zeroDefault = true; }
+      if (f != null) cur.fst = f;
+      if (f != null || bb != null) cur.hasBoss = true;
+      per[r.student_id] = cur;
     });
-    const gids = Array.from(new Set(per.map((r) => r.gid)));
-    if (!gids.length) { body.innerHTML = 'ยังไม่มีผู้เรียนคนใดทำแบบทดสอบหลังเรียน (ยังไม่ได้ทำ ' + stu.length + ' คน จาก ' + stu.length + ' คนในห้อง)'; return; }
-    const pc = (n, b) => b >= 5 ? (n / b * 100).toFixed(1) + '%' : n + ' คน';
-    let h = '';
-    gids.forEach(function (gid) {
-      const g = gameById(gid); const rs = per.filter((r) => r.gid === gid);
-      const tested = rs.filter((r) => r.fst != null);
-      const n = tested.length, pass = tested.filter((r) => r.fst >= BOSS_PASS).length;
-      const noAttN = tested.filter((r) => r.noAtt).length;
-      const noFirst = rs.length - n;                       /* มีเลขครั้งแต่ไม่พบครั้งที่ 1 ในฐาน */
-      const sat = new Set(rs.map((r) => r.sid));
-      const notYet = stu.filter((s) => !sat.has(s.id)).length;
-      h += (gids.length > 1 ? '<div class="small"><b>' + G.esc(g ? g.name : gid) + '</b></div>' : '')
-        + '<div><b style="font-size:20px">' + pc(pass, n) + '</b> <span class="small muted">(' + pass + ' จาก ' + n + ' คนที่สอบแล้ว'
-        + (n < 5 ? ' — ฐานต่ำกว่า 5 คน ไม่แสดงร้อยละ' : '') + ')</span></div>'
+    const list = Object.keys(per).map((k) => per[k]);
+    const tested = list.filter((x) => x.fst != null), n = tested.length;
+    const pass = tested.filter((x) => x.fst >= BOSS_PASS).length;
+    const zeroDef = list.filter((x) => x.fst == null && x.zeroDefault).length;
+    const waiting = list.filter((x) => x.fst == null && x.hasBoss && !x.zeroDefault).length;   /* ใบเก่าก่อน .79 — มี _boss แต่ไม่มี _boss_first */
+    const notYet = stu.length - list.filter((x) => x.hasBoss).length;
+    const pc = (x, y) => y >= 5 ? (x / y * 100).toFixed(1) + '%' : x + ' คน';
+    let body;
+    if (!n && !waiting && !zeroDef) {
+      body = 'ยังไม่มีผู้เรียนคนใดทำแบบทดสอบหลังเรียน (ยังไม่ได้ทำ ' + notYet + ' คน จาก ' + stu.length + ' คนในห้อง)';
+    } else {
+      body = '<div><b style="font-size:20px">' + pc(pass, n) + '</b> <span class="small muted">(' + pass + ' จาก ' + n
+        + ' คนที่มีคะแนนสอบครั้งแรก' + (n < 5 ? ' — ฐานต่ำกว่า 5 คน ไม่แสดงร้อยละ' : '') + ')</span></div>'
         + '<div class="small muted">ยังไม่ได้ทำแบบทดสอบ ' + notYet + ' คน จาก ' + stu.length + ' คนในห้อง</div>'
-        + (noAttN ? '<div class="small">🚩 ' + noAttN + ' จาก ' + n + ' คน ใช้ลำดับเวลาแทนเลขครั้ง (แถวยุคแรกไม่มีเลขครั้ง — มติ 1 ก.ย.)</div>' : '')
-        + (noFirst ? '<div class="small muted">อีก ' + noFirst + ' คนมีเลขครั้งแต่ไม่พบครั้งที่ 1 ในฐาน — ไม่นับ</div>' : '');
-    });
-    h += '<div class="muted small" style="margin-top:6px">เกณฑ์ ' + BOSS_PASS + ' จาก ' + BOSS_FULL + ' คะแนน (70%) · ใช้คะแนนสอบครั้งแรกล้วน ไม่มีการสอบซ้ำปน '
-      + '· คะแนนที่ผู้เรียนได้รับ (สอบซ่อมได้ เพดาน ' + BOSS_PASS + ') เป็นคนละค่ากับตัวเลขนี้</div>';
-    body.className = 'rs-boss-body'; body.style.marginTop = '4px'; body.innerHTML = h;
+        + (waiting ? '<div class="small">⏳ รอใบผลรุ่นใหม่ ' + waiting + ' คน — ใบผลของกลุ่มนี้ส่งจากเกมรุ่นก่อน V.7.99.79 ยังไม่มีช่องคะแนนครั้งแรก'
+                   + ' · เปิดหน้าครูในเกมหนึ่งครั้ง แล้วกด 🔄 อัปเดตผลจากเกม</div>' : '')
+        + (zeroDef ? '<div class="small">❔ ไม่ทราบคะแนนครั้งแรก ' + zeroDef + ' คน — ใบผลระบุครั้งแรก 0 ทั้งที่มีคะแนนสอบ (ระบบไม่พบการสอบครั้งที่ 1 ของกลุ่มนี้)'
+                   + ' · ไม่นับเข้าฐาน ไม่นับเป็น 0 · รอเกมปรับการส่งค่า</div>' : '');
+    }
+    return '<div class="card" id="rs-boss70-' + (cid || 'all') + '"><b>📝 ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน</b> '
+      + '<span class="small muted">(ด่าน 8 ปีศาจข้อสอบ · เต็ม ' + BOSS_FULL + ' · คะแนนสอบครั้งแรก — เกมเป็นผู้คิด เว็บกลางอ่านอย่างเดียว)</span>'
+      + '<div class="rs-boss-body small" style="margin-top:4px">' + body + '</div>'
+      + '<div class="muted small" style="margin-top:6px">เกณฑ์ ' + BOSS_PASS + ' จาก ' + BOSS_FULL + ' คะแนน (70%) · อ่านจากช่อง "คะแนนสอบครั้งแรก" ในใบผลที่เกมส่ง (ภาค 1 เท่านั้น) '
+      + '· คะแนนที่ผู้เรียนได้รับ (สอบซ่อมได้ เพดาน ' + BOSS_PASS + ') เป็นคนละค่า ไม่ใช้ในงานวิจัย</div></div>';
   }
 
   /* [D3 + B6] รอบเล่นซ้ำรายคน + ธง "ชวนครูเข้าไปดู" — สัญญาณให้ช่วย ไม่ใช่เครื่องตัดสิน
@@ -3897,7 +3909,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + '<tr><td class="muted small">รอบที่ส่งผล</td><td class="num">' + G.fmtInt(p.attempts_count) + '</td></tr>'
         + (p.total_play_seconds ? '<tr><td class="muted small">เวลาเล่นสะสม</td><td class="num">' + G.fmtInt(p.total_play_seconds / 60) + ' นาที</td></tr>' : '')
         + '<tr><td class="muted small">เล่นล่าสุด</td><td class="num">' + G.timeAgo(p.last_played_at) + '</td></tr>'
-        + Object.keys(m).slice(0, 6).map((k) => '<tr><td class="muted small">' + G.esc(k) + '</td><td class="num">' + G.fmt(m[k]) + '</td></tr>').join('')
+        /* [V.1.6.43 · ใบ AUDIT 13:3x ข้อ 2] เดิม slice(0,6) — ด่านที่ 7 ขึ้นไป + _boss หายเงียบ (STD-001 ข้อ 3) · ชื่อด่านคือข้อมูล ห่อคำ ไม่ตัด */
+        + Object.keys(m).map((k) => '<tr><td class="muted small" style="overflow-wrap:anywhere;white-space:normal">' + G.esc(unitName(k, p.game_version)) + '</td><td class="num">' + G.fmt(m[k]) + '</td></tr>').join('')
         + '</tbody></table></div>';
     }).join('') : '<div class="card muted">ยังไม่มีข้อมูลการเล่น</div>') + '</div>';
 

@@ -140,6 +140,26 @@ export const compDimsRS = compDims.concat([
 
 /* [V.1.6.40] แถวสอบด่าน 8 — S1 มีเลขครั้ง: ครั้งที่ 1 = 25 (ผ่าน 21) แม้ครั้งที่ 2 ได้ 30 · S2 ไร้เลขครั้ง: แถวแรกตามเวลา 15 (ไม่ผ่าน) 🚩 noAtt
    ⇒ ผ่าน 1 จาก 2 คนที่สอบแล้ว · ธง 1/2 · ⛔ ถ้าอ่านค่าสูงสุดหรือ _boss จะได้ 2/2 — เทสต์นี้กันไว้ */
+/* [V.1.6.42] การ์ดผลสัมฤทธิ์อ่าน unit_scores._boss_first ที่เกมคำนวณ — S1 ใบ .79 (25 ผ่าน) · S2 ใบเก่า .76 (มี _boss ไม่มี _boss_first = รอใบผลรุ่นใหม่)
+   · S2 ยังมีใบภาค 2 ที่มี _boss_first 30 — ต้องไม่ถูกนับ (คนละเครื่องมือวัด · ถ้าหลุดจะกลายเป็นผ่าน 2 จาก 2) */
+export const S3B = 'cccccccc-0000-4000-8000-000000000003';
+export const studentsBoss3 = studentsAllOn.concat([{ ...studentsAllOn[0], id: S3B, student_number: '3', first_name: 'สมศักดิ์', last_name: 'ไม่พบครั้งแรก' }]);
+export const achieveBossFirst = [
+  /* S3B: เกมส่ง _boss_first = 0 ทั้งที่ _boss = 21 (ค่าตั้งต้นเมื่อไม่พบครั้งที่ 1 — รอบหก) ⇒ ต้องเป็น "ไม่ทราบ" ไม่ใช่ 0 */
+  { student_id: S3B, classroom_id: R1, game_id: G1, game_name: 'กาญจนบุรี 2050', game_version: 'V.7.99.79-IX2050-2569.101',
+    score: 95, max_score: 130, percent: 73.1, grade_label: 'ดี', progress_percent: 75,
+    unit_scores: { '1': 9, _boss: 21, _boss_first: 0 }, criteria_note: null, is_legacy: false },
+  { student_id: S1, classroom_id: R1, game_id: G1, game_name: 'กาญจนบุรี 2050', game_version: 'V.7.99.79-IX2050-2569.101',
+    score: 100, max_score: 130, percent: 76.9, grade_label: 'ดี', progress_percent: 80,
+    unit_scores: { '1': 10, _boss: 25, _boss_first: 25 }, criteria_note: null, is_legacy: false },
+  { student_id: S2, classroom_id: R1, game_id: G1, game_name: 'กาญจนบุรี 2050', game_version: 'V.7.99.76-IX2050-2569.100',
+    score: 90, max_score: 130, percent: 69.2, grade_label: 'พอใช้', progress_percent: 70,
+    unit_scores: { '1': 9, _boss: 21 }, criteria_note: null, is_legacy: false },
+  { student_id: S2, classroom_id: R1, game_id: G2, game_name: 'กาญจนบุรี 2050 ภาค 2', game_version: 'V.8.84-p2-2569.148',
+    score: 80, max_score: 130, percent: 61.5, grade_label: 'พอใช้', progress_percent: 50,
+    unit_scores: { '1': 8, _boss: 30, _boss_first: 30 }, criteria_note: null, is_legacy: false },
+];
+
 export const eventsBoss = [
   { student_id: S1, game_id: G1, kind: 'boss', score: 25, raw: { attemptNo: '1' }, created_at: '2026-08-20T09:00:00Z' },
   { student_id: S1, game_id: G1, kind: 'boss', score: 30, raw: { attemptNo: '2' }, created_at: '2026-08-21T09:00:00Z' },

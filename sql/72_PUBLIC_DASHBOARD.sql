@@ -72,6 +72,19 @@ end $guard$;
 -- อยู่ที่เดียว ไม่ต้องเขียนซ้ำในทั้งสามฟังก์ชัน แล้วหลุดไปแก้ไม่ครบ
 -- ============================================================
 
+-- [V.1.6.42 · มติครู 8 ก.ย. "ก"] ทะเบียนห้องที่ไม่นับเข้าหน้าสาธารณะ (ห้องทดสอบ/ห้องทดลองระบบ)
+--   ทำไมเป็นตารางใหม่ ไม่ใช่คอลัมน์ใน classrooms: additive ล้วน · ไม่แตะตารางที่ท่อวิจัยเขียน · ถอนได้ด้วย delete แถวเดียว
+--   ⛔ ไม่ลบแถวข้อมูลใด — ห้องยังอยู่ครบในหน้าครู/แท็บวิจัย/ฐาน · หายเฉพาะจากหน้าสาธารณะและตัวกรองของมัน
+create table if not exists public.pub_room_exclusions (
+  classroom_id uuid primary key references public.classrooms(id) on delete cascade,
+  reason       text not null,
+  created_at   timestamptz not null default now()
+);
+alter table public.pub_room_exclusions enable row level security;
+revoke all on public.pub_room_exclusions from public, anon, authenticated;
+comment on table public.pub_room_exclusions is
+  'ห้องที่ไม่นับเข้าหน้าสรุปสาธารณะ (เช่น ห้องทดสอบระบบ) — อ่านโดย v_pub_rooms เท่านั้น · เพิ่ม/ถอนด้วย insert/delete แถวเดียว ไม่แตะข้อมูลเด็ก';
+
 create or replace view public.v_pub_rooms as
 select c.id            as classroom_id,
        c.school_id,
@@ -83,7 +96,8 @@ select c.id            as classroom_id,
   left join public.schools s on s.id = c.school_id
  where coalesce(c.is_active, true)
    and btrim(coalesce(c.name, '')) <> 'ผู้เล่นทั่วไป'   -- กติกาความเป็นส่วนตัว ข้อ 3
-   and c.teacher_id is not null;                        -- ห้องที่ยังไม่มีเจ้าของ = ยังไม่เริ่มใช้จริง
+   and c.teacher_id is not null                         -- ห้องที่ยังไม่มีเจ้าของ = ยังไม่เริ่มใช้
+   and not exists (select 1 from public.pub_room_exclusions x where x.classroom_id = c.id);  -- [V.1.6.42] ห้องทดสอบ (มติครู 8 ก.ย. "ก")จริง
 
 revoke all on public.v_pub_rooms from public, anon, authenticated;
 

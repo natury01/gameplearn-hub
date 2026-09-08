@@ -1369,6 +1369,17 @@ ok "⭐ [.42] ไม่มีช่อง units ใดที่ n<5 ออกส
 n=$($Q -c "select count(*) from (select (x->'comp_by_dim'->>'HOT')::numeric as b, (select (y->>'avg_score')::numeric from jsonb_array_elements(rpc_pub_summary(null,null,null,null,(x->>'key')::uuid)->'comps') y where y->>'code'='HOT') as s
    from jsonb_array_elements(rpc_pub_breakdown('classroom',null,null,null,null,null)) x where x->'comp_by_dim' ? 'HOT') t where t.b is distinct from t.s;")
 ok "⭐ [.42] breakdown รายห้อง = summary(p_room) ด้าน HOT ทุกห้อง (กติกาตัวหารเดียวกัน)" "$n" "0"
+# [V.1.6.42 · มติครู 8 ก.ย. "ก"] ห้องในทะเบียน pub_room_exclusions ต้องหายจากหน้าสาธารณะ (filters + summary) แต่ยังอยู่ในตารางครบ
+RX=$($Q -c "select (x->>'key') from jsonb_array_elements(rpc_pub_breakdown('classroom',null,null,null,null,null)) x limit 1;")  # ห้องที่มีข้อมูลจริง (ไม่งั้นข้อทดสอบผ่านแบบว่างเปล่า)
+n0=$($Q -c "select (rpc_pub_filters()->>'rooms_with_data');")
+n=$($Q -c "begin; insert into pub_room_exclusions (classroom_id, reason) values ('$RX','ทดสอบ'); $AS_ANON select (rpc_pub_filters()->>'rooms_with_data'); rollback;")
+ok "⭐ [.42 ก] ห้องที่ติดธงหายจากตัวกรองสาธารณะ (rooms_with_data ลด 1)" "$n" "$((n0-1))"
+n=$($Q -c "begin; insert into pub_room_exclusions (classroom_id, reason) values ('$RX','ทดสอบ'); $AS_ANON select count(*) from jsonb_array_elements(rpc_pub_breakdown('classroom',null,null,null,null,null)) x where x->>'key' = '$RX'; rollback;")
+ok "⭐ [.42 ก] ห้องที่ติดธงหายจากตารางรายห้อง" "$n" "0"
+n=$($Q -c "select count(*) from classrooms where id='$RX';")
+ok "[.42 ก] แถวห้องยังอยู่ในตาราง (ธง ≠ ลบ)" "$n" "1"
+n=$($Q -c "begin; set local role anon; select count(*) from pub_room_exclusions; rollback;" 2>&1 | grep -c "permission denied")
+ok "[.42 ก] anon อ่านทะเบียนห้องทดสอบไม่ได้" "$n" "1"
 n=$($Q -c "select x->>'note' from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='TW';")
 okc "⭐ ถ้อยคำ TW = 'หลักฐานไม่เพียงพอ' (มติครู 7 ก.ย. — ไม่ใช่ 'ไม่มีการประเมิน')" "$n" "หลักฐานไม่เพียงพอ"
 n=$($Q -c "select (x->>'status')||'/'||(x->>'n_rows') from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='CM';")

@@ -658,9 +658,29 @@ console.log('\n═══ 13) [V.1.6.39 · ใบ HUB 7 ก.ย. ×3] หน้�
   await p.close();
 }
 
+console.log('\n═══ 13b) [V.1.6.43] ตารางวิจัยรายระดับ: ผ่านระดับ 5 เด่น · ป้ายสีระดับ · ตารางรายเกมไม่ตัด 6 แถว ═══');
+{
+  const { p, calls } = await open({ compDims: F.compDimsRS, students: F.studentsAllOn }, '#/room/' + F.R1);
+  await p.click('[data-tab="research"]'); await sleep(900);
+  const hd = await p.evaluate(() => Array.from(document.querySelectorAll('table.rs-lv thead th')).map((x) => x.textContent.trim()));
+  ok('⭐ "ผ่านระดับ 5" อยู่ถัดจากฐาน (คอลัมน์ 3) — ตัวเลขที่เล่มใช้ต้องเด่นสุด', hd[2] === 'ผ่านระดับ 5', hd);
+  const pills = await p.evaluate(() => document.querySelectorAll('table.rs-lv tbody .lvpill').length);
+  ok('ตัวเลขรายระดับเป็นป้ายสีตามระดับ (คงเลขในป้าย)', pills > 0, pills);
+  const zeroColored = await p.evaluate(() => Array.from(document.querySelectorAll('table.rs-lv tbody td')).filter((td) => /ยังไม่มีผล|หลักฐานไม่เพียงพอ/.test(td.textContent) && td.querySelector('.lvpill')).length);
+  ok('ช่องว่าง/หลักฐานไม่เพียงพอ ไม่มีป้ายสีระดับ (ว่าง ≠ ระดับต่ำ)', zeroColored === 0, zeroColored);
+  /* [V.1.6.43 · ใบ AUDIT 13:3x ข้อ 4] เลือกเกม → ส่วนสมรรถนะตามกรอบต้องบอกว่าแยกเกมไม่ได้ ไม่วาดเลขรวมทุกเกมเงียบ ๆ */
+  await p.click('[data-tab="comp"]'); await sleep(500);
+  const gpSel = await p.evaluate(() => { const s = document.getElementById('game-pick'); if (!s) return 'no-picker'; const o = Array.from(s.options).find((x) => x.value); if (!o) return 'no-option'; s.value = o.value; s.dispatchEvent(new Event('change')); return 'ok'; });
+  await sleep(700);
+  const cmpTxt = await p.evaluate(() => (document.getElementById('content') || {}).textContent || '');
+  ok('⭐ [.43] เลือกเกมแล้ว ส่วนสมรรถนะตามกรอบบอกว่า "ยังแยกรายเกมไม่ได้" (ไม่วาดเลขรวมทุกเกมเงียบ ๆ) — ' + gpSel, gpSel !== 'ok' || /ยังแยกรายเกมไม่ได้/.test(cmpTxt), cmpTxt.slice(0, 160));
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+
 console.log('\n═══ 14) [V.1.6.40] ปุ่มอัปเดตผลจากเกม (this.TIMEOUT) · ผลสัมฤทธิ์ = คะแนนสอบครั้งแรก ═══');
 {
-  const { p, calls } = await open({ events: F.eventsBoss, students: F.studentsAllOn }, '#/room/' + F.R1);
+  const { p, calls } = await open({ achieve: F.achieveBossFirst, events: F.eventsBoss, students: F.studentsBoss3 }, '#/room/' + F.R1);
   /* (1) _ensureFrame ของจริงต้องได้ iframe — เดิม this.TIMEOUT undefined ⇒ ปฏิเสธใน 0 ms ทุกครั้ง */
   const fr = await p.evaluate(async () => {
     const t0 = performance.now();
@@ -680,13 +700,16 @@ console.log('\n═══ 14) [V.1.6.40] ปุ่มอัปเดตผลจ�
   await p.click('#gr-go'); await sleep(1500);
   const msg = await p.evaluate(() => (document.getElementById('gr-msg') || {}).textContent || '');
   ok('เหตุผลที่ล้มบอกขั้นที่ล้ม (เกมข้ามโดเมน → ข้อความบอกเหตุ) ไม่ใช่ "อัปเดตไม่สำเร็จ" ลอย ๆ', (msg.includes('ยังไม่ได้ตั้งที่อยู่หน้าครูของเกม') || msg.includes('ยังไม่ได้เปิดเกมที่รองรับ')) && !/อัปเดตไม่สำเร็จ\s*$/.test(msg.trim()), msg.slice(0, 160));
-  /* (3) การ์ดผลสัมฤทธิ์ = fst จาก events */
+  /* (3) [V.1.6.42 · ใบ AUDIT/PLAN 8 ก.ย.] การ์ดผลสัมฤทธิ์อ่าน unit_scores._boss_first ช่องเดียว — ไม่อ่าน events ไม่คำนวณเอง */
   await p.click('[data-tab="research"]'); await sleep(900);
   const bc = await p.evaluate(() => (document.querySelector('[id^="rs-boss70-"]') || {}).textContent || '');
-  ok('นับจากคะแนนสอบครั้งแรก: ผ่าน 1 จาก 2 คนที่สอบแล้ว (S1 ครั้งแรก 25 ผ่าน · S2 แถวแรก 15 ไม่ผ่าน — ไม่ใช่ค่าสูงสุด)', /1 จาก 2 คนที่สอบแล้ว/.test(bc), bc.slice(0, 200));
-  ok('🚩 ธงกลุ่มไร้เลขครั้ง 1 จาก 2 (มติ 1 ก.ย. — ห้ามกลืนรวมเงียบ)', /🚩 1 จาก 2 คน ใช้ลำดับเวลา/.test(bc), '');
-  ok('บรรทัด "ยังไม่ได้ทำแบบทดสอบ" ติดตัวเลข', /ยังไม่ได้ทำแบบทดสอบ 0 คน จาก 2 คนในห้อง/.test(bc), '');
-  ok('ฐาน < 5 → แสดงจำนวน ไม่แสดง % · ป้าย ซ8 (เต็ม 130) ไม่อยู่ในการ์ดนี้แล้ว', /1 คน/.test(bc) && !bc.includes('ไม่ได้หมายความว่าทำได้ไม่ดี') && bc.includes('เพดาน 21'), '');
+  ok('⭐ อ่านจากช่องคะแนนครั้งแรกที่เกมส่ง: ผ่าน 1 จาก 1 คน (S1 = 25) — S2 ใบเก่าไม่มีช่อง ไม่ถูกเดา', /1 คน \(1 จาก 1 คนที่มีคะแนนสอบครั้งแรก/.test(bc), bc.slice(0, 200));
+  ok('⭐ ใบเก่าก่อน .79 ขึ้น "รอใบผลรุ่นใหม่ 1 คน" — ไม่ถอยไปคำนวณจาก events (กติกา AUDIT)', /รอใบผลรุ่นใหม่ 1 คน/.test(bc), bc.slice(0, 300));
+  ok('⭐ ใบภาค 2 ที่มี _boss_first 30 ไม่ถูกนับ (ถ้าหลุดจะเป็น 2 จาก 2)', !/2 จาก 2/.test(bc), bc.slice(0, 200));
+  ok('การ์ดไม่ยิงอ่าน events อีก (เลิกมีสามที่คิดเลขเดียวกัน)', !calls.some((c) => /\/rest\/v1\/events\?kind=eq\.boss/.test(c.url || String(c))), calls.filter((c) => /events/.test(c.url || String(c))).length);
+  ok('บรรทัด "ยังไม่ได้ทำแบบทดสอบ" ติดตัวเลข', /ยังไม่ได้ทำแบบทดสอบ 0 คน จาก 3 คนในห้อง/.test(bc), bc.slice(0, 300));
+  ok('⭐ [.43 · กฎ ก2] _boss_first = 0 ทั้งที่ _boss = 21 → "ไม่ทราบคะแนนครั้งแรก 1 คน" ไม่เข้าฐาน ไม่เป็น 0 (ฐานยังเป็น 1 จาก 1)', /ไม่ทราบคะแนนครั้งแรก 1 คน/.test(bc) && /1 คน \(1 จาก 1 คนที่มีคะแนนสอบครั้งแรก/.test(bc), bc.slice(0, 400));
+  ok('ฐาน < 5 → แสดงจำนวน ไม่แสดง % · หัวการ์ดบอกว่าเกมเป็นผู้คิด', /1 คน/.test(bc) && /เกมเป็นผู้คิด/.test(bc) && !/\d+\.\d%/.test(bc), bc.slice(0, 120));  /* (70%) ในเชิงอรรถไม่ใช่ค่าเฉลี่ย — ค่าเฉลี่ยมีทศนิยมเสมอ */
   ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
   await p.close();
 }

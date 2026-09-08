@@ -97,6 +97,60 @@ comment on view public.v_pub_rooms is
 --   เพราะตัวเลือกที่เลือกแล้วได้หน้าว่างเปล่า คือตัวเลือกที่ไม่ควรมี
 -- ============================================================
 
+-- ============================================================
+-- 0. [V.1.6.41 · ตรวจ A-P0-1 · 8 ก.ย. 2569] view ใบผลสองตัวจาก 43 กรอง run_id
+--    ต้นเหตุ: 43 เลือกแถว "ใหม่สุด" ต่อ (นักเรียน, เกม, ด้าน) โดยไม่ดู run_id
+--    ⇒ แถววิเคราะห์คู่ (run_id อื่น ตามกติกา "คำนวณคู่ ห้ามเขียนทับ") ที่ [Code] จะ insert
+--       ภายหลัง จะ "ชนะ" แถว live ของเกมบนทุกหน้าโดยไม่มีใครตั้งใจ
+--    ทำ: คงคอลัมน์เดิมทุกตัว (create or replace ได้) เพิ่มเฉพาะ where run_id ∈ {live, LEGACY-SHEETS}
+--    ⛔ ไม่แตะตาราง ไม่แตะแถว · แถว run_id อื่นยังอยู่ครบ อ่านตรงจากตารางได้ตามเดิม
+-- ============================================================
+do $$ begin
+  if to_regclass('public.v_student_achievement') is null or to_regclass('public.v_student_comp_dims') is null then
+    raise exception 'ต้องรัน 43_REPORT_CARDS.sql ก่อน (ยังไม่มี view ใบผล)';
+  end if;
+end $$;
+
+create or replace view public.v_student_achievement
+with (security_invoker = on) as
+select distinct on (ar.student_id, ar.game_id)
+  ar.student_id, ar.game_id, ar.run_id, ar.game_version,
+  g.code as game_code, g.name as game_name,
+  s.classroom_id, s.student_number, s.first_name, s.last_name,
+  ar.score, ar.max_score, ar.percent, ar.grade_label,
+  ar.progress_percent, ar.unit_scores, ar.criteria_note,
+  ar.computed_at,
+  (ar.run_id = 'LEGACY-SHEETS') as is_legacy
+from public.achievement_results ar
+join public.students s on s.id = ar.student_id
+join public.games g    on g.id = ar.game_id
+where ar.run_id in ('live', 'LEGACY-SHEETS')
+order by ar.student_id, ar.game_id,
+         (ar.run_id = 'LEGACY-SHEETS') asc, ar.computed_at desc;
+
+create or replace view public.v_student_comp_dims
+with (security_invoker = on) as
+select distinct on (r.student_id, r.game_id, r.comp_code)
+  r.student_id, r.game_id, r.run_id, r.comp_code, r.game_version,
+  g.code as game_code, g.name as game_name,
+  s.classroom_id, s.student_number, s.first_name, s.last_name,
+  r.score, r.level,
+  coalesce(r.level_label, public.gp_level_label(r.level)) as level_label,
+  r.sub_scores, r.evidence, r.decided_by, r.system_level, r.system_score,
+  r.criteria_note, r.computed_at,
+  (r.run_id = 'LEGACY-SHEETS') as is_legacy,
+  fi.name as comp_name
+from public.competency_dim_results r
+join public.students s on s.id = r.student_id
+join public.games g    on g.id = r.game_id
+left join lateral (
+  select i.name_th as name from public.framework_items i
+  where i.code = r.comp_code and i.depth = 1
+  limit 1) fi on true
+where r.run_id in ('live', 'LEGACY-SHEETS')
+order by r.student_id, r.game_id, r.comp_code,
+         (r.run_id = 'LEGACY-SHEETS') asc, r.computed_at desc;
+
 create or replace function public.rpc_pub_filters()
 returns jsonb
 language sql
@@ -212,7 +266,7 @@ as $fn$
      · latest_ver = รุ่นเกมของใบล่าสุดในขอบเขต — ใช้ "ติดป้าย" แถวที่คะแนนมาจากรุ่นก่อนหน้า
        (ติดป้าย ไม่ตัดทิ้ง — มติ [PLAN]: แถวเก่าเป็นหลักฐานของวงจรปรับปรุง ห้ามลบ ห้ามซ่อนเงียบ) */
   dim_scored as (                       -- แถวที่มีคะแนนจริง ทุกรุ่น — ใช้ติดป้าย n_old_version
-    select d.* from dim d where d.score is not null
+    select d.* from dim d where d.score is not null and d.level is not null
   ),
   latest_ver as (                       -- รุ่นของใบล่าสุดต่อเกม (ไม่นับแถวที่ไม่ระบุรุ่น · เสมอกัน = รุ่นชื่อมากกว่า)
     select distinct on (d.game_code) d.game_code, d.game_version
@@ -241,7 +295,7 @@ as $fn$
     select d.student_id, d.comp_code, d.score from public.v_student_comp_dims d
      join public.v_pub_rooms r on r.classroom_id = d.classroom_id
      where d.evidence <> 'self_report'
-       and d.score is not null
+       and d.score is not null and d.level is not null
        and (p_game is null or d.game_code = p_game)
   ),
   units as (
@@ -301,6 +355,7 @@ as $fn$
     'n_schools_all', (select count(distinct school_id) from room),
     'n_games',    (select count(distinct game_code)   from ach),
     'n_students', (select count(distinct student_id)  from ach),
+    'n_students_any', (select n from head),
     'ach', jsonb_build_object(
       'n',           (select count(*) from ach),
       /* [V.1.6.35] ค่าเฉลี่ย/การกระจายของกลุ่มเล็ก < 5 คน ถูกยามกดเป็น null/[] — รูปเดียวกับ breakdown */
@@ -309,6 +364,7 @@ as $fn$
       /* [V.1.6.38] เส้นเทียบผลสัมฤทธิ์ทั้งระบบก็อยู่ใต้ยาม < 5 เดียวกัน (กติกาเดียว ไม่มีข้อยกเว้นเงียบ) */
       'avg_all',     case when (select count(*) from ach_all) < 5 then null
                           else (select round(avg(percent)::numeric, 1) from ach_all) end,
+      'n_all',       (select count(*) from ach_all),
       'dist', case when (select n from head) < 5 then '[]'::jsonb else
               (select coalesce(jsonb_agg(jsonb_build_object('band', b.band, 'label', b.label, 'n', b.n)
                                          order by b.ord), '[]'::jsonb)
@@ -316,8 +372,8 @@ as $fn$
                               count(*) filter (where percent >= 80) as n from ach
                        union all select 2, '70-79',  'ดี (70–79)',        count(*) filter (where percent >= 70 and percent < 80) from ach
                        union all select 3, '60-69',  'พอใช้ (60–69)',      count(*) filter (where percent >= 60 and percent < 70) from ach
-                       union all select 4, '50-59',  'ผ่านเกณฑ์ (50–59)',  count(*) filter (where percent >= 50 and percent < 60) from ach
-                       union all select 5, '0-49',   'ต้องช่วยเหลือ (ต่ำกว่า 50)', count(*) filter (where percent < 50) from ach) b) end),
+                       union all select 4, '50-59',  'ผ่าน (50–59)',        count(*) filter (where percent >= 50 and percent < 60) from ach
+                       union all select 5, '0-49',   'ยังไม่ถึงเกณฑ์ (ต่ำกว่า 50)', count(*) filter (where percent < 50) from ach) b) end),
     /* [V.1.6.37 · ซ8] คะแนนเต็มของใบผลต่อเกม (ทุกเกม ไม่ใช่เฉพาะตอนปน) — หน้าเว็บใช้เขียนป้าย
        "คะแนนคิดจากคะแนนเต็ม N เสมอ ผู้เรียนที่ยังเล่นไม่ครบทุกด่านจะอยู่ช่วงล่าง" โดยไม่ต้องรู้เลข 130 เอง */
     'full_marks', coalesce((select jsonb_agg(jsonb_build_object(
@@ -333,7 +389,7 @@ as $fn$
     'comps', (select coalesce(jsonb_agg(jsonb_build_object(
                        'code', c.code, 'name', c.name,
                        'n_students', c.n_students, 'n_rows', c.n_rows,
-                       'avg_score', c.avg_score, 'avg_all', c.avg_all,
+                       'avg_score', c.avg_score, 'avg_all', c.avg_all, 'n_all', c.n_all,
                        'status', c.status,
                        'note', case
                                  when c.status = 'insufficient' then 'หลักฐานไม่เพียงพอ — มีการเก็บข้อมูลด้านนี้แล้ว แต่ยังไม่มีผู้เรียนที่ได้ระดับจากเกม'
@@ -356,6 +412,8 @@ as $fn$
                                 ทั้งที่ค่าเฉลี่ยกลุ่มถูกกดแล้ว · ผู้ได้ระดับทั้งระบบ < 5 คน ⇒ null */
                              case when (select count(distinct a.student_id) from dim_all a where a.comp_code = v.code) < 5 then null
                                   else (select round(avg(a.score)::numeric, 1) from dim_all a where a.comp_code = v.code) end as avg_all,
+                             /* [V.1.6.41 · มติครู 8 ก.ย.] ค่าเฉลี่ยที่เผยแพร่ต้องแสดงตัวหาร — รวมเส้นเทียบทั้งระบบ */
+                             (select count(distinct a.student_id) from dim_all a where a.comp_code = v.code) as n_all,
                              case when exists (select 1 from dim_ok d where d.comp_code = v.code) then 'ok'
                                   when exists (select 1 from dim d where d.comp_code = v.code) then 'insufficient'
                                   else 'none' end as status,
@@ -378,7 +436,7 @@ as $fn$
                                 'game', game_name, 'game_code', game_code,
                                 'name', unit_name, 'n', n, 'avg', avg_value)
                               order by game_name, unit_name), '[]'::jsonb) from units) end,
-    'updated_at', (select max(computed_at) from ach)
+    'updated_at', greatest((select max(computed_at) from ach), (select max(computed_at) from dim))
   )
 $fn$;
 

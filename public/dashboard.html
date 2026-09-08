@@ -123,6 +123,8 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
   const $ = (id) => document.getElementById(id);
   const esc = G.esc;
   let S = { filters: null, sum: null, rows: null, group: 'school', table: false };
+  /* [V.1.6.41 · ตรวจ C-19] กรรมการสแกน QR ด้วยมือถือ — กราฟ SVG กว้าง 1000 ย่อจนตัวอักษร ~4px ⇒ จอแคบเปิดมาเป็นตารางก่อน สลับได้ */
+  try { if (window.matchMedia && matchMedia('(max-width: 640px)').matches) S.table = true; } catch (e) {}
 
   function showErr(m) { const b = $('err'); b.textContent = m || ''; b.classList.toggle('on', !!m); }
 
@@ -280,18 +282,23 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
     /* ---- ตัวเลขหัวเรื่อง ---- */
     html += '<div class="statrow">'
       + '<div class="stat"><b>' + (ach.avg_percent == null ? '—' : ach.avg_percent + '%') + '</b>'
-      +   '<span>ผลสัมฤทธิ์เฉลี่ย' + (ach.avg_percent != null && ach.n != null ? ' (จาก ' + ach.n + ' ใบ)' : '') + (ach.avg_all != null ? ' · ทั้งระบบ ' + ach.avg_all + '%' : '') + '</span></div>'
-      + '<div class="stat"><b>' + (s.n_students || 0) + '</b><span>นักเรียนที่มีผล</span></div>'
+      +   '<span>คะแนนเก็บเฉลี่ย' + (ach.avg_percent != null && ach.n != null ? ' (จาก ' + ach.n + ' รายการ)' : '')
+      +     (ach.avg_all != null ? ' · ทั้งระบบ ' + ach.avg_all + '%' + (ach.n_all ? ' (จาก ' + ach.n_all + ' รายการ)' : '') : '') + '</span></div>'
+      + '<div class="stat"><b>' + (s.n_students || 0) + '</b><span>นักเรียนที่มีผล (ใบผลสัมฤทธิ์)</span></div>'
       + '<div class="stat"><b>' + (s.n_rooms || 0) + '</b><span>ห้องเรียน</span></div>'
       + '<div class="stat"><b>' + (s.n_schools || 0) + '</b><span>โรงเรียน</span></div>'
       + '<div class="stat"><b>' + (s.n_games || 0) + '</b><span>เกมที่มีผล</span></div>'
-      + '</div>';
+      + '</div>'
+      /* [V.1.6.41 · ตรวจ C-P0-4] หน้านี้ต้องบอกนิยามของตัวเอง — "ผลสัมฤทธิ์" ที่นี่ = คะแนนเก็บสะสม ไม่ใช่คะแนนสอบหลังเรียน (ซึ่งอยู่ในหน้าครู/เล่ม) */
+      + '<div class="muted small" style="margin:-2px 0 10px">ผลสัมฤทธิ์ในหน้านี้ = <b>คะแนนเก็บสะสมทุกด่านของเกม</b>'
+      +   ((s.full_marks || []).length ? ' (เต็ม ' + esc((s.full_marks || []).map((f) => f.max_score).join(' / ')) + ')' : '')
+      +   ' — ไม่ใช่คะแนนแบบทดสอบหลังเรียน · 1 รายการ = ผู้เรียน 1 คนต่อ 1 เกม</div>';
 
     /* [V.1.6.8] เดิมเช็คแค่จำนวนใบผลสัมฤทธิ์ — ห้องที่ครูเพิ่งเริ่มใช้จะมีแต่ใบสมรรถนะ
        ทำให้ขึ้น 'ยังไม่มีผลในกลุ่มที่เลือก' แล้ว return ทิ้งกราฟสมรรถนะที่ฐานส่งมาแล้ว
        ⇒ จะบอกว่าไม่มีผล ต่อเมื่อไม่มีทั้งใบผลสัมฤทธิ์และไม่มีสมรรถนะด้านใดที่มีค่า */
     const hasComp = (comps || []).some(function (c) {
-      return c && c.avg_score !== null && c.avg_score !== undefined;
+      return c && ((c.avg_score !== null && c.avg_score !== undefined) || c.status === 'ok' || (c.n_students || 0) > 0);
     });
     if (!nAch && !hasComp) {
       html += '<div class="card"><b>ยังไม่มีผลในกลุ่มที่เลือก</b>'
@@ -316,7 +323,7 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
     } else {
     const dist = (ach.dist || []).map((d) => ({ label: d.label, v: Number(d.n || 0) }));
     const distMax = Math.max(1, ...dist.map((d) => d.v));
-    html += '<section class="card"><h2 class="section-title" style="margin-top:0">ผลสัมฤทธิ์ — กระจายตามช่วงคะแนน</h2>'
+    html += '<section class="card"><h2 class="section-title" style="margin-top:0">คะแนนเก็บ — กระจายตามช่วงคะแนน</h2>'
       /* [V.1.6.19 · ครูทัก] เดิมเขียนว่า "ใบ" ซึ่งเป็นศัพท์ของคนทำระบบ ครูอ่านแล้วไม่รู้ว่าคืออะไร
          และตัวเลขดู "ไม่ตรง" กับจำนวนนักเรียนในห้อง เพราะสองอย่างนี้ไม่ใช่สิ่งเดียวกัน:
            · เด็ก 1 คนเล่น 2 เกม = 2 รายการ ⇒ เรียก "คน" ก็ผิด
@@ -368,7 +375,13 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
          ③ กติกาเหล็ก "ชื่อช่องมาจากเกม" ยังครบ: ตัดรูปแบบออกจาก "ป้ายที่แสดง" เท่านั้น
             ห้ามแปล/ย่อ/ตั้งชื่อใหม่ · ชื่อเต็มอยู่ในตารางและ tooltip เสมอ (ข้อยกเว้นแคบ
             ที่ HUB ยื่นเข้าสัญกรณ์กลาง P-HUB-10) */
-      const uAll = units.map((x) => {
+      /* [V.1.6.41 · ตรวจ C-P0-5] คีย์ขึ้นต้น _ = รายการประกอบตามสัญญาเกม (ภาคผนวกรอบ 2) — หน้าสาธารณะเคยปล่อยชื่อดิบ `_boss`
+         ขึ้นจอและปนเข้ากราฟรายด่าน · ชื่อไทยชุดเดียวกับ teacher.html UNIT_LABEL (ของค้าง P-HUB-14: ควรย้ายไป gp-core.js) */
+      const AUX_LABEL = { _boss: 'คะแนนสอบปีศาจข้อสอบ ที่ผู้เรียนได้รับ (เต็ม 30 · สอบซ่อมกดเพดาน 21)',
+                          _boss_first: 'คะแนนสอบปีศาจข้อสอบ ครั้งแรก (เต็ม 30 · ใช้ในงานวิจัย)' };
+      const auxRows = units.filter((x) => String(x.name || '').charAt(0) === '_');
+      const unitRows = units.filter((x) => String(x.name || '').charAt(0) !== '_');
+      const uAll = unitRows.map((x) => {
         const nm = String(x.name || '');
         const m = /\(เต็ม\s*([0-9.]+)\)/.exec(nm);
         const ceil = m ? Number(m[1]) : null;
@@ -409,6 +422,12 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
               + '(วาดแท่งรวมแกนกับช่องที่เพดานต่างกันจะให้ภาพผิด):</div>'
               + table(noCeil, ucols)
             : '')
+        + (auxRows.length
+            ? '<div class="muted small" style="margin-top:10px"><b>รายการประกอบ (ไม่รวมในคะแนนเก็บ)</b></div>'
+              + table(auxRows.map((x) => ({ game: x.game || '', name: AUX_LABEL[String(x.name)] || String(x.name).replace(/^_/, ''), avg: x.avg, n: x.n })),
+                      (!oneGame ? [['เกม', (r) => r.game || '—']] : []).concat([['รายการ', (r) => r.name], ['ค่าเฉลี่ย', (r) => r.avg], ['จำนวนรายการ', (r) => r.n]]))
+              + '<div class="muted small" style="margin-top:4px">คะแนนสอบที่ผู้เรียนได้รับ นับการสอบซ่อมแบบกดเพดาน 21 — ตัวเลขผลสัมฤทธิ์ในงานวิจัยใช้คะแนนสอบครั้งแรก (ดูในหน้าครู)</div>'
+            : '')
         + '</section>';
     }
 
@@ -443,8 +462,8 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
       + (S.table
           ? table(comps, [['ด้าน', (r) => r.name || r.code],
                           ['ค่าเฉลี่ย', (r) => r.avg_score == null ? compEmpty(r) : r.avg_score],
-                          ['ทั้งระบบ', (r) => r.avg_all == null ? '—' : r.avg_all],
-                          ['นักเรียน', (r) => r.n_students || 0]])
+                          ['ทั้งระบบ', (r) => r.avg_all == null ? '—' : r.avg_all + (r.n_all ? ' (จาก ' + r.n_all + ' คน)' : '')],
+                          ['ได้ระดับแล้ว (เก็บแล้ว)', (r) => (r.n_students || 0) + ((r.n_rows || 0) > (r.n_students || 0) ? ' (' + r.n_rows + ')' : '')]])
           : bars(cm, { max: 100, labelWidth: 300, alt: 'ค่าเฉลี่ยสมรรถนะหลัก 6 ด้าน',
                        emptyText: 'ยังไม่มีผลสรุปด้านนี้ส่งขึ้นมา' }))
       + '</div>'
@@ -460,9 +479,11 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
       + '</section>';
 
     /* ---- 4. แยกตามกลุ่ม ---- */
+    /* [V.1.6.41 · ตรวจ C-22/C-26] กลุ่มเล็ก <5 ต้องพูดว่า "กลุ่มเล็ก" ไม่ใช่ "ไม่มีข้อมูล" · comp_avg ถูกฐานกำกับว่าห้ามใช้ตัดสิน จึงไม่ขึ้นหน้าสาธารณะ */
     const br = rows.map((r) => ({ label: r.label + (r.sub ? ' · ' + r.sub : ''),
       v: r.avg_percent == null ? null : Number(r.avg_percent),
-      note: (r.n_students || 0) + ' คน' + (r.comp_avg != null ? ' · สมรรถนะเฉลี่ย ' + r.comp_avg : '') }));
+      empty: r.suppressed ? 'ไม่แสดง — กลุ่มเล็ก (น้อยกว่า 5 คน)' : null,
+      note: (r.n_students || 0) + ' คน' }));
     html += '<section class="card"><h2 class="section-title" style="margin-top:0">แยกตามกลุ่ม</h2>'
       + '<div class="grouptabs" role="tablist">'
       /* [V.1.6.31 · A6] เดิมใช้ aria-pressed ขณะที่หน้าครูใช้ aria-selected — สองมาตรฐานในระบบเดียว
@@ -476,8 +497,7 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
       + '<div class="chartbox viz">'
       + (S.table
           ? table(rows, [['กลุ่ม', (r) => r.label + (r.sub ? ' · ' + r.sub : '')],
-                         ['ผลสัมฤทธิ์เฉลี่ย', (r) => r.avg_percent == null ? '—' : r.avg_percent + '%'],
-                         ['สมรรถนะเฉลี่ย', (r) => r.comp_avg == null ? '—' : r.comp_avg],
+                         ['คะแนนเก็บเฉลี่ย', (r) => r.avg_percent == null ? (r.suppressed ? 'กลุ่มเล็ก (<5)' : '—') : r.avg_percent + '%'],
                          ['นักเรียน', (r) => r.n_students || 0]])
           : bars(br, { max: 100, unit: '%', labelWidth: 320, alt: 'ผลสัมฤทธิ์เฉลี่ยแยกตามกลุ่ม' }))
       + '</div></section>';

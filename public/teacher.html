@@ -682,8 +682,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + 'รันตามลำดับใน <code>README_DEPLOY.md</code> แล้วรีเฟรชหน้านี้ ตัวเลขจะขึ้นเองโดยไม่ต้องแก้อะไรอีก</div>';
     }
     if (S.has43 == null) return '';       /* ตรวจไม่ได้ (เน็ตหลุดตอนโหลด) — ไม่เดาให้ครู */
-    return '<div class="warn-note pipe">⏳ <b>รัน <code>43_REPORT_CARDS.sql</code> แล้ว '
-      + 'แต่ยังไม่มีเกมส่งใบรายงานผลเข้ามา</b> — ท่อพร้อมแล้ว รออีกฝั่งส่งข้อมูล<br>'
+    /* [V.1.6.41 · ตรวจ B-15] ชื่อไฟล์ SQL เป็นเรื่องผู้ดูแล ไม่ใช่เรื่องครู — และมีปุ่มอัปเดตในหน้าห้องแล้ว */
+    return '<div class="warn-note pipe">⏳ <b>ยังไม่มีเกมส่งใบรายงานผลเข้ามาสำหรับขอบเขตนี้</b> — ท่อพร้อมแล้ว รออีกฝั่งส่งข้อมูล<br>'
       + 'เกมจะส่งให้ตอน<b>เปิดหน้าครูของเกมนั้นสักครั้ง</b> (เกมเป็นผู้คิดคะแนนและเป็นผู้ส่ง '
       + 'เว็บกลางรับมาแสดงอย่างเดียว) · เปิดครั้งเดียวแล้วกลับมารีเฟรชหน้านี้</div>';
   }
@@ -736,7 +736,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const tb = (k, label) => '<button class="tab" role="tab" data-tab="' + k + '"'
       + ' aria-selected="' + (TAB === k) + '" tabindex="' + (TAB === k ? 0 : -1) + '">' + label + '</button>';
     return '<div class="tabs" role="tablist">'
-      + tb('ach', 'ผลสัมฤทธิ์')
+      + tb('ach', 'ผลสัมฤทธิ์ (คะแนนเก็บ)')
       + tb('comp', 'สมรรถนะหลัก')
       /* [V.1.6.22 · ครูสั่ง] แท็บเทียบเกณฑ์ — ยกมาจาก Dashboard ภาค 2 ตามที่ครูขอ */
       + tb('cmp', 'เทียบเกณฑ์ (ครู/เพื่อน/ตนเอง)')
@@ -758,7 +758,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   function noAssessText(nameOrCode) {
     const isTW = nameOrCode === 'TW' || String(nameOrCode || '').indexOf('ทำงานเป็นทีม') >= 0;
     if (isTW && (S.twEv || 0) > 0)
-      return '⏳ เก็บหลักฐานทีมแล้ว ' + S.twEv + ' รอบ (mg1) — เกณฑ์อยู่ระหว่างทดลองเก็บ';
+      /* [V.1.6.41 · ตรวจ B-12] ถ้อยคำมติครู 7 ก.ย. — ไม่พูดชื่อด่าน/นับรอบทั้งระบบ */
+      return 'หลักฐานไม่เพียงพอ — เกมเก็บหลักฐานทีมแล้ว ยังไม่มีผู้ได้ระดับ'
     return 'ยังไม่มีเกมวัด';
   }
   function compPanel(title, note, rows) {
@@ -899,6 +900,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       html += comp6Section(cid) + comp6Table(cid) + compSection(cid);
     } else if (TAB === 'cert') {
       html += certSection(cid);
+    } else if (TAB === 'cmp' && !cid) {
+      /* [V.1.6.41 · ตรวจ B-10] เดิมกดแท็บเทียบเกณฑ์บนหน้ารวมแล้วได้เนื้อหาผลสัมฤทธิ์ทั้งที่แท็บไฮไลต์ */
+      html += '<div class="card muted">แท็บเทียบเกณฑ์ (ครู/เพื่อน/ตนเอง) แสดงรายห้อง — เลือกห้องจากช่อง "ดูข้อมูลของ" ด้านบน หรือเปิดจากการ์ดห้อง</div>';
     } else if (TAB === 'research') {
       /* [V.1.6.34 · D2] หน้ารวม: มีตัวกรองห้องอยู่แล้ว — เลือกห้องเมื่อไรก็ได้ตารางรายห้องทันที */
       /* [V.1.6.39] ครูที่มีห้องเดียว: แท็บวิจัยใช้ห้องนั้นเลย — ไม่สั่งให้เลือกจากแถบที่ไม่ได้ถูกวาด */
@@ -925,8 +929,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
   function compSection(classroomId) {
     const fws = compFrameworks();
     if (!fws.length) {
-      return '<div class="card muted">ยังไม่มีข้อมูลสมรรถนะ — ต้องรัน <code>08_ASSESSMENT_CORE.sql</code> '
-        + 'และให้เกมส่งผลสมรรถนะเข้ามาก่อน (ดู <code>07_CONTENT_STANDARDS.md</code>)</div>';
+      return '<div class="card muted">ยังไม่มีข้อมูลสมรรถนะตามกรอบหลักสูตร — จะขึ้นเมื่อเกมส่งผลเข้ามา</div>';
     }
     return fws.map(function (f) {
       const items = itemsOf(f.code);
@@ -1061,7 +1064,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       const perGame = games.map(function (gn) {
         const g = scored.filter((r) => r.game_name === gn);
         const gw = g.filter((r) => r.score != null);
-        return { name: gn, n: g.length,
+        return { name: gn, n: gw.length,
           avg: gw.length ? gw.reduce((t, r) => t + Number(r.score), 0) / gw.length : null,
           label: (g.find((r) => r.level_label) || {}).level_label || null };
       });
@@ -1078,7 +1081,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           const w = byTeacher.filter((r) => r.system_score != null);
           return w.length ? w.reduce((t, r) => t + Number(r.system_score), 0) / w.length : null;
         })(),
-        students: new Set(scored.map((r) => r.student_id)).size,
+        /* [V.1.6.41 · ตรวจ B-11] ฐานของค่าเฉลี่ย = คนที่มีคะแนนจริง (แถว score null คือ "เกมยังตัดสินไม่ได้" ห้ามนับเข้าฐาน) */
+        students: new Set(withScore.map((r) => r.student_id)).size,
+        noScore: new Set(scored.filter((r) => r.score == null).map((r) => r.student_id)).size,
         games, subs, perGame,
         self: { n: selfR.length,
           avg: selfScored.length ? selfScored.reduce((t, r) => t + Number(r.score), 0) / selfScored.length : null } };
@@ -1472,10 +1477,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
               + '<span class="c6val">' + d.avg.toFixed(1) + '</span>'
             : '<span class="c6none">' + (lvOnly
                 ? 'ประเมินเป็นระดับ' + ((d.perGame[0] && d.perGame[0].label) ? ' — ' + G.esc(d.perGame[0].label) : '')
-                : gathering ? '⏳ กำลังเก็บหลักฐาน — ยังสรุประดับไม่ได้'
-                : (d.code === 'TW' && (S.twEv || 0) > 0
-                    ? '⏳ เก็บหลักฐานทีมแล้ว ' + S.twEv + ' รอบ (mg1) — เกณฑ์อยู่ระหว่างทดลองเก็บ'
-                    : 'ยังไม่มีเกมวัดด้านนี้')) + '</span>')
+                /* [V.1.6.41 · ตรวจ B-12] ถ้อยคำเดียวกับหน้าสาธารณะ/แท็บวิจัย (มติครู 7 ก.ย.) — ไม่พูดชื่อด่าน ไม่นับรอบทั้งระบบ */
+                : (gathering || d.noScore > 0) ? 'หลักฐานไม่เพียงพอ — เก็บแล้ว ' + (d.noScore || d.students) + ' คน ยังไม่มีผู้ได้ระดับ'
+                : 'ยังไม่มีเกมวัดด้านนี้') + '</span>')
         + '</button>'
         + (d.n ? '<div class="c6body hidden" data-c6body="' + d.code + '">'
             + (d.subs.length ? '<div class="c6subs">' + d.subs.map((s2) =>
@@ -1509,15 +1513,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     html += '<div class="card"><div class="c6wrap">'
       + '<div class="c6radar">' + radarSvg(ds) + '</div>'
       + '<div class="c6list">' + bars + '</div></div>'
-      + (onlyHot ? '<div class="panel-note">ตอนนี้มีข้อมูลเฉพาะ <b>การคิดขั้นสูง</b> — '
-          + 'ระบบรองรับครบ 6 ด้านแล้ว ด้านที่เหลือยังไม่มีข้อมูลส่งเข้ามา ลองไล่ตามลำดับนี้:'
-          + '<ol style="margin:6px 0 0 18px;padding:0">'
-          + '<li>เปิดเกม → เข้าสู่ระบบครู → <b>เปิด "ห้องเรียนของครู" ในตัวเกม</b> → กดแท็บ <b>🧪 เทียบเกณฑ์</b> '
-          + 'หนึ่งครั้งต่อห้อง (ใบสมรรถนะ 6 ด้านถูกส่งตอนนี้ — หน้านี้เป็นแค่หน้าอ่าน ไม่ได้ส่งเอง)</li>'
-          + '<li>ถ้ายังไม่ขึ้น ให้ผู้ดูแลตรวจว่ารันไฟล์ <code>43_REPORT_CARDS.sql</code> และ '
-          + '<code>72_PUBLIC_DASHBOARD.sql</code> บนฐานแล้ว</li>'
-          + '<li>ถ้าห้องนี้เล่นแต่ภาค 1 จะได้ไม่ครบ 6 ด้านโดยธรรมชาติ (ภาค 1 ไม่ได้วัดด้านการรวมพลังทำงานเป็นทีม)</li>'
-          + '</ol></div>' : '')
+      + (onlyHot ? '<div class="panel-note">ตอนนี้มีข้อมูลเฉพาะ <b>การคิดขั้นสูง</b> — ด้านอื่นจะขึ้นเมื่อเกมส่งผลเข้ามา (กด "🔄 อัปเดตผลจากเกม" ที่หน้าห้องได้)</div>' : '')
       + (selfs.length ? '<div class="panel-note">📋 จากแบบประเมินตนเอง (แสดงแยก ไม่รวมกับคะแนน): '
           + selfs.map((d) => G.esc(d.name) + (d.self.avg != null ? ' เฉลี่ย ' + d.self.avg.toFixed(1) : '')
             + ' (' + d.self.n + ' รายการ)').join(' · ') + '</div>' : '')
@@ -1605,8 +1601,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      คนละสเกลกัน ถ้าใช้ตระกูลเดียว "สีส้ม" จะแปลได้สองอย่างบนหน้าเดียว)
      ช่วงคะแนน (lo/hi) ยังตรงกับฐาน sql/72 ทุกตัว — ห้ามตั้งเกณฑ์ใหม่เองเหมือนเดิม */
   const ACH_BANDS = [
-    { k: 'low',  lo: 0,  hi: 50,  name: 'ต้องช่วยเหลือ (ต่ำกว่า 50)', c: 'var(--ach-low)' },
-    { k: 'pass', lo: 50, hi: 60,  name: 'ผ่านเกณฑ์ (50–59)',        c: 'var(--ach-pass)' },
+    /* [V.1.6.41 · ตรวจ C-23] ชื่อช่วงใช้ชุดเดียวกับเกม (ACH_LVNAME) — เกมเรียก "ยังไม่ถึงเกณฑ์/ผ่าน" หน้าเว็บก็ต้องเรียกเหมือนกัน */
+    { k: 'low',  lo: 0,  hi: 50,  name: 'ยังไม่ถึงเกณฑ์ (ต่ำกว่า 50)', c: 'var(--ach-low)' },
+    { k: 'pass', lo: 50, hi: 60,  name: 'ผ่าน (50–59)',              c: 'var(--ach-pass)' },
     { k: 'ok',   lo: 60, hi: 70,  name: 'พอใช้ (60–69)',            c: 'var(--ach-ok)' },
     { k: 'good', lo: 70, hi: 80,  name: 'ดี (70–79)',               c: 'var(--ach-good)' },
     { k: 'best', lo: 80, hi: 101, name: 'ดีเยี่ยม (80–100)',        c: 'var(--ach-best)' },
@@ -1673,7 +1670,9 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
           + none + '</b></span>' : '')
       + '</div><div class="achnames muted small" data-ach-names="' + G.esc(gameKey) + '"'
       + ' id="achnames-' + G.esc(String(gameKey).replace(/\s+/g, '-')) + '"'
-      + ' style="display:none;margin-top:6px"></div>';
+      + ' style="display:none;margin-top:6px"></div>'
+      /* [V.1.6.41 · ตรวจ B-14] ป้าย ซ8 ถ้อยคำเดียวกับหน้าสาธารณะ — ช่วงล่างส่วนใหญ่คือยังเล่นไม่ครบด่าน */
+      + '<div class="muted small" style="margin-top:6px">ℹ️ ร้อยละคิดจากคะแนนเต็มของเกมเสมอ' + (achScalesOf(rows).length ? ' (เต็ม ' + achScalesOf(rows).map(G.fmt).join(' / ') + ')' : '') + ' — ผู้เรียนที่ยังเล่นไม่ครบทุกด่านจะอยู่ในช่วงคะแนนล่าง ไม่ได้หมายความว่าทำได้ไม่ดี</div>';
   }
 
   function achSummaryCards(cid) {
@@ -1693,13 +1692,14 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + '<div class="muted small">' + g.length + ' คนมีผลสรุปจากเกม'
         + (legacy ? ' · ข้อมูลเก่าจากชีต ' + legacy + ' คน' : '') + '</div>'
         + (mixed.length ? '<div class="note-warn" role="note">' + achScaleNote(mixed) + '</div>' : '')
-        + (avg != null ? meter(avg) + '<div class="muted small">คะแนนเฉลี่ย ' + avg.toFixed(1) + '% ของคะแนนเต็ม</div>' : '')
+        + (avg != null ? meter(avg) + '<div class="muted small">คะแนนเก็บเฉลี่ย ' + avg.toFixed(1) + '% ของคะแนนเต็ม'
+            + (achScalesOf(g).length ? ' ' + achScalesOf(g).map(G.fmt).join('/') : '') + ' (จาก ' + g.filter((r) => r.percent != null).length + ' คน)</div>' : '')
         /* [V.1.6.21] การกระจาย — ค่าเฉลี่ยข้างบนบอกไม่ได้ว่าห้องกระจุกอยู่ตรงไหน */
         + achDistBar(g, gn)
         + (note ? '<div class="form-hint">' + G.esc(note) + '</div>' : '') + '</div>';
     }).join('');
-    return '<h2 class="section-title">ผลสัมฤทธิ์จากใบรายงานผลของเกม '
-      + '<span class="sub">ตัวเลขตรงกับหน้า Dashboard ของเกม — เกมเป็นผู้คิด</span></h2>'
+    return '<h2 class="section-title">ผลสัมฤทธิ์ (คะแนนเก็บ) จากใบรายงานผลของเกม '
+      + '<span class="sub">คะแนนเก็บสะสมทุกด่าน ไม่รวมคะแนนสอบด่าน 8 · ตัวเลขตรงกับหน้า Dashboard ของเกม — เกมเป็นผู้คิด</span></h2>'
       + '<div class="grid cols-3">' + cards + '</div>';
   }
 
@@ -2159,7 +2159,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
 
   const CERT_RULES = [
     ['finish', 'จบเกมครบทุกด่าน (ตรงกับใบในเกม)'],
-    ['ach80',  'ผลสัมฤทธิ์ระดับดีเยี่ยม (80 ขึ้นไป)'],
+    ['ach80',  'คะแนนเก็บระดับดีเยี่ยม (80% ขึ้นไป)'],
     ['lv5',    'สมรรถนะระดับ 5 ขึ้นไป (สามารถ/เหนือความคาดหวัง)'],
   ];
   /* คืนข้อมูลใบเมื่อ "ได้รับ" ตามเกณฑ์ · null = ไม่ได้รับ — ใช้ทั้งตาราง/พิมพ์/PNG จุดเดียว */
@@ -3337,7 +3337,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let head = '<thead><tr>'
       + '<th scope="col" rowspan="2" class="num">เลขที่</th>'
       + '<th scope="col" rowspan="2">ชื่อ — นามสกุล</th>'
-      + (games.length ? '<th scope="colgroup" colspan="' + games.length + '" class="grp grp-ach">🏅 ผลสัมฤทธิ์</th>' : '')
+      + (games.length ? '<th scope="colgroup" colspan="' + games.length + '" class="grp grp-ach">🏅 คะแนนเก็บ (%)</th>' : '')
       + '<th scope="colgroup" colspan="' + dims.length + '" class="grp grp-c6">🌟 สมรรถนะหลัก ' + dims.length + ' ด้าน</th>'
       + '</tr><tr>'
       + games.map((g) => '<th scope="col" class="sub-h">' + G.esc(g.name) + '</th>').join('')
@@ -3353,7 +3353,7 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       const achCells = games.map(function (g) {
         const a = (S.achieve || []).find((x) => x.student_id === s.id && x.game_id === g.id);
         if (!a || a.percent == null) return '<td class="num"><span class="muted small">–</span></td>';
-        return '<td class="num"><b>' + G.fmt(a.percent) + '%</b></td>';
+        return '<td class="num" title="' + G.fmt(a.score) + ' จากเต็ม ' + G.fmt(a.max_score) + '"><b>' + G.fmt(a.percent) + '%</b></td>';
       }).join('');
       const c6Cells = dims.map(function (d) {
         const v = c6Cell(s.id, d[0]);

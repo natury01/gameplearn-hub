@@ -1342,7 +1342,8 @@ $Q -c "delete from competency_dim_results;
    ('$SA','$GID','live','HOT','V.7.99.71-IX2050-2569.100',82,6,'scored',now()),
    ('$SB','$GID','live','HOT','V.7.99.50-IX2050-2569.80',60,4,'scored',now() - interval '20 days'),
    ('$SA','$GID','live','TW','V.7.99.71-IX2050-2569.100',null,null,'scored',now()),
-   ('$SB','$GID','ht-old','TW','V.7.80.1',86,5,'scored',now() - interval '40 days'),
+   ('$SB','$GID','live','TW','V.7.80.1',86,5,'scored',now() - interval '40 days'),
+   ('$SA','$GID','ht-subdim-2569a','TW','V.7.99.71-IX2050-2569.100',95,6,'scored',now()),
    ('$SC','$GID','live','TW','V.7.99.71-IX2050-2569.100',null,null,'scored',now()),
    ('$SA','$GID','live','SN','V.7.99.71-IX2050-2569.100',70,5,'scored',now());" >/dev/null
 # ⚠️ SB มีแถว TW รุ่นเก่า (V.7.80.1) คะแนน 86 และไม่เคยถูกใบใหม่ทับ — เคส "86.1 กลับมาได้" จากรีวิวปรปักษ์:
@@ -1351,6 +1352,11 @@ n=$($Q -c "select (x->>'status')||'/'||(x->>'n_students')||'/'||(x->>'n_rows')||
 ok "⭐ TW: status=insufficient · นับหัว 0 (ไม่ใช่ 3) · n_rows 3 · avg null — แถวรุ่นเก่า 86 ของ SB ไม่ยกขึ้นหน้า" "$n" "insufficient/0/3/null"
 n=$($Q -c "select x->>'n_old_version' from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='TW';")
 ok "⭐ TW ยังติดป้ายรุ่นเก่า 1 คน (SB) แม้ถูกกันออกจากค่าเฉลี่ย — ติดป้าย ไม่ลบ" "$n" "1"
+# [V.1.6.41 · P0-1] แถววิเคราะห์คู่ (run_id อื่น เช่น ht-subdim-2569a ของ ค3) ต้องไม่ขึ้น view — ไม่งั้นแถว SA 95/ระดับ 6 จะทำ TW กลายเป็น ok เอง
+n=$($Q -c "select count(*) from v_student_comp_dims where run_id not in ('live','LEGACY-SHEETS');")
+ok "⭐ [P0-1] view กรอง run_id: แถววิเคราะห์คู่ 0 แถวบน view (แถวยังอยู่ในตารางครบ)" "$n" "0"
+n=$($Q -c "select count(*) from competency_dim_results where run_id='ht-subdim-2569a';")
+ok "[P0-1] แถววิเคราะห์คู่ยังอยู่ในตาราง 1 แถว (กันออกจากการแสดงผล ไม่ได้ลบ)" "$n" "1"
 n=$($Q -c "select x->>'note' from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='TW';")
 okc "⭐ ถ้อยคำ TW = 'หลักฐานไม่เพียงพอ' (มติครู 7 ก.ย. — ไม่ใช่ 'ไม่มีการประเมิน')" "$n" "หลักฐานไม่เพียงพอ"
 n=$($Q -c "select (x->>'status')||'/'||(x->>'n_rows') from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='CM';")
@@ -1374,8 +1380,10 @@ ok "⭐ full_marks มีรายการต่อเกม (ไม่ว่�
 n=$($Q -c "select (x->>'max_score') from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'full_marks') x limit 1;")
 ok "full_marks บอกคะแนนเต็มจริงของใบ (100 ในชุดจำลอง)" "$n" "100"
 # คุมลบ: แถวใหม่ที่มีคะแนนกลับมา ⇒ TW กลายเป็น ok ทันที (ป้ายไม่ค้าง)
+# [V.1.6.41] ท่อจริงของเกมคือ upsert แถว run_id='live' (ไม่ใช่แถว run_id อื่น — แถวนั้นถูก view กันออกแล้ว)
 $Q -c "insert into competency_dim_results (student_id, game_id, run_id, comp_code, game_version, score, level, evidence, computed_at) values
-   ('$SA','$GID','ht-subdim-2569a','TW','V.7.99.71-IX2050-2569.100',64,4,'scored',now() + interval '1 minute');" >/dev/null
+   ('$SA','$GID','live','TW','V.7.99.71-IX2050-2569.100',64,4,'scored',now() + interval '1 minute')
+   on conflict (student_id, game_id, run_id, comp_code) do update set score=excluded.score, level=excluded.level, computed_at=excluded.computed_at;" >/dev/null
 n=$($Q -c "select (x->>'status')||'/'||(x->>'n_students') from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='TW';")
 ok "คุมลบ: รุ่นล่าสุดสรุป TW ได้แล้ว 1 คน → ด้านเลิกถูกกัน · แถวรุ่นเก่าของ SB กลับมานับ (ไม่ได้ตัดรุ่นเก่าทิ้งทั้งหมด) → ok/2" "$n" "ok/2"
 n=$($Q -c "select x->>'n_old_version' from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='TW';")

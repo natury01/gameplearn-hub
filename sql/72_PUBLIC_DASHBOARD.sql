@@ -291,12 +291,22 @@ as $fn$
      where not exists (select 1 from dim_superseded x
                         where x.game_code = s.game_code and x.comp_code = s.comp_code)
   ),
+  /* [V.1.6.42 · ตรวจปลายทาง 8 ก.ย.] ค่าเฉลี่ยรายด้านต้องคิด "1 แถวต่อคน" ให้ตรงป้าย "(จาก n คน)" —
+     ผู้เรียนที่มีใบทั้งสองเกม (ห้องทดสอบ) เคยเข้าค่าเฉลี่ย 2 แถวแต่นับหัว 1 ⇒ 83.8 มาจาก 28 แถว/27 คน · ใช้ใบใหม่สุดของคนนั้น */
+  dim_one as (
+    select distinct on (s.student_id, s.comp_code) s.* from dim_ok s
+     order by s.student_id, s.comp_code, s.computed_at desc nulls last
+  ),
   dim_all as (
-    select d.student_id, d.comp_code, d.score from public.v_student_comp_dims d
+    select d.student_id, d.comp_code, d.score, d.computed_at from public.v_student_comp_dims d
      join public.v_pub_rooms r on r.classroom_id = d.classroom_id
      where d.evidence <> 'self_report'
        and d.score is not null and d.level is not null
        and (p_game is null or d.game_code = p_game)
+  ),
+  dim_all_one as (
+    select distinct on (a.student_id, a.comp_code) a.* from dim_all a
+     order by a.student_id, a.comp_code, a.computed_at desc nulls last
   ),
   units as (
     /* [V.1.6.31 · ข้อ C — ใบ HUB 25/26 ส.ค.] เพิ่มมิติเกม
@@ -317,6 +327,9 @@ as $fn$
              else '{}'::jsonb end) u
      where u.value ~ '^-?[0-9]+(\.[0-9]+)?$'          -- เก็บเฉพาะช่องที่เป็นตัวเลขจริง
      group by a.game_code, a.game_name, u.key         -- [V.1.6.31 · ข้อ C] มิติเกม
+     /* [V.1.6.42 · ตรวจปลายทาง 8 ก.ย.] ยามกลุ่มเล็กต้องคุมรายช่องด้วย — กลุ่มผ่านยามหัว ≥5 แต่ช่องที่มีคน 1–4
+        (ด่านท้าย ๆ ที่ยังไปไม่ถึงกัน) เคยขึ้นค่าเฉลี่ย = คะแนนรายบุคคลบนหน้าสาธารณะ (เห็นจริง: ช่องสอบ 29/30 ของเด็ก 1 คน) */
+    having count(*) >= 5
   )
   select jsonb_build_object(
     'scope', jsonb_build_object('school', p_school, 'grade', p_grade, 'year', p_year, 'game', p_game,
@@ -406,12 +419,12 @@ as $fn$
                                 [V.1.6.37] และคุมรายด้าน: ผู้ได้ระดับด้านนั้น < 5 คน ก็ไม่แสดง (กติกาเดิม 5 ไม่ตั้งเลขใหม่) */
                              case when (select n from head) < 5
                                     or (select count(distinct d.student_id) from dim_ok d where d.comp_code = v.code) < 5 then null
-                                  else (select round(avg(d.score)::numeric, 1) from dim_ok d where d.comp_code = v.code) end as avg_score,
+                                  else (select round(avg(d.score)::numeric, 1) from dim_one d where d.comp_code = v.code) end as avg_score,
                              /* [V.1.6.38 · ตรวจปลายทาง .37] เส้นเทียบ "ทั้งระบบ" ต้องอยู่ใต้ยามกลุ่มเล็กเดียวกัน —
                                 ของจริง: TW ทั้งระบบ = เด็ก 2 คนห้องทดสอบ (ภาค 2) เฉลี่ย 86.1 โผล่เป็นขีดเทียบบนหน้าสาธารณะ
                                 ทั้งที่ค่าเฉลี่ยกลุ่มถูกกดแล้ว · ผู้ได้ระดับทั้งระบบ < 5 คน ⇒ null */
                              case when (select count(distinct a.student_id) from dim_all a where a.comp_code = v.code) < 5 then null
-                                  else (select round(avg(a.score)::numeric, 1) from dim_all a where a.comp_code = v.code) end as avg_all,
+                                  else (select round(avg(a.score)::numeric, 1) from dim_all_one a where a.comp_code = v.code) end as avg_all,
                              /* [V.1.6.41 · มติครู 8 ก.ย.] ค่าเฉลี่ยที่เผยแพร่ต้องแสดงตัวหาร — รวมเส้นเทียบทั้งระบบ */
                              (select count(distinct a.student_id) from dim_all a where a.comp_code = v.code) as n_all,
                              case when exists (select 1 from dim_ok d where d.comp_code = v.code) then 'ok'
@@ -490,6 +503,7 @@ as $fn$
       join room r on r.classroom_id = d.classroom_id
      where d.evidence <> 'self_report'
        and d.score is not null
+       and d.level is not null   /* [V.1.6.42] กติกาเดียวกับ dim_scored ของ summary — ของจริง: ป.4/2 SM 57.2 (breakdown) vs 67.3 (summary) */
        and (p_game is null or d.game_code = p_game)
        and not exists (
          select 1

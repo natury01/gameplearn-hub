@@ -1048,8 +1048,9 @@ $Q -c "insert into classrooms (id, teacher_id, school_id, name, grade, join_key,
         ('cccccccc-0000-4000-8000-000000000101','cccccccc-0000-4000-8000-000000000061','เด็ก','สี่','1'),
         ('cccccccc-0000-4000-8000-000000000102','cccccccc-0000-4000-8000-000000000061','เด็ก','ห้า','2');
        insert into achievement_results (student_id, game_id, run_id, score, max_score, percent, unit_scores) values
-        ('cccccccc-0000-4000-8000-000000000101','$GID','live',90,100,90,'{}'::jsonb),
-        ('cccccccc-0000-4000-8000-000000000102','$GID','live',55,100,55,'{}'::jsonb);" >/dev/null
+        ('cccccccc-0000-4000-8000-000000000101','$GID','live',90,100,90,'{\"คะแนนเก็บ\":60,\"คะแนนสอบ\":60}'::jsonb),
+        ('cccccccc-0000-4000-8000-000000000102','$GID','live',55,100,55,'{\"คะแนนเก็บ\":60,\"คะแนนสอบ\":60}'::jsonb);" >/dev/null
+# [V.1.6.42] สองแถวนี้เคยส่ง unit_scores ว่าง — ตอนนี้ยาม <5 คุมรายช่อง จึงต้องมี 5 รายการต่อช่องให้ช่องออกหน้าสาธารณะ (ค่า 60 คงค่าเฉลี่ย 60.0)
 n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->>'suppressed'); rollback;")
 ok "เด็กครบ 5 คน → ยามปล่อย" "$n" "false"
 n=$($Q -c "begin; $AS_ANON select (rpc_pub_summary()->'ach'->>'avg_percent'); rollback;")
@@ -1089,7 +1090,7 @@ ok "⭐ แบบประเมินตนเองไม่ถูกนับ
 n=$($Q -c "begin; $AS_ANON select jsonb_array_length(rpc_pub_summary()->'units'); rollback;")
 ok "แยกคะแนนเก็บ/คะแนนสอบให้ตามที่เกมส่งมา (2 ช่อง)" "$n" "2"
 n=$($Q -c "begin; $AS_ANON select (select u->>'avg' from jsonb_array_elements(rpc_pub_summary()->'units') u where u->>'name'='คะแนนเก็บ'); rollback;")
-ok "ค่าเฉลี่ยคะแนนเก็บถูก ((80+60+40)/3 = 60.0)" "$n" "60.0"
+ok "ค่าเฉลี่ยคะแนนเก็บถูก ((80+60+40+60+60)/5 = 60.0 · [.42] ต้องครบ 5 รายการช่องจึงออก)" "$n" "60.0"
 
 # ── [V.1.6.35] ตัวกรองห้อง p_room (ครูสั่ง 2 ก.ย.) ──
 RM5=$($Q -c "select classroom_id from students where last_name='หนึ่ง' limit 1;")
@@ -1242,9 +1243,14 @@ _CLASH_DATA="begin;
  insert into games (id, code, name) values
    ('44444444-4444-4444-8444-44444444444c','kan-p2-test','เกมภาคสองจำลอง');
  insert into achievement_results (student_id, game_id, run_id, score, max_score, percent, unit_scores) values
-   ('$SA','44444444-4444-4444-8444-44444444444c','live',65,100,65,'{\"_boss\":13}'::jsonb);
+   ('$SA','44444444-4444-4444-8444-44444444444c','live',65,100,65,'{\"_boss\":13}'::jsonb),
+   ('$SB','44444444-4444-4444-8444-44444444444c','live',65,100,65,'{\"_boss\":13}'::jsonb),
+   ('$SC','44444444-4444-4444-8444-44444444444c','live',65,100,65,'{\"_boss\":13}'::jsonb),
+   ('cccccccc-0000-4000-8000-000000000101','44444444-4444-4444-8444-44444444444c','live',65,100,65,'{\"_boss\":13}'::jsonb),
+   ('cccccccc-0000-4000-8000-000000000102','44444444-4444-4444-8444-44444444444c','live',65,100,65,'{\"_boss\":13}'::jsonb);
+ /* [V.1.6.42] ยาม <5 คุมรายช่อง ⇒ จำลอง 5 ใบต่อเกมให้ช่อง _boss ของทั้งสองเกมออกได้ */
  update achievement_results set unit_scores = unit_scores || '{\"_boss\":19.1}'::jsonb
-  where game_id='$GID' and student_id='$SA';"
+  where game_id='$GID';"
 #  เทสต์ของเทสต์ (negative control ตามข้อกำชับ HUB "เทสต์ต้องแดงได้"): ข้อมูลชุดนี้ต้อง "ชนจริง"
 #  — จัดกลุ่มท่าเก่า (group by key เฉย ๆ) _boss ต้องยุบเหลือแถวเดียว
 #  ถ้าข้อนี้ไม่ออก 1 แปลว่าข้อมูลจำลองไม่ชน = ข้อถัดไปจะเขียวหลอกทันที
@@ -1357,6 +1363,12 @@ n=$($Q -c "select count(*) from v_student_comp_dims where run_id not in ('live',
 ok "⭐ [P0-1] view กรอง run_id: แถววิเคราะห์คู่ 0 แถวบน view (แถวยังอยู่ในตารางครบ)" "$n" "0"
 n=$($Q -c "select count(*) from competency_dim_results where run_id='ht-subdim-2569a';")
 ok "[P0-1] แถววิเคราะห์คู่ยังอยู่ในตาราง 1 แถว (กันออกจากการแสดงผล ไม่ได้ลบ)" "$n" "1"
+# [V.1.6.42] ยาม <5 คุม units รายช่อง · breakdown ใช้กติกา level-null เดียวกับ summary · 1 แถวต่อคนต่อด้าน
+n=$($Q -c "select count(*) from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'units') x where (x->>'n')::int < 5;")
+ok "⭐ [.42] ไม่มีช่อง units ใดที่ n<5 ออกสู่หน้าสาธารณะ" "$n" "0"
+n=$($Q -c "select count(*) from (select (x->'comp_by_dim'->>'HOT')::numeric as b, (select (y->>'avg_score')::numeric from jsonb_array_elements(rpc_pub_summary(null,null,null,null,(x->>'key')::uuid)->'comps') y where y->>'code'='HOT') as s
+   from jsonb_array_elements(rpc_pub_breakdown('classroom',null,null,null,null,null)) x where x->'comp_by_dim' ? 'HOT') t where t.b is distinct from t.s;")
+ok "⭐ [.42] breakdown รายห้อง = summary(p_room) ด้าน HOT ทุกห้อง (กติกาตัวหารเดียวกัน)" "$n" "0"
 n=$($Q -c "select x->>'note' from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='TW';")
 okc "⭐ ถ้อยคำ TW = 'หลักฐานไม่เพียงพอ' (มติครู 7 ก.ย. — ไม่ใช่ 'ไม่มีการประเมิน')" "$n" "หลักฐานไม่เพียงพอ"
 n=$($Q -c "select (x->>'status')||'/'||(x->>'n_rows') from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='CM';")

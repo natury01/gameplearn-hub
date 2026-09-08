@@ -253,7 +253,8 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
   function render() {
     const s = S.sum, rows = S.rows || [];
     if (!s) return;
-    const ach = s.ach || {}, comps = s.comps || [], units = s.units || [];
+    const ach = s.ach || {}, comps = s.comps || [];
+    let units = s.units || [];
     const nAch = Number(ach.n || 0);
 
     /* ⚠️ เขียนบรรทัด "กำลังดู…" ตรงนี้ ก่อนทางแยกทุกทาง — ไม่ใช่ท้ายฟังก์ชัน
@@ -291,7 +292,7 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
       + '</div>'
       /* [V.1.6.41 · ตรวจ C-P0-4] หน้านี้ต้องบอกนิยามของตัวเอง — "ผลสัมฤทธิ์" ที่นี่ = คะแนนเก็บสะสม ไม่ใช่คะแนนสอบหลังเรียน (ซึ่งอยู่ในหน้าครู/เล่ม) */
       + '<div class="muted small" style="margin:-2px 0 10px">ผลสัมฤทธิ์ในหน้านี้ = <b>คะแนนเก็บสะสมทุกด่านของเกม</b>'
-      +   ((s.full_marks || []).length ? ' (เต็ม ' + esc((s.full_marks || []).map((f) => f.max_score).join(' / ')) + ')' : '')
+      +   ((s.full_marks || []).length ? ' (เต็ม ' + esc((s.full_marks || []).map((f) => (f.game ? f.game + ' ' : '') + f.max_score).join(' · ')) + ')' : '')
       +   ' — ไม่ใช่คะแนนแบบทดสอบหลังเรียน · 1 รายการ = ผู้เรียน 1 คนต่อ 1 เกม</div>';
 
     /* [V.1.6.8] เดิมเช็คแค่จำนวนใบผลสัมฤทธิ์ — ห้องที่ครูเพิ่งเริ่มใช้จะมีแต่ใบสมรรถนะ
@@ -377,8 +378,16 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
             ที่ HUB ยื่นเข้าสัญกรณ์กลาง P-HUB-10) */
       /* [V.1.6.41 · ตรวจ C-P0-5] คีย์ขึ้นต้น _ = รายการประกอบตามสัญญาเกม (ภาคผนวกรอบ 2) — หน้าสาธารณะเคยปล่อยชื่อดิบ `_boss`
          ขึ้นจอและปนเข้ากราฟรายด่าน · ชื่อไทยชุดเดียวกับ teacher.html UNIT_LABEL (ของค้าง P-HUB-14: ควรย้ายไป gp-core.js) */
+      /* [V.1.6.42] ป้ายแยกตามเกม — เพดานซ่อม 21 เป็นกติกาภาค 1 · ภาค 2 รุ่นเก่าเคยส่ง _cap24 (คะแนนดิบด่านกาญ 2050 เต็ม 24) */
       const AUX_LABEL = { _boss: 'คะแนนสอบปีศาจข้อสอบ ที่ผู้เรียนได้รับ (เต็ม 30 · สอบซ่อมกดเพดาน 21)',
-                          _boss_first: 'คะแนนสอบปีศาจข้อสอบ ครั้งแรก (เต็ม 30 · ใช้ในงานวิจัย)' };
+                          _boss_first: 'คะแนนสอบปีศาจข้อสอบ ครั้งแรก (เต็ม 30 · ใช้ในงานวิจัย)',
+                          _cap24: 'ภารกิจกาญจนบุรี 2050 คะแนนดิบ (เต็ม 24)' };
+      const AUX_LABEL_P2 = { _boss: 'คะแนนสอบบอส ที่ผู้เรียนได้รับ (เต็ม 30 · ภาค 2)' };
+      const auxLabel = (x) => (String(x.game_code || '').indexOf('-p2') >= 0 && AUX_LABEL_P2[String(x.name)])
+        || AUX_LABEL[String(x.name)] || String(x.name).replace(/^_/, '');
+      /* [V.1.6.42] ยาม <5 รายช่อง — ชั้นที่สอง (SQL 104 กรองที่ต้นทางแล้ว) · บอกจำนวนที่ซ่อนแทนหายเงียบ */
+      const smallN = units.filter((x) => Number(x.n || 0) < 5).length;
+      units = units.filter((x) => Number(x.n || 0) >= 5);
       const auxRows = units.filter((x) => String(x.name || '').charAt(0) === '_');
       const unitRows = units.filter((x) => String(x.name || '').charAt(0) !== '_');
       const uAll = unitRows.map((x) => {
@@ -424,10 +433,11 @@ html[data-theme="dark"] .viz { --s1: #3987e5; --s2: #d95926; --gridline: rgba(25
             : '')
         + (auxRows.length
             ? '<div class="muted small" style="margin-top:10px"><b>รายการประกอบ (ไม่รวมในคะแนนเก็บ)</b></div>'
-              + table(auxRows.map((x) => ({ game: x.game || '', name: AUX_LABEL[String(x.name)] || String(x.name).replace(/^_/, ''), avg: x.avg, n: x.n })),
+              + table(auxRows.map((x) => ({ game: x.game || '', name: auxLabel(x), avg: x.avg, n: x.n })),
                       (!oneGame ? [['เกม', (r) => r.game || '—']] : []).concat([['รายการ', (r) => r.name], ['ค่าเฉลี่ย', (r) => r.avg], ['จำนวนรายการ', (r) => r.n]]))
               + '<div class="muted small" style="margin-top:4px">คะแนนสอบที่ผู้เรียนได้รับ นับการสอบซ่อมแบบกดเพดาน 21 — ตัวเลขผลสัมฤทธิ์ในงานวิจัยใช้คะแนนสอบครั้งแรก (ดูในหน้าครู)</div>'
             : '')
+        + (smallN ? '<div class="muted small" style="margin-top:6px">ไม่แสดง ' + smallN + ' ช่องที่มีน้อยกว่า 5 รายการ (กติกากลุ่มเล็ก)</div>' : '')
         + '</section>';
     }
 

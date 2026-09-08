@@ -387,3 +387,24 @@ export const visitDaily = [
   { day: '2026-08-23', page: 'dashboard', game_code: null, device: 'mobile', source: 'hub', views: 5, visitors: 4 },
   { day: '2026-08-23', page: 'gameopen', game_code: 'g-alpha', device: 'mobile', source: 'qr', views: 9, visitors: 7 },
 ];
+
+/* [V.1.6.46] แถวจาก v_student_boss_pair (ขอครูรัน_106) — 5 คนในห้อง R1 (studentsBoss3)
+   คาดหวัง: ครั้งแรกผ่าน 2/5 (S2 21 · S5B 22) · ครั้งสุดท้ายผ่าน 4/5 (S4B 20 ตก) · เฉลี่ย 14.60 → 25.00 (+10.40)
+   สูงขึ้น 4 · เท่าเดิม 1 · ต่ำลง 0 · ครั้งต่อคน [6,1,12,3,2] ⇒ มัธยฐาน 3 · พิสัย 1–12 · แจกแจง 1/2–4/5–9/≥10 = 1/2/1/1 */
+export const bossPair5 = [
+  { classroom_id: R1, student_id: S1,  game_id: G1, game_code: 'kanchanaburi2050', first_score: 10, last_score: 25, first_at: '2026-07-23T02:14:00Z', last_at: '2026-08-28T04:15:00Z', n_exams: 6 },
+  { classroom_id: R1, student_id: S2,  game_id: G1, game_code: 'kanchanaburi2050', first_score: 21, last_score: 21, first_at: '2026-08-28T04:18:00Z', last_at: '2026-08-28T04:18:00Z', n_exams: 1 },
+  { classroom_id: R1, student_id: S3B, game_id: G1, game_code: 'kanchanaburi2050', first_score: 5,  last_score: 29, first_at: '2026-08-07T03:58:00Z', last_at: '2026-08-26T07:30:00Z', n_exams: 12 },
+  { classroom_id: R1, student_id: S4B, game_id: G1, game_code: 'kanchanaburi2050', first_score: 15, last_score: 20, first_at: '2026-08-26T03:24:00Z', last_at: '2026-08-28T04:16:00Z', n_exams: 3 },
+  { classroom_id: R1, student_id: S5B, game_id: G1, game_code: 'kanchanaburi2050', first_score: 22, last_score: 30, first_at: '2026-08-26T07:12:00Z', last_at: '2026-08-28T04:20:00Z', n_exams: 2 },
+  /* [ผู้ตรวจอิสระ 22:5x] แถวเกมภาค 2 ของ S1 (game_code -p2) — ถ้าหลุดเข้าการ์ด S1 จะกลายเป็น 1 → 1 (ครั้งสุดท้ายผ่านเหลือ 3/5 · เฉลี่ยเปลี่ยน) */
+  { classroom_id: R1, student_id: S1, game_id: G2, game_code: 'kanchanaburi2050-p2', first_score: 1, last_score: 1, first_at: '2026-07-01T00:00:00Z', last_at: '2026-09-01T00:00:00Z', n_exams: 9 },
+  /* แถวของห้องอื่น — ต้องไม่ถูกนับเมื่อดูห้อง R1 */
+  { classroom_id: 'bbbbbbbb-0000-4000-8000-000000000002', student_id: 'cccccccc-0000-4000-8000-000000000099', game_id: G1, game_code: 'kanchanaburi2050', first_score: 30, last_score: 30, first_at: '2026-08-01T00:00:00Z', last_at: '2026-08-01T00:00:00Z', n_exams: 1 },
+];
+/* [V.1.6.46] ใบผล .82 ครบทุกคน (นิยาม ข — เกมส่ง _boss_first ทุกคนที่มีแถวสอบ) ⇒ การ์ดผลสัมฤทธิ์ต้องขึ้นป้าย "นิยาม ข" ไม่ใช่ "คะแนนสูงสุด" และไม่มีบรรทัด "ไม่ทราบ" */
+export const achieveV82 = [S1, S2, S3B, S4B, S5B].map((sid, i) => ({
+  student_id: sid, classroom_id: R1, game_id: G1, game_name: 'กาญจนบุรี 2050', game_version: 'V.7.99.82-IX2050-2569.104',
+  score: 90, max_score: 130, percent: 69.2, grade_label: 'พอใช้', progress_percent: 70,
+  unit_scores: { '1': 9, _boss: 21, _boss_first: [12, 21, 5, 15, 22][i] }, criteria_note: null, is_legacy: false,
+}));

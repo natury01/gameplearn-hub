@@ -146,6 +146,8 @@ export async function stub(page, opt = {}) {
     /* [V.1.6.40] opt.events — ฉีดแถว events (เช่น kind=boss) ให้การ์ดผลสัมฤทธิ์จากแบบทดสอบ */
     if (has('events')) return opt.events ? json(inIds(opt.events, 'student_id')) : json([], 200, { 'content-range': '0-0/7' });
     if (has('v_classroom_game_summary')) return json(inIds(F.summary, 'classroom_id'));
+    /* [V.1.6.46] opt.bossPair — มุมมองคู่ก่อน→หลัง (ขอครูรัน_106) · opt.no106 = ฐานยังไม่ได้รัน */
+    if (has('v_student_boss_pair')) return opt.no106 ? gone() : json(inIds(opt.bossPair || [], 'classroom_id'));
     if (has('v_student_achievement')) {
       if (opt.has43 === false) return gone();
       /* [V.1.6.21] opt.achieve — ให้เทสต์ฉีดชุดใบผลสัมฤทธิ์ของตัวเองได้

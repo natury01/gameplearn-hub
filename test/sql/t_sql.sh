@@ -1380,6 +1380,28 @@ n=$($Q -c "select count(*) from classrooms where id='$RX';")
 ok "[.42 ก] แถวห้องยังอยู่ในตาราง (ธง ≠ ลบ)" "$n" "1"
 n=$($Q -c "begin; set local role anon; select count(*) from pub_room_exclusions; rollback;" 2>&1 | grep -c "permission denied")
 ok "[.42 ก] anon อ่านทะเบียนห้องทดสอบไม่ได้" "$n" "1"
+# [V.1.6.46 · AUDIT 21:2x + PLAN 20:4x] v_student_boss_pair — คู่ "ครั้งแรกที่บันทึกไว้ → ครั้งสุดท้ายที่บันทึกไว้" แหล่งเดียวของหน้าครูและเล่ม
+n=$($Q -c "begin; insert into events (student_id, game_id, kind, score, created_at) values
+   ('$SA','$GID','boss',12,'2026-07-23 09:14+07'),('$SA','$GID','boss',25,'2026-08-07 10:53+07'),('$SA','$GID','boss',28,'2026-08-28 11:15+07');
+   select first_score||'/'||last_score||'/'||n_exams from v_student_boss_pair where student_id='$SA' and game_id='$GID'; rollback;")
+ok "⭐ [.46] คู่ก่อนหลัง = แถวแรกสุด 12 · แถวสุดท้าย 28 · 3 ครั้ง (ไม่ใช่ max ไม่ใช่เลขครั้ง)" "$n" "12/28/3"
+n=$($Q -c "begin; insert into events (student_id, game_id, kind, score, created_at) values ('$SA','$GID','boss',29,'2026-08-07 10:53+07'),('$SA','$GID','boss',5,'2026-08-28 11:15+07');
+   select first_score||'/'||last_score from v_student_boss_pair where student_id='$SA' and game_id='$GID'; rollback;")
+ok "[.46] ครั้งสุดท้ายต่ำกว่าครั้งแรกก็รายงานตามจริง (29 → 5) — ไม่หยิบค่าที่ดีกว่า" "$n" "29/5"
+n=$($Q -c "begin; with a as (insert into attempts (student_id, game_id, game_version) values ('$SA','$GID','V.8.84-p2-2569.148') returning id)
+   insert into events (attempt_id, student_id, game_id, kind, score, created_at) select id,'$SA','$GID','boss',30,'2026-09-01 10:00+07' from a;
+   insert into events (student_id, game_id, kind, score, created_at) values ('$SA','$GID','boss',12,'2026-07-23 09:14+07');
+   select first_score||'/'||last_score||'/'||n_exams from v_student_boss_pair where student_id='$SA' and game_id='$GID'; rollback;")
+ok "[.46] แถวภาค 2 (attempts.game_version มี -p2-) ไม่ถูกนับในคู่" "$n" "12/12/1"
+n=$($Q -c "begin; insert into events (student_id, game_id, kind, score, created_at) values ('$SA','$GID','boss',null,'2026-07-01 09:00+07'),('$SA','$GID','boss',35,'2026-07-02 09:00+07');
+   select first_score||'/'||n_exams from v_student_boss_pair where student_id='$SA' and game_id='$GID'; rollback;")
+ok "[.46] แถว score null ไม่นับ · คะแนนเกิน 30 ถูกตัดที่ 30" "$n" "30/1"
+n=$($Q -c "select count(*) from v_student_boss_pair where student_id='$SA';")
+ok "[.46] ไม่มีแถวสอบ = ไม่มีแถวใน view (ไม่ใช่แถวศูนย์)" "$n" "0"
+n=$($Q -c "begin; set local role anon; select count(*) from v_student_boss_pair; rollback;" 2>&1 | grep -c "permission denied")
+ok "[.46] anon อ่านมุมมองคู่ไม่ได้ (เฉพาะครูที่ล็อกอิน)" "$n" "1"
+n=$($Q -c "select count(*) from information_schema.columns where table_name='v_student_boss_pair' and column_name in ('first_name','last_name','character_name');")
+ok "[.46] มุมมองคู่ไม่มีคอลัมน์ชื่อ" "$n" "0"
 n=$($Q -c "select x->>'note' from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='TW';")
 okc "⭐ ถ้อยคำ TW = 'หลักฐานไม่เพียงพอ' (มติครู 7 ก.ย. — ไม่ใช่ 'ไม่มีการประเมิน')" "$n" "หลักฐานไม่เพียงพอ"
 n=$($Q -c "select (x->>'status')||'/'||(x->>'n_rows') from jsonb_array_elements(rpc_pub_summary(null,null,null,null,null)->'comps') x where x->>'code'='CM';")

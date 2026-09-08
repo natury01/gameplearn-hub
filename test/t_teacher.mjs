@@ -761,5 +761,49 @@ console.log('\n═══ 15) [V.1.6.45] ครูสั่ง 4 ข้อ 8 ก.
     /\.in\{[^}]*justify-content:space-between[^}]*\}/.test(src) && !/\.sign\{margin-top:auto/.test(src) && /\.sign\{margin-top:0/.test(src));
 }
 
+console.log('\n═══ 16) [V.1.6.46] การ์ดคู่ ครั้งแรก→ครั้งสุดท้าย (view เดียว) · ป้ายผลสัมฤทธิ์ตามรุ่นใบ .82 ═══');
+{
+  const { p, calls } = await open({ bossPair: F.bossPair5, achieve: F.achieveV82, students: F.studentsBoss3 }, '#/room/' + F.R1);
+  await p.click('[data-tab="research"]'); await sleep(900);
+  const t = await p.evaluate(() => {
+    const pair = document.querySelector('[id^="rs-bosspair-"]'), top = document.querySelector('.rs-top');
+    return { pair: pair ? pair.textContent : '', boss: (document.querySelector('[id^="rs-boss70-"]') || {}).textContent || '',
+      before: !!(pair && top && (pair.compareDocumentPosition(top) & Node.DOCUMENT_POSITION_FOLLOWING)) };
+  });
+  ok('⭐ การ์ดคู่มี และอ่านจาก view v_student_boss_pair — ไม่ยิง events kind=boss เอง (กติกา .42)',
+    t.pair.length > 0 && calls.some((c) => /v_student_boss_pair/.test(c[1])) && !calls.some((c) => /events\?kind=eq\.boss/.test(c[1])));
+  ok('⭐ ครั้งแรก 2 จาก 5 · ครั้งสุดท้าย 4 จาก 5 — ฐานเดียวกัน แถวห้องอื่นและแถวเกมภาค 2 (-p2) ไม่ปน',
+    /ครั้งแรกที่บันทึกไว้:[^]*?2 จาก 5 คน/.test(t.pair) && /ครั้งสุดท้ายที่บันทึกไว้:[^]*?4 จาก 5 คน/.test(t.pair), t.pair.slice(0, 260));
+  ok('เฉลี่ย 14.60 → 25.00 · ต่างเฉลี่ย +10.40 (ร้อยละแสดงได้เพราะฐาน 5)', /14\.60/.test(t.pair) && /25\.00/.test(t.pair) && /\+10\.40/.test(t.pair) && /%/.test(t.pair), t.pair.slice(0, 400));
+  ok('สูงขึ้น 4 · เท่าเดิม 1 · ต่ำลง 0 · ยังไม่ถึงเกณฑ์แม้สอบซ้ำ 1 (ห้ามตัดประโยคนี้ — PLAN)',
+    /สูงขึ้น 4 คน/.test(t.pair) && /เท่าเดิม 1 คน/.test(t.pair) && /ต่ำลง 0 คน/.test(t.pair) && /ยังไม่ถึงเกณฑ์แม้สอบซ้ำ 1 คน/.test(t.pair));
+  ok('จำนวนครั้ง: มัธยฐาน 3 (พิสัย 1–12) · แจกแจง 1/2/1/1', /มัธยฐาน 3 ครั้ง \(พิสัย 1–12\)/.test(t.pair)
+    && /สอบ 1 ครั้ง 1 คน · 2–4 ครั้ง 2 คน · 5–9 ครั้ง 1 คน · 10 ครั้งขึ้นไป 1 คน/.test(t.pair), t.pair.slice(300, 700));
+  ok('⭐ การ์ดคู่อยู่ก่อน .rs-top (สิ่งแรกของชั้นสรุป — AUDIT)', t.before === true);
+  ok('ไม่มีคำต้องห้ามในการ์ดคู่ (ก่อนเรียน/หลังเรียน/รายบุคคล/pre-test/post-test)', !/ก่อนเรียน|หลังเรียน|รายบุคคล|pre-?test|post-?test/i.test(t.pair));
+  ok('ป้ายบังคับอยู่ในการ์ด: ชุดข้อสอบเดิม 30 ข้อ · ร่วมกันบนเครื่องเดียว · องค์ประกอบกลุ่ม · ไม่ใช้เลขครั้งของเครื่อง',
+    /ชุดข้อสอบเดิม 30 ข้อ/.test(t.pair) && /ร่วมกันบนเครื่องเดียว/.test(t.pair) && /องค์ประกอบกลุ่ม/.test(t.pair) && /ไม่ใช้เลขครั้งของเครื่อง/.test(t.pair));
+  ok('⭐ ใบผล .82 ทุกคน → ป้ายการ์ดผลสัมฤทธิ์บอก "นิยาม ข" และไม่มี "คะแนนสูงสุด"', /นิยาม ข/.test(t.boss) && !/คะแนนสูงสุด/.test(t.boss), t.boss.slice(-400));
+  ok('ใบ .82 ทุกคนมีช่อง → ไม่มีบรรทัด "ไม่ทราบคะแนนครั้งที่ 1" · ของผู้มีคะแนน 2 จาก 5 (S2 21 · S5B 22)', !/ไม่ทราบคะแนนครั้งที่ 1/.test(t.boss) && /2 จาก 5 คน/.test(t.boss), t.boss.slice(0, 300));
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+{
+  /* ฐาน < 5 → จำนวนเท่านั้น · ใบผลปน .80/.82 → เห็นทั้งสองบรรทัด · ฐานยังไม่รัน 106 → บอกตรง ๆ ไม่พัง */
+  const { p, calls } = await open({ bossPair: F.bossPair5.slice(0, 4), achieve: F.achieveBossFirst.concat([F.achieveV82[0]]), students: F.studentsBoss3 }, '#/room/' + F.R1);
+  await p.click('[data-tab="research"]'); await sleep(900);
+  const t = await p.evaluate(() => ({ pair: (document.querySelector('[id^="rs-bosspair-"]') || {}).textContent || '', boss: (document.querySelector('[id^="rs-boss70-"]') || {}).textContent || '' }));
+  ok('⭐ ฐาน 4 คน → แสดงจำนวน ไม่มีเครื่องหมาย % ในการ์ดคู่ และบอกว่าฐานต่ำกว่า 5', /จาก 4 คน/.test(t.pair) && !/%/.test(t.pair) && /ฐานต่ำกว่า 5 คน/.test(t.pair), t.pair.slice(0, 300));
+  ok('ใบผลปนรุ่น (.76/.79/.80 + .82) → เห็นทั้งป้าย "นิยาม ข" และป้าย "คะแนนสูงสุด" พร้อมคำแนะนำอัปใบผล', /นิยาม ข/.test(t.boss) && /คะแนนสูงสุด/.test(t.boss) && /รุ่นก่อน \.82/.test(t.boss), t.boss.slice(-500));
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+  const { p: p2, calls: c2 } = await open({ no106: true, students: F.studentsBoss3 }, '#/room/' + F.R1);
+  await p2.click('[data-tab="research"]'); await sleep(900);
+  const t2 = await p2.evaluate(() => ({ pair: (document.querySelector('[id^="rs-bosspair-"]') || {}).textContent || '', top: !!document.querySelector('.rs-top') }));
+  ok('ฐานยังไม่รัน 106 → การ์ดคู่บอก "ขอครูรัน_106" · ชั้นสรุปที่เหลือยังขึ้นปกติ', /ขอครูรัน_106/.test(t2.pair) && t2.top === true, t2.pair);
+  ok('สคริปต์ไม่พัง (view หาย = 404 ที่ถูกกลืนอย่างตั้งใจ)', realErrors(c2).length === 0, realErrors(c2));
+  await p2.close();
+}
+
 await b.close(); srv.close();
 process.exit(ok.done());

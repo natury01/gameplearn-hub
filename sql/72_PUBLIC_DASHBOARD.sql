@@ -634,6 +634,40 @@ $fn$;
 revoke all on function public.rpc_pub_breakdown(text, uuid, text, text, text, uuid) from public;
 grant execute on function public.rpc_pub_breakdown(text, uuid, text, text, text, uuid) to anon, authenticated;
 
+-- ============================================================
+-- [V.1.6.46 · 8 ก.ย. 2569 ค่ำ] v_student_boss_pair — คู่ "ครั้งแรกที่บันทึกไว้ → ครั้งสุดท้ายที่บันทึกไว้" ของด่าน 8
+--   นิยามตรึงล่วงหน้าโดย [PLAN] 8 ก.ย. 20:4x · รับรองโดย [AUDIT] 21:2x · มติครู 21:2x ("ไปถึงเกณฑ์หรือไม่ และใช้กี่ครั้ง")
+--   ก่อน  = แถวบอสแถวแรกสุดตามเวลาของผู้เรียน (= นิยาม ข ที่ครูเคาะ)
+--   หลัง  = แถวบอสแถวสุดท้ายตามเวลาของผู้เรียนคนเดียวกัน · ฐานเดียวกัน (ทุกคนที่มีแถวสอบ)
+--   ⛔ ไม่ใช้ attemptNo (ตัวนับของเบราว์เซอร์ — รอบสิบเอ็ด) · ⛔ ไม่ใช้ max · ⛔ ไม่ใช้ _boss (มีเพดานซ่อม 21)
+--   แหล่งเดียว: หน้าครู (การ์ดคู่ .46) และเล่ม (ครูรัน_รอบสิบสอง) ใช้สูตรเดียวกันจากที่นี่ — เว็บกลางไม่คิดจาก events เอง (กติกา .42)
+--   ตัดแถวภาค 2 ด้วย attempts.game_version (-p2-) · คะแนนถูกตัดที่ 0–30 · ไม่มีคอลัมน์ชื่อ · security_invoker ⇒ RLS ของ events/students บังคับต่อ
+-- ============================================================
+create or replace view public.v_student_boss_pair
+with (security_invoker = on) as
+with b as (
+  select e.student_id, e.game_id, e.created_at,
+         least(30, greatest(0, e.score::numeric)) as sc,
+         row_number() over (partition by e.student_id, e.game_id order by e.created_at, e.id) as rk,
+         count(*)     over (partition by e.student_id, e.game_id) as n
+    from public.events e
+    left join public.attempts a on a.id = e.attempt_id
+   where e.kind = 'boss' and e.score is not null
+     and coalesce(a.game_version, '') not like '%-p2-%'
+)
+select s.classroom_id, b.student_id, b.game_id, g.code as game_code,
+       max(b.sc) filter (where b.rk = 1)   as first_score,
+       max(b.sc) filter (where b.rk = b.n) as last_score,
+       min(b.created_at) as first_at,
+       max(b.created_at) as last_at,
+       max(b.n)::int     as n_exams
+  from b
+  join public.students s on s.id = b.student_id
+  join public.games    g on g.id = b.game_id
+ group by s.classroom_id, b.student_id, b.game_id, g.code;
+revoke all on public.v_student_boss_pair from public, anon;
+grant select on public.v_student_boss_pair to authenticated;
+
 notify pgrst, 'reload schema';
 
 
@@ -664,7 +698,9 @@ select '⚠️ view ภายใน v_pub_rooms ต้อง **ไม่** ใ�
        case when has_table_privilege('anon','public.v_pub_rooms','select')
             then '❌ อ่านได้ — ผิด' else '✅ อ่านไม่ได้ (ถูกต้อง)' end
 union all
-select 'ห้องที่นับเข้าหน้าสาธารณะตอนนี้', (select count(*)::text from public.v_pub_rooms);
+select 'ห้องที่นับเข้าหน้าสาธารณะตอนนี้', (select count(*)::text from public.v_pub_rooms)
+union all
+select '[.46] มุมมองคู่ก่อน→หลัง v_student_boss_pair', case when to_regclass('public.v_student_boss_pair') is not null then '✅ มี' else '❌ ไม่มี' end;
 
 -- ► ทดลอง: select public.rpc_pub_summary();
 --   ต้องได้ ach/comps/units ครบ และไม่มีชื่อนักเรียนโผล่มาสักตัว
@@ -677,6 +713,7 @@ select 'ห้องที่นับเข้าหน้าสาธารณ
 -- drop function if exists public.rpc_pub_summary(uuid, text, text, text, uuid);
 -- drop function if exists public.rpc_pub_filters();
 -- drop view if exists public.v_pub_rooms;
+-- drop view if exists public.v_student_boss_pair;   -- [V.1.6.46] การ์ดคู่บนหน้าครูจะขึ้นว่ายังไม่ได้รัน 106
 -- ⚠️ ไม่มีตารางหรือข้อมูลใดถูกแตะในไฟล์นี้ — ย้อนกลับแล้วไม่มีอะไรเสีย
 --    (หน้า dashboard.html จะขึ้นกล่องบอกว่ายังไม่ได้รันไฟล์นี้ ส่วนหน้าอื่นไม่กระทบ)
 -- ============================================================

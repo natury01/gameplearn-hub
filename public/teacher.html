@@ -1390,6 +1390,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      แล้วลอกสูตร — ติดสามจุด: สะกด attemptNo เดียว · ไม่มีเพดาน · ไม่แยกภาค ⇒ เลข 86.1/59.4 รูปเดียวกัน)
      ไม่มีช่อง ⇒ "รอใบผลรุ่นใหม่" ไม่ถอยไปคำนวณเอง · ใบภาค 2 (-p2-) ไม่นับ — คนละเครื่องมือวัด
      หลัก: เกมเป็นเจ้าของเนื้อหา · เว็บกลางเป็นเจ้าของการแสดงผล · ตัวเลขหนึ่งตัวมีที่คำนวณเดียว */
+  /* อันดับรุ่นย่อยของใบผลภาค 1: 'V.7.99.80-IX2050-2569.102' → 80 · อ่านไม่ได้ → 0 (ถือเป็นใบเก่า) */
+  const bossVerRank = (v) => { const m = /^V\.7\.99\.(\d+)/.exec(String(v || '')); return m ? Number(m[1]) : 0; };
   function rsBoss70Card(cid, stu) {
     const sids = new Set(stu.map((s) => s.id));
     const rows = (S.achieve || []).filter((r) => sids.has(r.student_id) && !isP2(r.game_version)
@@ -1398,11 +1400,16 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const per = {};
     rows.forEach((r) => {
       const u = r.unit_scores; let f = num(u._boss_first); const bb = num(u._boss);
-      const cur = per[r.student_id] || { fst: null, hasBoss: false, zeroDefault: false };
-      /* [V.1.6.43 · รอบหก 8 ก.ย. · กฎ ก2] เกม .79 ส่ง _boss_first = 0 เป็นค่าตั้งต้นเมื่อไม่พบแถวสอบครั้งที่ 1
-         (clsBossScore ตั้ง fst=0) — "ไม่มีหลักฐาน ≠ 0" ⇒ ถ้า 0 แต่มีคะแนนสอบที่ได้รับ (>0) ถือว่า "ไม่ทราบครั้งที่ 1" ไม่เข้าฐาน
-         ไม่ใช่การคำนวณใหม่ — เป็นการอ่านค่าตั้งต้นให้ถูกความหมาย · หายเองเมื่อเกมส่ง null แทน 0 (ข13 · P-CODE-10) */
-      if (f === 0 && bb != null && bb > 0) { f = null; cur.zeroDefault = true; }
+      const cur = per[r.student_id] || { fst: null, hasBoss: false, unknownFirst: false };
+      const ver = bossVerRank(r.game_version);
+      /* [V.1.6.44 · คำชี้ขาด AUDIT 8 ก.ย. 15:0x] ⛔ ห้ามฝังกฎ "0 ⇒ ไม่ทราบ" ถาวร (เด็กที่สอบครั้งแรกได้ 0 จริงมีได้)
+         อ่านตามรุ่นใบผล:
+           ≥ .80 — เกมส่ง null เมื่อไม่พบครั้งที่ 1 และไม่ส่งคีย์ ⇒ ไม่มี _boss_first แต่มี _boss = "ไม่ทราบครั้งที่ 1 (เกมระบุ)" · มีค่า (รวม 0) = เชื่อตรง ๆ
+           = .79 — ค่าตั้งต้น 0 ยังหลุดมา (clsBossScore fst=0) ⇒ 0 ∧ _boss>0 = "ไม่ทราบ" **เฉพาะรุ่นนี้** (ยืนยันจาก events รอบหก 8 ก.ย.: ไม่มีแถวครั้งที่ 1 ทั้งสองสะกด)
+                   ⏳ ถอดสาขานี้ได้เมื่อไม่มีใบ .79 เหลือในฐาน (ครูอัป .80 + เปิดหน้าครูในเกม)
+           < .79 — ไม่มีช่องนี้เลย ⇒ "รอใบผลรุ่นใหม่" */
+      if (ver >= 80) { if (f == null && bb != null) cur.unknownFirst = true; }
+      else if (ver === 79) { if (f === 0 && bb != null && bb > 0) { f = null; cur.unknownFirst = true; } }
       if (f != null) cur.fst = f;
       if (f != null || bb != null) cur.hasBoss = true;
       per[r.student_id] = cur;
@@ -1410,8 +1417,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     const list = Object.keys(per).map((k) => per[k]);
     const tested = list.filter((x) => x.fst != null), n = tested.length;
     const pass = tested.filter((x) => x.fst >= BOSS_PASS).length;
-    const zeroDef = list.filter((x) => x.fst == null && x.zeroDefault).length;
-    const waiting = list.filter((x) => x.fst == null && x.hasBoss && !x.zeroDefault).length;   /* ใบเก่าก่อน .79 — มี _boss แต่ไม่มี _boss_first */
+    const zeroDef = list.filter((x) => x.fst == null && x.unknownFirst).length;
+    const waiting = list.filter((x) => x.fst == null && x.hasBoss && !x.unknownFirst).length;   /* ใบเก่าก่อน .79 — มี _boss แต่ไม่มี _boss_first */
     const notYet = stu.length - list.filter((x) => x.hasBoss).length;
     const pc = (x, y) => y >= 5 ? (x / y * 100).toFixed(1) + '%' : x + ' คน';
     let body;
@@ -1423,8 +1430,8 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
         + '<div class="small muted">ยังไม่ได้ทำแบบทดสอบ ' + notYet + ' คน จาก ' + stu.length + ' คนในห้อง</div>'
         + (waiting ? '<div class="small">⏳ รอใบผลรุ่นใหม่ ' + waiting + ' คน — ใบผลของกลุ่มนี้ส่งจากเกมรุ่นก่อน V.7.99.79 ยังไม่มีช่องคะแนนครั้งแรก'
                    + ' · เปิดหน้าครูในเกมหนึ่งครั้ง แล้วกด 🔄 อัปเดตผลจากเกม</div>' : '')
-        + (zeroDef ? '<div class="small">❔ ไม่ทราบคะแนนครั้งแรก ' + zeroDef + ' คน — ใบผลระบุครั้งแรก 0 ทั้งที่มีคะแนนสอบ (ระบบไม่พบการสอบครั้งที่ 1 ของกลุ่มนี้)'
-                   + ' · ไม่นับเข้าฐาน ไม่นับเป็น 0 · รอเกมปรับการส่งค่า</div>' : '');
+        + (zeroDef ? '<div class="small">❔ ไม่ทราบคะแนนครั้งที่ 1 · ' + zeroDef + ' คน (ยืนยันจาก events: ฐานไม่มีบันทึกการสอบครั้งที่ 1 ของกลุ่มนี้)'
+                   + ' — ไม่นับเข้าฐาน และไม่นับเป็นคะแนนศูนย์</div>' : '');
     }
     return '<div class="card" id="rs-boss70-' + (cid || 'all') + '"><b>📝 ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน</b> '
       + '<span class="small muted">(ด่าน 8 ปีศาจข้อสอบ · เต็ม ' + BOSS_FULL + ' · คะแนนสอบครั้งแรก — เกมเป็นผู้คิด เว็บกลางอ่านอย่างเดียว)</span>'

@@ -143,8 +143,22 @@ export const compDimsRS = compDims.concat([
 /* [V.1.6.42] การ์ดผลสัมฤทธิ์อ่าน unit_scores._boss_first ที่เกมคำนวณ — S1 ใบ .79 (25 ผ่าน) · S2 ใบเก่า .76 (มี _boss ไม่มี _boss_first = รอใบผลรุ่นใหม่)
    · S2 ยังมีใบภาค 2 ที่มี _boss_first 30 — ต้องไม่ถูกนับ (คนละเครื่องมือวัด · ถ้าหลุดจะกลายเป็นผ่าน 2 จาก 2) */
 export const S3B = 'cccccccc-0000-4000-8000-000000000003';
-export const studentsBoss3 = studentsAllOn.concat([{ ...studentsAllOn[0], id: S3B, student_number: '3', first_name: 'สมศักดิ์', last_name: 'ไม่พบครั้งแรก' }]);
+export const S4B = 'cccccccc-0000-4000-8000-000000000004';
+export const S5B = 'cccccccc-0000-4000-8000-000000000005';
+export const studentsBoss3 = studentsAllOn.concat([
+  { ...studentsAllOn[0], id: S3B, student_number: '3', first_name: 'สมศักดิ์', last_name: 'ไม่พบครั้งแรก' },
+  { ...studentsAllOn[0], id: S4B, student_number: '4', first_name: 'สมพร', last_name: 'ใบแปดศูนย์ไม่มีช่อง' },
+  { ...studentsAllOn[0], id: S5B, student_number: '5', first_name: 'สมใจ', last_name: 'ศูนย์จริง' },
+]);
 export const achieveBossFirst = [
+  /* S4B: ใบ .80 — เกมส่ง null และไม่ส่งคีย์ _boss_first ⇒ "ไม่ทราบครั้งที่ 1 (เกมระบุ)" ไม่ใช่ "รอใบผลรุ่นใหม่" */
+  { student_id: S4B, classroom_id: R1, game_id: G1, game_name: 'กาญจนบุรี 2050', game_version: 'V.7.99.80-IX2050-2569.102',
+    score: 90, max_score: 130, percent: 69.2, grade_label: 'พอใช้', progress_percent: 70,
+    unit_scores: { '1': 9, _boss: 21 }, criteria_note: null, is_legacy: false },
+  /* S5B: ใบ .80 — _boss_first = 0 จริง (เกม .80 ส่ง 0 เฉพาะเมื่อสอบครั้งแรกได้ 0 จริง) ⇒ ต้องนับเข้าฐานเป็น 0 (ไม่ผ่าน) */
+  { student_id: S5B, classroom_id: R1, game_id: G1, game_name: 'กาญจนบุรี 2050', game_version: 'V.7.99.80-IX2050-2569.102',
+    score: 60, max_score: 130, percent: 46.2, grade_label: 'ยังไม่ถึงเกณฑ์', progress_percent: 60,
+    unit_scores: { '1': 6, _boss: 21, _boss_first: 0 }, criteria_note: null, is_legacy: false },
   /* S3B: เกมส่ง _boss_first = 0 ทั้งที่ _boss = 21 (ค่าตั้งต้นเมื่อไม่พบครั้งที่ 1 — รอบหก) ⇒ ต้องเป็น "ไม่ทราบ" ไม่ใช่ 0 */
   { student_id: S3B, classroom_id: R1, game_id: G1, game_name: 'กาญจนบุรี 2050', game_version: 'V.7.99.79-IX2050-2569.101',
     score: 95, max_score: 130, percent: 73.1, grade_label: 'ดี', progress_percent: 75,

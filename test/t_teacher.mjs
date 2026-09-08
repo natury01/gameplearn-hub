@@ -780,6 +780,17 @@ console.log('\n═══ 16) [V.1.6.46] การ์ดคู่ ครั้ง
   ok('จำนวนครั้ง: มัธยฐาน 3 (พิสัย 1–12) · แจกแจง 1/2/1/1', /มัธยฐาน 3 ครั้ง \(พิสัย 1–12\)/.test(t.pair)
     && /สอบ 1 ครั้ง 1 คน · 2–4 ครั้ง 2 คน · 5–9 ครั้ง 1 คน · 10 ครั้งขึ้นไป 1 คน/.test(t.pair), t.pair.slice(300, 700));
   ok('⭐ การ์ดคู่อยู่ก่อน .rs-top (สิ่งแรกของชั้นสรุป — AUDIT)', t.before === true);
+  /* [V.1.6.47 · ครูสั่ง 23:4x] ตารางระดับ 5 ระดับ + ดีขึ้นไป (ACH_BANDS บน 30) · first [10,21,5,15,22] · last [25,21,29,20,30] */
+  const bands = await p.evaluate(() => Array.from(document.querySelectorAll('#rs-bosspair-bands tbody tr')).map((tr) => Array.from(tr.cells).map((td) => td.textContent.trim())));
+  ok('⭐ [.47] ตารางระดับมี 6 แถว (5 ระดับ + ดีขึ้นไป) ชื่อและช่วงคะแนนบน 30 ถูก (24/21/18/15)', bands.length === 6
+    && bands.map((r) => r[0]).join('|') === 'ยังไม่ถึงเกณฑ์|ผ่าน|พอใช้|ดี|ดีเยี่ยม|ระดับดีขึ้นไป (ถึงเกณฑ์ 21/30)'
+    && bands.map((r) => r[1]).join('|') === '0–14|15–17|18–20|21–23|24–30|21–30', bands);
+  ok('⭐ [.47] ครั้งแรก: ยังไม่ถึง 2 (40.0%) · ผ่าน 1 · พอใช้ 0 · ดี 2 · ดีเยี่ยม 0 · ดีขึ้นไป 2 (40.0%)',
+    bands.map((r) => r[2]).join('|') === '2|1|0|2|0|2' && bands[0][3] === '40.0%' && bands[5][3] === '40.0%', bands);
+  ok('⭐ [.47] ครั้งสุดท้าย: ยังไม่ถึง 0 · ผ่าน 0 · พอใช้ 1 · ดี 1 · ดีเยี่ยม 3 (60.0%) · ดีขึ้นไป 4 (80.0%)',
+    bands.map((r) => r[4]).join('|') === '0|0|1|1|3|4' && bands[4][5] === '60.0%' && bands[5][5] === '80.0%', bands);
+  ok('[.47] ผลรวมทุกระดับ = ฐาน 5 ทั้งสองคอลัมน์ (ไม่มีใครตกหล่น/นับซ้ำ)',
+    bands.slice(0, 5).reduce((s, r) => s + Number(r[2]), 0) === 5 && bands.slice(0, 5).reduce((s, r) => s + Number(r[4]), 0) === 5);
   ok('ไม่มีคำต้องห้ามในการ์ดคู่ (ก่อนเรียน/หลังเรียน/รายบุคคล/pre-test/post-test)', !/ก่อนเรียน|หลังเรียน|รายบุคคล|pre-?test|post-?test/i.test(t.pair));
   ok('ป้ายบังคับอยู่ในการ์ด: ชุดข้อสอบเดิม 30 ข้อ · ร่วมกันบนเครื่องเดียว · องค์ประกอบกลุ่ม · ไม่ใช้เลขครั้งของเครื่อง',
     /ชุดข้อสอบเดิม 30 ข้อ/.test(t.pair) && /ร่วมกันบนเครื่องเดียว/.test(t.pair) && /องค์ประกอบกลุ่ม/.test(t.pair) && /ไม่ใช้เลขครั้งของเครื่อง/.test(t.pair));
@@ -793,7 +804,7 @@ console.log('\n═══ 16) [V.1.6.46] การ์ดคู่ ครั้ง
   const { p, calls } = await open({ bossPair: F.bossPair5.slice(0, 4), achieve: F.achieveBossFirst.concat([F.achieveV82[0]]), students: F.studentsBoss3 }, '#/room/' + F.R1);
   await p.click('[data-tab="research"]'); await sleep(900);
   const t = await p.evaluate(() => ({ pair: (document.querySelector('[id^="rs-bosspair-"]') || {}).textContent || '', boss: (document.querySelector('[id^="rs-boss70-"]') || {}).textContent || '' }));
-  ok('⭐ ฐาน 4 คน → แสดงจำนวน ไม่มีเครื่องหมาย % ในการ์ดคู่ และบอกว่าฐานต่ำกว่า 5', /จาก 4 คน/.test(t.pair) && !/%/.test(t.pair) && /ฐานต่ำกว่า 5 คน/.test(t.pair), t.pair.slice(0, 300));
+  ok('⭐ ฐาน 4 คน → แสดงจำนวน ไม่มีเครื่องหมาย % ในการ์ดคู่ (รวมตารางระดับ: ช่อง % เป็น –) และบอกว่าฐานต่ำกว่า 5', /จาก 4 คน/.test(t.pair) && !/%/.test(t.pair) && /ฐานต่ำกว่า 5 คน/.test(t.pair) && /ระดับดีขึ้นไป/.test(t.pair), t.pair.slice(0, 300));
   ok('ใบผลปนรุ่น (.76/.79/.80 + .82) → เห็นทั้งป้าย "นิยาม ข" และป้าย "คะแนนสูงสุด" พร้อมคำแนะนำอัปใบผล', /นิยาม ข/.test(t.boss) && /คะแนนสูงสุด/.test(t.boss) && /รุ่นก่อน \.82/.test(t.boss), t.boss.slice(-500));
   ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
   await p.close();

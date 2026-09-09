@@ -1247,17 +1247,18 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     /* [V.1.6.40 · ครูสั่ง 7 ก.ย. "หน้าวิจัยไม่สะอาดตา ข้อความผู้พัฒนาเยอะ"] จัดสามชั้น — ย้าย ไม่ลบ:
        ชั้น 1 สรุป (ผลสัมฤทธิ์จากแบบทดสอบ · สมรรถนะ 6 ด้านรายระดับ) · ชั้น 2 รายคน · ชั้น 3 <details> สำหรับตรวจสอบ
        (ทะเบียน 22 องค์ + ที่มา + B4) — กรรมการกดเปิดได้ ไม่หายจากหน้า */
-    html += '<h2 class="section-title">สรุปห้องนี้ <span class="sub">ตัวเลขทุกตัวพกฐาน (เศษ/ส่วน) · ฐานต่ำกว่า 5 คนแสดงจำนวน</span></h2>'
-      /* [V.1.6.45 · ครูสั่ง ข้อ 4] การ์ดผลสัมฤทธิ์สั้น ตารางระดับกว้าง — ให้ 1:2 บนจอกว้าง (css .rs-top) แทน auto-fit ที่แบ่งครึ่งเท่ากัน */
+    html += '<h2 class="section-title">สรุปห้องนี้ <span class="sub">ฐาน = ผู้เรียนทั้งห้อง ' + stu.length + ' คน ทุกตาราง</span></h2>'
+      /* [V.1.6.48 · ครูสั่ง 9 ก.ย. 00:1x ผ่าน HUB] ถอดการ์ด "ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน" (ซ้ำกับการ์ดคู่ทุกบรรทัด) และตัวห่อ .rs-top
+         ⇒ การ์ดสมรรถนะกว้างเต็ม · ทุกตารางในชั้นนี้ใช้ฐาน = ผู้เรียนทั้งห้อง (มติครู 00:12) · ข้อความผู้พัฒนาย้ายลง <details> ท้ายหน้า */
       + rsBossPairCard(cid, stu)
-      + '<div class="grid rs-top">'
-      + rsBoss70Card(cid, stu)
-      + '<div class="card"><b>📊 สมรรถนะ 6 ด้าน — สัดส่วนแต่ละระดับ</b> <span class="small muted">เกณฑ์ผ่าน = ระดับ 5 ขึ้นไป (ครูเคาะ 7 ก.ย. 2569)</span>'
-      + rsLevelDist(dims, stu) + '</div></div>';
+      + '<div class="card"><b>📊 สมรรถนะ 6 ด้าน — สัดส่วนแต่ละระดับ</b> <span class="small muted">เกณฑ์ผ่าน = ระดับ 5 ขึ้นไป</span>'
+      + rsLevelDist(dims, stu) + '</div>';
 
     /* ── D2.① ระดับ + จำนวนหลักฐานในเซลล์เดียว — "สามารถ (3 ชิ้น)" ── */
     html += '<h2 class="section-title">ระดับพร้อมจำนวนหลักฐาน '
-      + '<span class="sub">รายคน × 6 ด้าน · จำนวนชิ้นอ่านจากหมายเหตุที่เกมส่งขึ้นมา · ▲ = ค่าทดแทนจากแบบประเมินตนเอง (ไม่ใช่หลักฐานเกม)</span></h2>';
+      /* [V.1.6.48 · ครูสั่ง "คลีน"] คำอธิบายระดับอยู่ใน legend แถวเดียว — เซลล์เหลือเม็ดเลข (คำเต็มอยู่ใน title ของเซลล์ · GPS-12) */
+      + '<span class="sub">' + [3, 4, 5, 6].map((l) => '<span class="lvpill" style="background:' + LV_COLOR_ON[l] + ';color:#fff">' + l + '</span> ' + LV_NAME[l]).join(' · ')
+      + ' · ตัวเลขเล็ก = จำนวนหลักฐาน · ▲ = ค่าทดแทนจากแบบประเมินตนเอง</span></h2>';
     if (!stu.length || !dims.length) {
       html += '<div class="card muted">ยังไม่มีผลสมรรถนะส่งขึ้นมาจากเกมสำหรับห้องนี้</div>';
     } else {
@@ -1277,11 +1278,11 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
                  อ่านไม่ได้ = ไม่โชว์เลข (ไม่เดา) */
               let nEv = null;
               rs.forEach((r) => { const m = /หลักฐาน\s*(\d+)\s*\/\s*(\d+)/.exec(r.criteria_note || ''); if (m && nEv == null) nEv = m[1] + '/' + m[2]; });
-              return '<td>'
-                + (lv != null ? '<span class="lvpill" style="background:' + (LV_COLOR_ON[lv] || 'var(--lv3-on)') + ';color:#fff">' + lv + '</span> ' : '')
-                + '<span class="small">' + G.esc(lb || (lv != null ? LV_NAME[lv] : 'กำลังเก็บหลักฐาน'))
-                + (nEv ? ' (' + nEv + ' ชิ้น)' : '') + '</span>'
-                + (hasSub ? '<div class="small rs-subst">▲ ค่าทดแทน</div>' : '')
+              const word = lb || (lv != null ? LV_NAME[lv] : 'กำลังเก็บหลักฐาน');
+              return '<td title="' + G.esc(word + (nEv ? ' · หลักฐาน ' + nEv + ' ชิ้น' : '')) + '">'
+                + (lv != null ? '<span class="lvpill" style="background:' + (LV_COLOR_ON[lv] || 'var(--lv3-on)') + ';color:#fff">' + lv + '</span>' : '<span class="muted small">…</span>')
+                + (nEv ? ' <span class="small muted">' + nEv + '</span>' : '')
+                + (hasSub ? '<div class="small rs-subst">▲</div>' : '')
                 + '</td>';
             }).join('') + '</tr>';
       });
@@ -1327,9 +1328,16 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       + 'มติ 29 ส.ค. เปลี่ยนโครงคะแนนเป็น ฐาน/ความชำนาญ/พัฒนาการ (B4) — เกมยังไม่เริ่มส่งสามค่านี้ '
       + 'แถบนี้จะขึ้นอัตโนมัติเมื่อรุ่นเกมที่ส่งค่าเริ่มใช้งานจริง</div></div>'
       + '<div class="card"><b>วิธีนับ</b><div class="small muted" style="margin-top:4px">'
-      + 'ฐานของสมรรถนะ = ผู้เรียนที่มีผลด้านนั้น ไม่ใช่ทั้งห้อง (กฎ ก2: ไม่มีหลักฐาน ≠ ระดับต่ำ) · ร้อยละปัดทศนิยม 1 ตำแหน่ง ผลรวมแต่ละแถวอาจเป็น 99.9–100.1 '
-      + '· ฐานต่ำกว่า 5 คนแสดงจำนวนอย่างเดียว (เส้นเดียวกับหน้าสาธารณะ) · "ไม่มีผลด้านนี้" นับจากทั้งห้อง คนละตัวหาร '
-      + '· ผลสัมฤทธิ์ = คะแนนสอบครั้งแรกของด่าน 8 (มติครู 29 ส.ค. · ทาง ข 1 ก.ย.) ไม่ใช่คะแนนเก็บ 130 และไม่ใช่คะแนนที่กดเพดานสอบซ่อม</div></div>'
+      + 'ฐานของทุกตารางในแท็บนี้ = ผู้เรียนทั้งห้อง (มติครู 9 ก.ย. 2569) ⇒ ทุกแถวรวม 100% · กลุ่ม "ยังไม่มีผลด้านนี้ / ยังไม่ได้เข้าสอบ" เป็นแถวหรือคอลัมน์ของตัวเอง ⛔ ไม่นับเป็นไม่ผ่าน (กฎ ก2: ไม่มีหลักฐาน ≠ ทำไม่ได้) '
+      + '· ร้อยละที่รวมผู้ไม่มีผลไว้ในตัวหารจะมีบรรทัด "สอบแล้วยังไม่ถึงเกณฑ์ n · ยังไม่ได้เข้าสอบ n" กำกับเสมอ (เงื่อนไข AUDIT 9 ก.ย.) '
+      + '· ฐานต่ำกว่า 5 คนแสดงจำนวนอย่างเดียว · หน้าสาธารณะยังใช้ฐาน "ผู้มีผล" พร้อมป้าย (จาก n คน) — สองหน้าคนละตัวหารโดยตั้งใจจนกว่า AUDIT เคาะขอบเขต'
+      + '</div></div>'
+      + '<div class="card"><b>ที่มาของตัวเลข (สำหรับผู้ตรวจ)</b><div class="small muted" style="margin-top:4px">'
+      + 'คู่ครั้งแรก→ครั้งสุดท้าย และจำนวนครั้ง อ่านจากมุมมองฐานข้อมูล v_student_boss_pair (ขอครูรัน_106) — ครั้งแรก = แถวสอบด่าน 8 แถวแรกสุดตามเวลาของผู้เรียน (นิยาม ข · มติครู 8 ก.ย. 2569) · ครั้งสุดท้าย = แถวสุดท้ายตามเวลา '
+      + '· ไม่ใช้เลขครั้งของเครื่อง (attemptNo) · ไม่ใช้คะแนนที่ผู้เรียนได้รับ (_boss มีเพดานสอบซ่อม 21) · สูตรเดียวกับ ครูรัน_รอบสิบสอง ที่เล่มใช้ทำซ้ำ '
+      + '· ระดับผลสัมฤทธิ์ใช้เกณฑ์ตัด 80/70/60/50 ของคะแนนเต็ม (สเกลเดียวกับคะแนนเก็บ · มติ ค1) ⇒ บนคะแนน 30 = 24/21/18/15 · ชื่อระดับ "ผ่าน (15–17)" เป็นชื่อในสเกล ไม่ใช่การถึงเกณฑ์ 21 '
+      + '· ระดับสมรรถนะอ่านจากใบรายงานผลที่เกมคิดแล้วส่งขึ้นฐาน (v_student_comp_dims · แถวล่าสุดต่อคนต่อด้าน · run_id live) เว็บกลางไม่คิดซ้ำ · ร้อยละปัดเศษ 1 ตำแหน่ง แต่ละแถวจึงรวมได้ 99.9–100.1'
+      + '</div></div>'
       + '</div></details>';
     return html;
   }
@@ -1342,78 +1350,58 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
      คอลัมน์ "ผ่านระดับ 5" = level ≥ 5 (ระดับ 6 นับด้วย) — เกณฑ์ครูเคาะ 7 ก.ย. */
   function rsLevelDist(dims, stu) {
     if (!dims.length) return '';
-    const pct = (n, base) => base >= 5 ? ' (' + (n / base * 100).toFixed(1) + '%)' : '';
-    /* [V.1.6.43 · มติครูจากภาพ 8 ก.ย. ข้อ 1/5 + กติกา AUDIT] คอลัมน์แรกกว้างและห่อคำ (ชื่อด้านไทยไม่มีช่องว่าง)
-       · "ผ่านระดับ 5" = ตัวเลขที่เล่มใช้ จึงอยู่ถัดจากฐานและเด่นที่สุด · ตัวเลขรายระดับเป็นป้ายสีตามระดับ (LV_COLOR_ON
-       ผ่านคอนทราสต์ 4.5:1 แล้ว · คงเลขในป้ายเพื่อตาบอดสี) · ช่อง "ยังสรุปไม่ได้"/"ไม่มีผล" ไม่มีสีระดับ (ว่าง ≠ ระดับต่ำ) */
-    const lvCell = (l, n, base) => n
-      ? '<span class="lvpill" style="background:' + (LV_COLOR_ON[l] || 'var(--lv3-on)') + ';color:#fff;min-width:22px;display:inline-block;text-align:center">' + n + '</span>'
-        + '<span class="small muted">' + pct(n, base) + '</span>'
+    /* [V.1.6.48 · มติครู 9 ก.ย. 00:12 "ฐานคือ 25 คน ต้องเท่ากันทุกส่วน สมรรถนะก็ 25 คน"] ฐาน = ผู้เรียนทั้งห้อง T ทุกด้าน
+       ⇒ "ยังไม่มีผลด้านนี้" อยู่ในฐาน (คอลัมน์ของตัวเอง สีกลาง — กฎ ก2: ไม่มีหลักฐาน ≠ ไม่ผ่าน) · ทุกแถวรวม T และ 100%
+       ร้อยละเมื่อ T ≥ 5 · แถวที่มีแต่ "ยังสรุปไม่ได้" ติดป้าย "หลักฐานไม่เพียงพอ" (มติครู 7 ก.ย.) */
+    const T = stu.length, sids = new Set(stu.map((s) => s.id));
+    const pct = (n) => T >= 5 ? ' <span class="small muted">(' + (n / T * 100).toFixed(1) + '%)</span>' : '';
+    const lvCell = (l, n) => n
+      ? '<span class="lvpill" style="background:' + (LV_COLOR_ON[l] || 'var(--lv3-on)') + ';color:#fff;min-width:22px;display:inline-block;text-align:center">' + n + '</span>' + pct(n)
       : '<span class="muted">0</span>';
     let h = '<div style="overflow-x:auto"><table class="gol small rs-lv" style="margin-top:8px;min-width:560px"><thead><tr>'
-      + '<th scope="col" style="width:30%;white-space:normal;overflow-wrap:anywhere">ด้าน</th>'
-      + '<th scope="col" class="num">ฐาน</th>'
+      + '<th scope="col" style="width:24%;white-space:normal;overflow-wrap:anywhere">ด้าน</th>'
       + '<th scope="col" class="num rs-pass5" style="background:var(--lv5-on);color:#fff">ผ่านระดับ 5</th>'
       + [6, 5, 4, 3].map((l) => '<th scope="col" class="num">ระดับ ' + l + '</th>').join('')
       + '<th scope="col" class="num">ยังสรุปไม่ได้</th>'
-      + '<th scope="col" class="num">ไม่มีผลด้านนี้</th></tr></thead><tbody>';
+      + '<th scope="col" class="num">ยังไม่มีผลด้านนี้</th></tr></thead><tbody>';
     COMP6.forEach(function (c) {
-      const rs = dims.filter((r) => r.comp_code === c[0]);
+      const rs = dims.filter((r) => r.comp_code === c[0] && sids.has(r.student_id));
       const seen = new Set(); const latest = [];
       rs.forEach((r) => { if (!seen.has(r.student_id)) { seen.add(r.student_id); latest.push(r); } });
-      const base = latest.length;
-      const none = stu.filter((s) => !seen.has(s.id)).length;
+      const none = T - seen.size;
       const cnt = (l) => latest.filter((r) => r.level === l).length;
       const unk = latest.filter((r) => r.level == null).length;
       const n5 = latest.filter((r) => r.level != null && r.level >= 5).length;
-      h += '<tr><td style="white-space:normal;overflow-wrap:anywhere" title="' + G.esc(c[1]) + '">' + G.esc(C6_SHORT[c[0]] || c[1]) + '</td><td class="num">' + base + '</td>';
-      if (!base) {
-        h += '<td colspan="6" class="muted small">ยังไม่มีผลด้านนี้ส่งขึ้นมา</td>';
-      } else if (unk === base) {
-        h += '<td colspan="6" class="small rs-insuff">หลักฐานไม่เพียงพอ — มีการเก็บข้อมูลด้านนี้แล้ว '
-          + 'แต่ยังไม่มีผู้เรียนที่ได้ระดับจากเกม (' + base + ' คน)</td>';
-      } else {
-        h += '<td class="num rs-pass5" style="background:rgba(21,128,61,.10)"><b style="font-size:15px">' + n5 + '/' + base + '</b>' + pct(n5, base) + '</td>'
-          + [6, 5, 4, 3].map((l) => '<td class="num">' + lvCell(l, cnt(l), base) + '</td>').join('')
-          + '<td class="num">' + unk + pct(unk, base) + '</td>';
-      }
-      h += '<td class="num muted">' + none + '</td></tr>';
+      const insuff = latest.length > 0 && unk === latest.length;
+      h += '<tr><td style="white-space:normal;overflow-wrap:anywhere" title="' + G.esc(c[1]) + '">' + G.esc(C6_SHORT[c[0]] || c[1]) + '</td>'
+        + '<td class="num rs-pass5" style="background:rgba(21,128,61,.10)"><b style="font-size:15px">' + n5 + '/' + T + '</b>' + pct(n5) + '</td>'
+        + [6, 5, 4, 3].map((l) => '<td class="num">' + lvCell(l, cnt(l)) + '</td>').join('')
+        + '<td class="num">' + unk + pct(unk) + (insuff ? '<div class="small rs-insuff">หลักฐานไม่เพียงพอ</div>' : '') + '</td>'
+        + '<td class="num muted" title="ยังไม่มีหลักฐานด้านนี้ — ไม่ใช่ไม่ผ่าน">' + none + pct(none) + '</td></tr>';
     });
     return h + '</tbody></table></div>'
-      + '<div class="muted small" style="margin-top:4px">ฐาน = ผู้มีผลด้านนั้น · ร้อยละอาจรวมได้ 99.9–100.1 (ปัดเศษ) · วิธีนับเต็มอยู่ใน "รายละเอียดสำหรับตรวจสอบ" ด้านล่าง</div>';
+      + '<div class="muted small" style="margin-top:4px">ฐาน = ผู้เรียนทั้งห้อง ' + T + ' คน ทุกแถว (รวม 100%) · "ยังไม่มีผลด้านนี้" = ยังไม่มีหลักฐาน ไม่ใช่ไม่ผ่าน</div>';
   }
 
-
-  /* [V.1.6.40 · ครูสั่ง 7 ก.ย. ข้อ 2 + ใบ AUDIT 8 ก.ย. 00:1x] "ผลสัมฤทธิ์ 70%" = แบบทดสอบหลังเรียน (ด่าน 8 · เต็ม 30)
-     ⛔ ไม่ใช่คะแนนเก็บ 130 (การ์ด .39 เดิม — 76.0% นั้นไม่ใช่เลขสอบ) และ ⛔ ไม่ใช่ unit_scores._boss (ค่านั้นกดเพดานสอบซ่อม 21
-     = คะแนนที่เด็กได้รับ ไม่ใช่คะแนนวิจัย) ⇒ อ่านจาก events kind='boss' แล้วลอกสูตร clsBossScore() ตรงตัว:
-       มีแถวที่เลขครั้งเป็นตัวเลข ⇒ fst = max(score) ของครั้งที่ 1 · ไม่มีเลขครั้งเลย ⇒ แถวแรกตามเวลา 🚩 noAtt
-     เกณฑ์ fst ≥ 21 (70% ของ 30 — BOSS_BEST_IDS ตายตัว 30 ข้อ เลข 21 มีจริง) · ฐาน = ผู้สอบแล้ว · "ยังไม่ได้ทำแบบทดสอบ" ติดตัวเลขเสมอ
-     อ่านอย่างเดียว ไม่เขียนฐาน · โหลดแยกหลังวาด (ไม่หน่วงทั้งหน้า) */
   const BOSS_FULL = 30, BOSS_PASS = 21;
-  /* [V.1.6.42 · ใบ AUDIT 8 ก.ย. 10:1x + PLAN 10:2x] ผลสัมฤทธิ์ = คะแนนสอบครั้งแรกที่ "เกม" คำนวณเอง
-     (clsBossScore ของภาค 1: อ่านเลขครั้งสองสะกด · เพดาน 30 · เห็นเฉพาะข้อมูลภาค 1) แล้วส่งขึ้นฐานเป็น
-     unit_scores._boss_first ตั้งแต่ V.7.99.79 ⇒ เว็บกลาง **อ่านช่องเดียว ไม่คำนวณเองอีก** (การ์ด .40–.41 เคยอ่าน events
-     แล้วลอกสูตร — ติดสามจุด: สะกด attemptNo เดียว · ไม่มีเพดาน · ไม่แยกภาค ⇒ เลข 86.1/59.4 รูปเดียวกัน)
-     ไม่มีช่อง ⇒ "รอใบผลรุ่นใหม่" ไม่ถอยไปคำนวณเอง · ใบภาค 2 (-p2-) ไม่นับ — คนละเครื่องมือวัด
-     หลัก: เกมเป็นเจ้าของเนื้อหา · เว็บกลางเป็นเจ้าของการแสดงผล · ตัวเลขหนึ่งตัวมีที่คำนวณเดียว */
-  /* อันดับรุ่นย่อยของใบผลภาค 1: 'V.7.99.80-IX2050-2569.102' → 80 · อ่านไม่ได้ → 0 (ถือเป็นใบเก่า) */
-  const bossVerRank = (v) => { const m = /^V\.7\.99\.(\d+)/.exec(String(v || '')); return m ? Number(m[1]) : 0; };
   /* [V.1.6.46 · AUDIT 8 ก.ย. 21:2x "เพิ่มการ์ดคู่ในชั้น 1" · นิยามตรึงโดย PLAN 20:4x · มติครู 21:2x] คู่ "ครั้งแรกที่บันทึกไว้ → ครั้งสุดท้ายที่บันทึกไว้"
      แหล่งเดียว = view v_student_boss_pair (ขอครูรัน_106) — สูตรเดียวกับ ครูรัน_รอบสิบสอง ที่เล่มใช้ · เว็บกลางไม่คิดจาก events เอง (กติกา .42)
      ⛔ ไม่ใช่การสอบสองครั้งที่ควบคุมเงื่อนไข · ⛔ ไม่ใช้เลขครั้งของเครื่อง · ⛔ ไม่ใช้คะแนนที่ผู้เรียนได้รับ (เพดานซ่อม 21)
      ป้ายบังคับของ AUDIT 21:2x + ถ้อยคำ PLAN 21:2x ("ไปถึงเกณฑ์หรือไม่ และใช้กี่ครั้ง" — ไม่ใช่ "รู้มากขึ้นเท่าไร") · ฐาน < 5 = จำนวนเท่านั้น */
   function rsBossPairCard(cid, stu) {
-    const wrap = (inner) => '<div class="card" id="rs-bosspair-' + (cid || 'all') + '"><b>📝 คะแนนสอบด่าน 8 — ครั้งแรกที่บันทึกไว้ → ครั้งสุดท้ายที่บันทึกไว้</b> '
-      + '<span class="small muted">(เต็ม ' + BOSS_FULL + ' · เกณฑ์ ' + BOSS_PASS + ' · ฐานเดียวกันทั้งสองค่า · อ่านจากมุมมอง v_student_boss_pair สูตรเดียวกับที่เล่มใช้)</span>'
+    /* [V.1.6.48 · มติครู 9 ก.ย. 00:12] ฐาน = ผู้เรียนทั้งห้อง T ทุกช่อง · [AUDIT 00:4x §๒.๓] ร้อยละที่รวมผู้ไม่มีผลไว้ในตัวหาร ต้องมีสองบรรทัดย่อยเสมอ
+       ("สอบแล้วยังไม่ถึงเกณฑ์ n · ยังไม่ได้เข้าสอบ n") · แถว "ยังไม่มีผลสอบ" อยู่ในตารางระดับเป็นแถวของตัวเอง สีกลาง (ก2) · ค่าเฉลี่ย/จำนวนครั้ง คิดจากผู้ที่มีแถวสอบ N (บอกฐานกำกับ)
+       ข้อความผู้พัฒนา (ชื่อ view · เกณฑ์ตัด · นิยาม) ย้ายลง <details> ท้ายหน้าตามคำสั่ง "คลีน" */
+    const T = stu.length;
+    const wrap = (inner) => '<div class="card" id="rs-bosspair-' + (cid || 'all') + '"><b>📝 คะแนนสอบด่าน 8 — ครั้งแรก → ครั้งสุดท้าย</b> '
+      + '<span class="small muted">(เต็ม ' + BOSS_FULL + ' · เกณฑ์ ' + BOSS_PASS + ' · ฐาน ' + T + ' คนทั้งห้อง)</span>'
       + '<div class="small" style="margin-top:4px">' + inner + '</div></div>';
     if (S.has106 === false) return wrap('<span class="muted">ยังไม่ได้รันไฟล์ฐานข้อมูลของการ์ดนี้ (ขอครูรัน_106) — การ์ดจะขึ้นเองหลังรัน</span>');
     const sids = new Set(stu.map((s) => s.id));
     const per = {};
     (S.bossPair || []).forEach((r) => {
       if (!sids.has(r.student_id)) return;
-      /* [V.1.6.46 · ผู้ตรวจอิสระ 22:5x] แถวของเกมภาค 2 (game_code มี -p2) ไม่นับ — view กรองด้วย attempts.game_version แล้ว แต่แถว boss ที่ถูกคัดลอกให้สมาชิกกลุ่ม
-         (rpc_split_group/rpc_split_named) ไม่มี attempt_id จึงหลุดตัวกรองนั้นได้ และการ์ดนี้รวมรายคนข้าม game_id ⇒ ต้องกันซ้ำที่นี่ */
+      /* แถวของเกมภาค 2 (game_code ลงท้าย -p2) ไม่นับ — view กรองด้วย attempts.game_version แล้ว แต่แถวที่คัดลอกให้สมาชิกกลุ่มไม่มี attempt_id จึงหลุดได้ */
       if (/-p2(-|$)/.test(String(r.game_code || ''))) return;
       const f = Number(r.first_score), l = Number(r.last_score), n = Number(r.n_exams) || 0;
       const cur = per[r.student_id] || { f: null, fAt: null, l: null, lAt: null, n: 0 };
@@ -1422,128 +1410,58 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
       cur.n += n; per[r.student_id] = cur;
     });
     const list = Object.keys(per).map((k) => per[k]).filter((x) => x.f != null && x.l != null);
-    const N = list.length, T = stu.length;
+    const N = list.length;
     if (!N) return wrap('<span class="muted">ยังไม่มีผู้เรียนคนใดมีแถวสอบด่าน 8 (ในห้องนี้ ' + T + ' คน)</span>');
-    const pct = N >= 5;   /* ยามเดิมของโครงการ — ฐานต่ำกว่า 5 คน แสดงจำนวน ไม่แสดงร้อยละ (ทั้งสัดส่วนคนและร้อยละของคะแนนเต็ม) */
-    const pcN = (x) => pct ? ' (' + (x / N * 100).toFixed(1) + '%)' : '';
-    const pcS = (v) => pct ? ' (' + (v / BOSS_FULL * 100).toFixed(1) + '% ของคะแนนเต็ม)' : '';
+    const pct = T >= 5;   /* ยามเดิม — ฐานต่ำกว่า 5 คน แสดงจำนวนเท่านั้น */
+    const pcT = (x) => pct ? ' <span class="muted">(' + (x / T * 100).toFixed(1) + '%)</span>' : '';
+    const pcTc = (x) => pct ? (x / T * 100).toFixed(1) + '%' : '–';
     const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length;
     const fs = list.map((x) => x.f), ls = list.map((x) => x.l), ns = list.map((x) => x.n).sort((a, b) => a - b);
     const passF = fs.filter((v) => v >= BOSS_PASS).length, passL = ls.filter((v) => v >= BOSS_PASS).length;
+    const noRow = T - N, failF = N - passF, failL = N - passL;
     const mF = mean(fs), mL = mean(ls), d = mL - mF;
     const up = list.filter((x) => x.l > x.f).length, same = list.filter((x) => x.l === x.f).length, down = list.filter((x) => x.l < x.f).length;
-    /* [ผู้ตรวจอิสระ 22:5x] "แม้สอบซ้ำ" ต้องนับเฉพาะคนที่สอบ ≥ 2 ครั้งจริง · คนที่สอบครั้งเดียวและยังไม่ถึงเกณฑ์แยกบรรทัด · "เท่าเดิม" บอกด้วยว่ากี่คนสอบครั้งเดียว */
     const stillFail = list.filter((x) => x.l < BOSS_PASS && x.n >= 2).length;
     const onceFail = list.filter((x) => x.l < BOSS_PASS && x.n < 2).length;
     const sameOnce = list.filter((x) => x.l === x.f && x.n < 2).length;
     const med = ns.length % 2 ? ns[(ns.length - 1) / 2] : (ns[ns.length / 2 - 1] + ns[ns.length / 2]) / 2;
     const bucket = (lo, hi) => ns.filter((v) => v >= lo && v <= hi).length;
     const f2 = (v) => (Math.round(v * 100) / 100).toFixed(2);
-    /* [V.1.6.47 · ครูสั่ง 8 ก.ย. 23:4x] ระดับผลสัมฤทธิ์ 5 ระดับ + "ดีขึ้นไป" (จำนวนคน + %) ทั้งครั้งแรก/ครั้งสุดท้าย — ข้อมูลสรุปด้านผลสัมฤทธิ์ของเล่ม
-       ⛔ ไม่ตั้งเกณฑ์ใหม่: ใช้ ACH_BANDS ชุดเดียวกับทั้งหน้า (80/70/60/50 ของคะแนนเต็ม · มติ ค1 V.7.99.69) คิดเป็นร้อยละของ 30 ⇒ 24/21/18/15
-       เกณฑ์ถึง 21/30 (70%) ตรงกับขอบล่างของ "ดี" ⇒ "ระดับดีขึ้นไป" = ถึงเกณฑ์ (แถวสรุปใช้ passF/passL ตัวเดียวกับบรรทัดบน — เลขเดียวแหล่งเดียว)
-       ฐาน < 5 คน: แสดงจำนวน ช่อง % เป็น – */
+    /* ตารางระดับ: ACH_BANDS ชุดเดียวกับทั้งหน้า (80/70/60/50 ของ 30 ⇒ 24/21/18/15) · เกณฑ์ 21 = ขอบล่าง "ดี" ⇒ แถว "ดีขึ้นไป" = ถึงเกณฑ์ (ตัวเลขเดียวกับบรรทัดบน) */
     const bandOf30 = (s) => achBandOf(s / BOSS_FULL * 100);
     const r30 = (p) => Math.ceil(p * BOSS_FULL / 100);
-    const pcT = (x) => pct ? (x / N * 100).toFixed(1) + '%' : '–';
     const bandName = (b) => b.name.replace(/\s*\(.*\)$/, '');
+    const row = (label, range, nf, nl, style) => '<tr' + (style || '') + '><td>' + label + '</td><td class="num">' + range + '</td>'
+      + '<td class="num">' + nf + '</td><td class="num">' + pcTc(nf) + '</td><td class="num">' + nl + '</td><td class="num">' + pcTc(nl) + '</td></tr>';
     const bandRows = ACH_BANDS.map((b) => {
       const nf = fs.filter((s) => bandOf30(s) === b).length, nl = ls.filter((s) => bandOf30(s) === b).length;
       const lo = r30(b.lo), hi = b.hi > 100 ? BOSS_FULL : r30(b.hi) - 1;
-      return '<tr><td><span class="lvpill" style="background:' + b.c + ';color:#fff">' + G.esc(bandName(b)) + '</span></td><td class="num">' + lo + '–' + hi + '</td>'
-        + '<td class="num">' + nf + '</td><td class="num">' + pcT(nf) + '</td><td class="num">' + nl + '</td><td class="num">' + pcT(nl) + '</td></tr>';
-    }).join('');
-    const bandTable = '<div style="margin-top:8px"><b>ระดับผลสัมฤทธิ์ (ด่าน 8 ปีศาจข้อสอบ · เต็ม ' + BOSS_FULL + ')</b> '
-      + '<span class="muted">เกณฑ์ตัด 80/70/60/50 ของคะแนนเต็ม — ชุดเดียวกับสเกลผลสัมฤทธิ์ทั้งหน้า · ฐานเดียวกัน ' + N + ' คน</span>'
+      return row('<span class="lvpill" style="background:' + b.c + ';color:#fff">' + G.esc(bandName(b)) + '</span>', lo + '–' + hi, nf, nl);
+    }).join('')
+      + row('<span class="lvpill" style="background:#94a3b8;color:#fff" title="ยังไม่มีหลักฐาน — ไม่ใช่ไม่ผ่าน">ยังไม่มีผลสอบ</span>', '—', noRow, noRow)
+      + row('ระดับดีขึ้นไป (ถึงเกณฑ์ ' + BOSS_PASS + '/' + BOSS_FULL + ')', BOSS_PASS + '–' + BOSS_FULL, passF, passL, ' style="font-weight:800"');
+    const bandTable = '<div style="margin-top:8px"><b>ระดับผลสัมฤทธิ์ (ด่าน 8 · เต็ม ' + BOSS_FULL + ')</b> '
+      + '<span class="muted">ฐาน ' + T + ' คนทั้งห้อง · ' + (pct ? 'ทุกคอลัมน์รวม 100%' : 'แสดงจำนวนเท่านั้น (ฐานต่ำกว่า 5 คน)') + '</span>'
       + '<div style="overflow-x:auto"><table class="gol small" id="rs-bosspair-bands" style="margin-top:4px;min-width:480px"><thead><tr>'
       + '<th scope="col">ระดับ</th><th scope="col" class="num">คะแนน/' + BOSS_FULL + '</th><th scope="col" class="num">ครั้งแรก (คน)</th><th scope="col" class="num">ร้อยละ</th>'
-      + '<th scope="col" class="num">ครั้งสุดท้าย (คน)</th><th scope="col" class="num">ร้อยละ</th></tr></thead><tbody>' + bandRows
-      + '<tr style="font-weight:800"><td>ระดับดีขึ้นไป (ถึงเกณฑ์ ' + BOSS_PASS + '/' + BOSS_FULL + ')</td><td class="num">' + BOSS_PASS + '–' + BOSS_FULL + '</td>'
-      + '<td class="num">' + passF + '</td><td class="num">' + pcT(passF) + '</td><td class="num">' + passL + '</td><td class="num">' + pcT(passL) + '</td></tr>'
-      + '</tbody></table></div></div>';
+      + '<th scope="col" class="num">ครั้งสุดท้าย (คน)</th><th scope="col" class="num">ร้อยละ</th></tr></thead><tbody>' + bandRows + '</tbody></table></div></div>';
     return wrap(
-      '<div><b>ครั้งสุดท้ายที่บันทึกไว้:</b> ไปถึงเกณฑ์ <b style="font-size:18px">' + passL + ' จาก ' + N + ' คน</b><span class="muted">' + pcN(passL) + '</span></div>'
-      + '<div><b>ครั้งแรกที่บันทึกไว้:</b> ไปถึงเกณฑ์ <b>' + passF + ' จาก ' + N + ' คน</b><span class="muted">' + pcN(passF) + '</span></div>'
-      + '<div>คะแนนเฉลี่ย ครั้งแรก <b>' + f2(mF) + '</b>/' + BOSS_FULL + pcS(mF) + ' → ครั้งสุดท้าย <b>' + f2(mL) + '</b>/' + BOSS_FULL + pcS(mL)
+      '<div><b>ครั้งสุดท้ายที่บันทึกไว้:</b> ถึงเกณฑ์ <b style="font-size:18px">' + passL + ' จาก ' + T + ' คนในห้อง</b>' + pcT(passL)
+      + ' <span class="muted">— สอบแล้วยังไม่ถึงเกณฑ์ ' + failL + ' คน · ยังไม่ได้เข้าสอบ ' + noRow + ' คน</span></div>'
+      + '<div><b>ครั้งแรกที่บันทึกไว้:</b> ถึงเกณฑ์ <b>' + passF + ' จาก ' + T + ' คนในห้อง</b>' + pcT(passF)
+      + ' <span class="muted">— สอบแล้วยังไม่ถึงเกณฑ์ ' + failF + ' คน · ยังไม่ได้เข้าสอบ ' + noRow + ' คน</span></div>'
+      + '<div>คะแนนเฉลี่ยของผู้ที่มีแถวสอบ (' + N + ' คน): ครั้งแรก <b>' + f2(mF) + '</b>/' + BOSS_FULL + ' → ครั้งสุดท้าย <b>' + f2(mL) + '</b>/' + BOSS_FULL
       + ' · ต่างเฉลี่ย <b>' + (d >= 0 ? '+' : '') + f2(d) + '</b></div>'
       + '<div>สูงขึ้น ' + up + ' คน · เท่าเดิม ' + same + ' คน' + (sameOnce ? ' (สอบครั้งเดียว ' + sameOnce + ')' : '') + ' · ต่ำลง ' + down + ' คน · <b>ยังไม่ถึงเกณฑ์แม้สอบซ้ำ ' + stillFail + ' คน</b>'
       + (onceFail ? ' · สอบครั้งเดียวและยังไม่ถึงเกณฑ์ ' + onceFail + ' คน' : '') + '</div>'
-      + '<div>จำนวนครั้งที่สอบต่อคน: มัธยฐาน <b>' + (med % 1 ? med.toFixed(1) : med) + '</b> ครั้ง (พิสัย ' + ns[0] + '–' + ns[ns.length - 1] + ')'
-      + ' · สอบ 1 ครั้ง ' + bucket(1, 1) + ' คน · 2–4 ครั้ง ' + bucket(2, 4) + ' คน · 5–9 ครั้ง ' + bucket(5, 9) + ' คน · 10 ครั้งขึ้นไป ' + bucket(10, 1e9) + ' คน</div>'
-      + '<div class="muted">ยังไม่มีแถวสอบ ' + (T - N) + ' คน จาก ' + T + ' คนในห้อง' + (pct ? '' : ' · ฐานต่ำกว่า 5 คน แสดงจำนวนเท่านั้น') + '</div>'
+      + '<div>จำนวนครั้งที่สอบต่อคน (' + N + ' คน): มัธยฐาน <b>' + (med % 1 ? med.toFixed(1) : med) + '</b> ครั้ง (พิสัย ' + ns[0] + '–' + ns[ns.length - 1] + ')'
+      + ' · สอบ 1 ครั้ง ' + bucket(1, 1) + ' คน · 2–4 ครั้ง ' + bucket(2, 4) + ' คน · 5–9 ครั้ง ' + bucket(5, 9) + ' คน · 10 ครั้งขึ้นไป ' + bucket(10, 1e9) + ' คน'
+      + (pct ? '' : ' · ฐานต่ำกว่า 5 คน แสดงจำนวนเท่านั้น') + '</div>'
       + bandTable
-      + '<div class="muted" style="margin-top:6px">ตัวเลขชุดนี้ตอบว่า "ผู้เรียนไปถึงเกณฑ์หรือไม่ และใช้กี่ครั้ง" — ไม่ใช่ "รู้มากขึ้นเท่าไร": ด่านนี้เล่นซ้ำได้บนชุดข้อสอบเดิม 30 ข้อ ไม่มีฉบับคู่ขนาน'
+      + '<div class="muted" style="margin-top:6px">⚠️ ตัวเลขชุดนี้ตอบว่า "ผู้เรียนไปถึงเกณฑ์หรือไม่ และใช้กี่ครั้ง" — ไม่ใช่ "รู้มากขึ้นเท่าไร": ข้อสอบชุดเดิม 30 ข้อ สอบซ้ำได้ ไม่มีฉบับคู่ขนาน'
       + ' · ไม่ใช่การสอบสองครั้งที่ควบคุมเงื่อนไข · คะแนนอาจบันทึกจากการสอบที่ทำร่วมกันบนเครื่องเดียว (บันทึกให้สมาชิกทุกคนในกลุ่ม) และองค์ประกอบกลุ่มอาจต่างกันระหว่างสองครั้ง'
-      + ' · เรียงตามเวลาที่บันทึก ไม่ใช้เลขครั้งของเครื่อง ไม่ใช้คะแนนที่ผู้เรียนได้รับ (มีเพดานสอบซ่อม ' + BOSS_PASS + ') · แถวแรกสุดของบางคนอาจบันทึกจากเกมรุ่นก่อนหน้า</div>');
+      + ' · เรียงตามเวลาที่บันทึก ไม่ใช้เลขครั้งของเครื่อง ไม่ใช้คะแนนที่ผู้เรียนได้รับ · แถวแรกสุดของบางคนอาจบันทึกจากเกมรุ่นก่อนหน้า</div>');
   }
-  function rsBoss70Card(cid, stu) {
-    const sids = new Set(stu.map((s) => s.id));
-    const rows = (S.achieve || []).filter((r) => sids.has(r.student_id) && !isP2(r.game_version)
-      && r.unit_scores && typeof r.unit_scores === 'object');
-    const num = (v) => { const n = Number(v); return (v != null && v !== '' && !isNaN(n)) ? Math.max(0, Math.min(BOSS_FULL, n)) : null; };
-    const per = {};
-    rows.forEach((r) => {
-      const u = r.unit_scores; let f = num(u._boss_first); const bb = num(u._boss);
-      const cur = per[r.student_id] || { fst: null, hasBoss: false, unknownFirst: false };
-      const ver = bossVerRank(r.game_version);
-      /* [V.1.6.44 · คำชี้ขาด AUDIT 8 ก.ย. 15:0x] ⛔ ห้ามฝังกฎ "0 ⇒ ไม่ทราบ" ถาวร (เด็กที่สอบครั้งแรกได้ 0 จริงมีได้)
-         อ่านตามรุ่นใบผล:
-           ≥ .80 — เกมส่ง null เมื่อไม่พบครั้งที่ 1 และไม่ส่งคีย์ ⇒ ไม่มี _boss_first แต่มี _boss = "ไม่ทราบครั้งที่ 1 (เกมระบุ)" · มีค่า (รวม 0) = เชื่อตรง ๆ
-           = .79 — ค่าตั้งต้น 0 ยังหลุดมา (clsBossScore fst=0) ⇒ 0 ∧ _boss>0 = "ไม่ทราบ" **เฉพาะรุ่นนี้** (ยืนยันจาก events รอบหก 8 ก.ย.: ไม่มีแถวครั้งที่ 1 ทั้งสองสะกด)
-                   ⏳ ถอดสาขานี้ได้เมื่อไม่มีใบ .79 เหลือในฐาน (ครูอัป .80 + เปิดหน้าครูในเกม)
-           < .79 — ไม่มีช่องนี้เลย ⇒ "รอใบผลรุ่นใหม่" */
-      if (ver >= 80) { if (f == null && bb != null) cur.unknownFirst = true; }
-      else if (ver === 79) { if (f === 0 && bb != null && bb > 0) { f = null; cur.unknownFirst = true; } }
-      if (f != null) cur.fst = f;
-      if (f != null || bb != null) cur.hasBoss = true;
-      per[r.student_id] = cur;
-    });
-    const list = Object.keys(per).map((k) => per[k]);
-    const tested = list.filter((x) => x.fst != null), n = tested.length;
-    const pass = tested.filter((x) => x.fst >= BOSS_PASS).length;
-    const zeroDef = list.filter((x) => x.fst == null && x.unknownFirst).length;
-    const waiting = list.filter((x) => x.fst == null && x.hasBoss && !x.unknownFirst).length;   /* ใบเก่าก่อน .79 — มี _boss แต่ไม่มี _boss_first */
-    const notYet = stu.length - list.filter((x) => x.hasBoss).length;
-    const pc = (x, y) => y >= 5 ? (x / y * 100).toFixed(1) + '%' : x + ' คน';
-    const total = stu.length, noScore = total - n;
-    const vers = rows.map((r) => bossVerRank(r.game_version));
-    const verMax = vers.length ? Math.max.apply(null, vers) : 0, verMin = vers.length ? Math.min.apply(null, vers) : 0;
-    const noteOld = '⚠️ ใบผลรุ่น V.7.99.80–.81 ใส่ช่องนี้ด้วย<b>คะแนนสูงสุด</b>ในบรรดาแถวสอบที่เกมนับเป็น "ครั้งที่ 1" — ตรวจพบ 8 ก.ย. ว่าผู้เรียนหนึ่งคนมีแถวเช่นนั้นได้หลายแถว (P-CODE-12)';
-    const noteNew = '✅ ใบผลรุ่น V.7.99.82 ขึ้นไปใช้<b>นิยาม ข</b> (มติครู 8 ก.ย. ค่ำ · ข้อสรุปร่วม AUDIT+PLAN): คะแนนครั้งที่ 1 = แถวสอบแรกสุดตามเวลาของผู้เรียน ไม่ใช้เลขครั้งของเครื่อง';
-    const verNote = (verMax >= 82 ? noteNew : '')
-      + (vers.some((v) => v >= 79 && v < 82) ? (verMax >= 82 ? '<br>' : '') + noteOld
-          + (verMax >= 82 ? ' — ใบผลบางคนยังเป็นรุ่นก่อน .82 เปิดหน้าครูในเกมหนึ่งครั้งเพื่ออัปใบผล' : ' ⇒ ตัวเลขการ์ดนี้ยังไม่ใช้ในเล่ม จนกว่าใบผลเป็นรุ่น .82 (เปิดหน้าครูในเกมหนึ่งครั้ง)') : '');   /* ยังไม่มีผลสอบในช่อง = ทั้งห้อง − ผู้มีคะแนน (ยังไม่ทำ + รอใบใหม่ + ไม่ทราบครั้งที่ 1) */
-    let body;
-    if (!n && !waiting && !zeroDef) {
-      body = 'ยังไม่มีผู้เรียนคนใดทำแบบทดสอบหลังเรียน (ยังไม่ได้ทำ ' + notYet + ' คน จาก ' + total + ' คนในห้อง)';
-    } else {
-      /* [V.1.6.45 · ครูสั่ง 8 ก.ย. เย็น ผ่าน HUB ข้อ 1] ⛔ ห้ามขึ้นร้อยละตัวเดียวลอย ๆ — สองตัวหารพร้อมป้ายเสมอ
-         ① ของทั้งห้อง (ตัวหาร = นักเรียนทั้งหมด ไม่ตัดใคร — ตัวเลขที่ครูสั่งให้เป็นหลัก)
-         ② ของผู้ที่มีคะแนนในช่อง (ตัวหาร = คนที่เกมส่งค่ามา) + บรรทัด "ยังไม่มีผลสอบ n คน" ติดกันเสมอ
-         ป้ายพูดตามที่เกมคำนวณจริง ไม่ใช้คำว่า "ครั้งแรก" ลอย ๆ (ดูหมายเหตุท้ายการ์ด · P-CODE-12 8 ก.ย.) */
-      body = '<div><b style="font-size:20px">' + pc(pass, total) + '</b> <span class="small muted">ของทั้งห้อง (' + pass + ' จาก ' + total + ' คน — ไม่ตัดใคร'
-          + (total < 5 ? ' · ฐานต่ำกว่า 5 คน ไม่แสดงร้อยละ' : '') + ')</span></div>'
-        + '<div><b style="font-size:16px">' + pc(pass, n) + '</b> <span class="small muted">ของผู้ที่มีคะแนนในช่อง (' + pass + ' จาก ' + n + ' คน'
-          + (n < 5 ? ' — ฐานต่ำกว่า 5 คน ไม่แสดงร้อยละ' : '') + ')</span></div>'
-        + '<div class="small"><b>ยังไม่มีผลสอบ ' + noScore + ' คน</b> — ยังไม่ได้ทำแบบทดสอบ ' + notYet + ' คน จาก ' + total + ' คนในห้อง'
-        + (waiting ? ' · ⏳ รอใบผลรุ่นใหม่ ' + waiting + ' คน — ใบผลของกลุ่มนี้ส่งจากเกมรุ่นก่อน V.7.99.79 ยังไม่มีช่องคะแนนครั้งแรก'
-                   + ' · เปิดหน้าครูในเกมหนึ่งครั้ง แล้วกด 🔄 อัปเดตผลจากเกม' : '')
-        + (zeroDef ? ' · ❔ ไม่ทราบคะแนนครั้งที่ 1 · ' + zeroDef + ' คน (ยืนยันจาก events: ฐานไม่มีบันทึกการสอบครั้งที่ 1 ของกลุ่มนี้)'
-                   + ' — ไม่นับเข้าฐาน และไม่นับเป็นคะแนนศูนย์' : '')
-        + '</div>';
-    }
-    return '<div class="card" id="rs-boss70-' + (cid || 'all') + '"><b>📝 ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน</b> '
-      + '<span class="small muted">(ด่าน 8 ปีศาจข้อสอบ · เต็ม ' + BOSS_FULL + ' · ช่อง "คะแนนครั้งที่ 1" — เกมเป็นผู้คิด เว็บกลางอ่านอย่างเดียว)</span>'
-      + '<div class="rs-boss-body small" style="margin-top:4px">' + body + '</div>'
-      + '<div class="muted small" style="margin-top:6px">เกณฑ์ ' + BOSS_PASS + ' จาก ' + BOSS_FULL + ' คะแนน (70%) · อ่านจากช่อง "คะแนนครั้งที่ 1" (_boss_first) ในใบผลที่เกมส่ง (ภาค 1 เท่านั้น) '
-      + '· คะแนนที่ผู้เรียนได้รับ (สอบซ่อมได้ เพดาน ' + BOSS_PASS + ') เป็นคนละค่า ไม่ใช้ในงานวิจัย'
-      /* [V.1.6.45 · รอบสิบ 8 ก.ย. 20:1x · P-CODE-12] เกม .80 ใส่ช่องนี้ด้วย max ของแถวที่เลขครั้ง = 1 และคนหนึ่งมีแถวเช่นนั้นได้หลายแถว (ป.4/1 14/15 คน)
-         ⇒ ป้ายต้องพูดตามที่คำนวณจริง จนกว่า AUDIT+PLAN เคาะนิยาม — เว็บกลางไม่แก้ตัวเลข แก้เฉพาะป้าย */
-      /* [V.1.6.46 · ครูเคาะนิยาม ข 8 ก.ย. ค่ำ · เกม .82] ป้ายแยกตามรุ่นใบผล — ใบ ≥ .82 ใช้นิยาม ข (แถวแรกสุดตามเวลา) · ใบ .80/.81 ยังเป็นค่าสูงสุดของแถวเลข 1 (P-CODE-12)
-         ห้องที่ใบผลปนสองรุ่นเห็นทั้งสองบรรทัดจนกว่าครูเปิดหน้าครูในเกม .82 หนึ่งครั้ง */
-      + (verNote ? '<br>' + verNote : '') + '</div></div>';
-  }
-
   /* [D3 + B6] รอบเล่นซ้ำรายคน + ธง "ชวนครูเข้าไปดู" — สัญญาณให้ช่วย ไม่ใช่เครื่องตัดสิน
      บทเรียน V.1.6.x เดิม (ไทล์ "รอบที่ส่งผล" ถูกถอด): จำนวนรอบไม่ใช่ตัววัดการเรียนรู้ —
      จึงจงใจแสดงคู่กับสถานะระดับเสมอ ไม่แสดงเดี่ยว ๆ ให้เข้าใจผิด */
@@ -1561,13 +1479,12 @@ catch(e){document.documentElement.dataset.theme='light';}</script>
     let h = '<h2 class="section-title">รอบการเล่น + ธงชวนดู '
       + '<span class="sub">จำนวนรอบที่ส่งผลไม่ใช่ตัววัดการเรียนรู้ — ใช้คู่กับระดับเพื่อหาเด็กที่ควรเข้าไปช่วย (B6)</span></h2>';
     if (flags.length) {
-      h += '<div class="card rs-flag"><b>🚩 ชวนครูเข้าไปดู ' + flags.length + ' คน</b> '
-        + '<span class="small muted">— เล่นมาแล้ว ≥5 รอบ แต่ยังมีด้านที่ระดับ ≤3 หรือยังสรุปไม่ได้ '
-        + '(เกณฑ์ชั่วคราวจนกว่าค่าพัฒนาการ B4 จะมาถึง — ธงนี้ใช้ชวนช่วย ไม่ใช้ตัดสิทธิ์)</span>'
-        + '<div class="small" style="margin-top:6px">'
-        + flags.map((st) => '<a href="#/student/' + st.id + '">' + G.esc((st.first_name || '') + ' ' + (st.last_name || ''))
-            + '</a> <span class="muted">(' + (byStu[st.id] || 0) + ' รอบ)</span>').join(' · ')
-        + '</div></div>';
+      /* [V.1.6.48 · ครูสั่ง "คลีน"] พับไว้ · รายชื่อเป็นชิป · เกณฑ์ธงอยู่ในบรรทัดเล็กใต้รายชื่อ (ไม่คั่นหน้า) */
+      h += '<details class="card rs-flag"><summary style="cursor:pointer"><b>🚩 ชวนครูเข้าไปดู ' + flags.length + ' คน</b> <span class="small muted">(กดเปิดรายชื่อ)</span></summary>'
+        + '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">'
+        + flags.map((st) => '<a class="cmpchip" style="display:inline-block;padding:2px 10px;border-radius:999px;border:1px solid var(--line,#ddd);text-decoration:none" href="#/student/' + st.id + '">'
+            + G.esc((st.first_name || '') + ' ' + (st.last_name || '')) + ' <span class="muted">' + (byStu[st.id] || 0) + ' รอบ</span></a>').join('')
+        + '</div><div class="small muted" style="margin-top:6px">เกณฑ์ธง: เล่นมาแล้ว 5 รอบขึ้นไป แต่ยังมีด้านที่ระดับไม่เกิน 3 หรือยังสรุปไม่ได้ — ใช้ชวนช่วย ไม่ใช้ตัดสิทธิ์</div></details>';
     } else {
       h += '<div class="card muted small">ยังไม่มีนักเรียนเข้าเงื่อนไขธงชวนดู (เล่น ≥5 รอบแต่ระดับยังไม่ขยับ)</div>';
     }

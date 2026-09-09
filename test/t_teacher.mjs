@@ -645,8 +645,8 @@ console.log('\n═══ 13) [V.1.6.39 · ใบ HUB 7 ก.ย. ×3] หน้�
   ok('ตารางระดับมีคอลัมน์ ฐาน + ผ่านระดับ 5 + ไม่มีผลด้านนี้', /ฐาน/.test(st.lv) && /ผ่านระดับ 5/.test(st.lv) && /ไม่มีผลด้านนี้/.test(st.lv), '');
   ok('⛔ TW ทั้งฐานสรุปไม่ได้ → ทั้งแถว "หลักฐานไม่เพียงพอ" ไม่พิมพ์ 0.0%', st.lv.includes('หลักฐานไม่เพียงพอ') && !st.lv.includes('0 (0.0%)'), '');
   ok('ฐาน < 5 → ไม่แสดง % (fixtures 1 คน) แต่มีเศษ/ส่วน', !/\(\d+\.\d%\)/.test(st.lv) && /1\/1/.test(st.lv), st.lv.slice(0, 120));
-  ok('[V.1.6.40] การ์ดผลสัมฤทธิ์ = แบบทดสอบหลังเรียน (ด่าน 8 เต็ม 30) ไม่ใช่คะแนนเก็บ 130', st.main.includes('ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน') && !st.main.includes('ทำแบบทดสอบได้ 70% ขึ้นไป'), '');
-  ok('[V.1.6.40] จัดหน้า 3 ชั้น: สรุปอยู่บนสุด → รายคน → ตาราง 22 องค์พับใน <details>', (() => { const a = st.main.indexOf('ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน'), b = st.main.indexOf('ระดับพร้อมจำนวนหลักฐาน'), c = st.main.indexOf('ความครอบคลุม 22'); return a > -1 && a < b && b < c; })(), '');
+  ok('[V.1.6.48 · ครูสั่ง 9 ก.ย.] การ์ดผลสัมฤทธิ์เดิมถูกถอดจากแท็บวิจัย · การ์ดคู่คือชั้นสรุป', !st.main.includes('ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน') && st.main.includes('ครั้งแรก → ครั้งสุดท้าย'), st.main.slice(0, 120));
+  ok('[V.1.6.40] จัดหน้า 3 ชั้น: สรุปอยู่บนสุด → รายคน → ตาราง 22 องค์พับใน <details>', (() => { const a = st.main.indexOf('ครั้งแรก → ครั้งสุดท้าย'), b = st.main.indexOf('ระดับพร้อมจำนวนหลักฐาน'), c = st.main.indexOf('ความครอบคลุม 22 องค์ประกอบ'); return a >= 0 && b > a && c > b; })(), '');
   ok('[V.1.6.40] ตาราง 22 องค์อยู่ใน details (พับได้ ไม่หาย)', await p.evaluate(() => !!document.querySelector('details.rs-ref table.gol')), '');
   ok('หัวตารางยึด Rubric ฉบับที่ ๓', st.main.includes('Rubric ฉบับที่ ๓'), '');
   ok('ตัวกรองห้องโผล่บนแท็บวิจัยของหน้าห้อง (แบบเด้ง) และเลือกห้องปัจจุบันอยู่', st.pick && st.jump && st.selVal === F.R1, st.selVal);
@@ -664,7 +664,7 @@ console.log('\n═══ 13b) [V.1.6.43] ตารางวิจัยราย
   const { p, calls } = await open({ compDims: F.compDimsRS, students: F.studentsAllOn }, '#/room/' + F.R1);
   await p.click('[data-tab="research"]'); await sleep(900);
   const hd = await p.evaluate(() => Array.from(document.querySelectorAll('table.rs-lv thead th')).map((x) => x.textContent.trim()));
-  ok('⭐ "ผ่านระดับ 5" อยู่ถัดจากฐาน (คอลัมน์ 3) — ตัวเลขที่เล่มใช้ต้องเด่นสุด', hd[2] === 'ผ่านระดับ 5', hd);
+  ok('⭐ [.48] "ผ่านระดับ 5" อยู่ถัดจากชื่อด้าน (คอลัมน์ 2 — คอลัมน์ฐานถอดออก เพราะฐานเดียวกันทั้งตาราง) และคอลัมน์สุดท้าย = ยังไม่มีผลด้านนี้', hd[1] === 'ผ่านระดับ 5' && hd[hd.length - 1] === 'ยังไม่มีผลด้านนี้', hd);
   const pills = await p.evaluate(() => document.querySelectorAll('table.rs-lv tbody .lvpill').length);
   ok('ตัวเลขรายระดับเป็นป้ายสีตามระดับ (คงเลขในป้าย)', pills > 0, pills);
   const zeroColored = await p.evaluate(() => Array.from(document.querySelectorAll('table.rs-lv tbody td')).filter((td) => /ยังไม่มีผล|หลักฐานไม่เพียงพอ/.test(td.textContent) && td.querySelector('.lvpill')).length);
@@ -701,20 +701,11 @@ console.log('\n═══ 14) [V.1.6.40] ปุ่มอัปเดตผลจ�
   await p.click('#gr-go'); await sleep(1500);
   const msg = await p.evaluate(() => (document.getElementById('gr-msg') || {}).textContent || '');
   ok('เหตุผลที่ล้มบอกขั้นที่ล้ม (เกมข้ามโดเมน → ข้อความบอกเหตุ) ไม่ใช่ "อัปเดตไม่สำเร็จ" ลอย ๆ', (msg.includes('ยังไม่ได้ตั้งที่อยู่หน้าครูของเกม') || msg.includes('ยังไม่ได้เปิดเกมที่รองรับ')) && !/อัปเดตไม่สำเร็จ\s*$/.test(msg.trim()), msg.slice(0, 160));
-  /* (3) [V.1.6.42 · ใบ AUDIT/PLAN 8 ก.ย.] การ์ดผลสัมฤทธิ์อ่าน unit_scores._boss_first ช่องเดียว — ไม่อ่าน events ไม่คำนวณเอง */
+  /* (3) [V.1.6.48 · ครูสั่ง 9 ก.ย.] การ์ดผลสัมฤทธิ์เดิมถูกถอด — เหลือแค่ตรวจว่าไม่กลับมา และหน้าไม่ยิง events kind=boss เอง */
   await p.click('[data-tab="research"]'); await sleep(900);
-  const bc = await p.evaluate(() => (document.querySelector('[id^="rs-boss70-"]') || {}).textContent || '');
-  ok('⭐ อ่านจากช่องที่เกมส่ง: ผ่าน 1 จาก 2 คนที่มีคะแนนในช่อง (S1 = 25 ผ่าน · S5B ใบ .80 ครั้งแรก 0 จริง = นับเป็น 0 ไม่ผ่าน) — S2 ใบเก่าไม่มีช่อง ไม่ถูกเดา', /1 คน ของผู้ที่มีคะแนนในช่อง \(1 จาก 2 คน/.test(bc), bc.slice(0, 300));
-  ok('⭐ [.45 · ครูสั่ง ข้อ 1] ตัวหลัก = ของทั้งห้อง ไม่ตัดใคร: 20.0% (1 จาก 5 คน) — สองตัวหารขึ้นคู่กันเสมอ', /20\.0% ของทั้งห้อง \(1 จาก 5 คน — ไม่ตัดใคร\)/.test(bc), bc.slice(0, 300));
-  ok('⭐ [.45 · ครูสั่ง ข้อ 1] บรรทัด "ยังไม่มีผลสอบ n คน" ติดกัน (5 − 2 = 3) และป้ายบอกว่าเกมใช้ค่าสูงสุดของแถวครั้งที่ 1 (P-CODE-12)', /ยังไม่มีผลสอบ 3 คน/.test(bc) && /คะแนนสูงสุด/.test(bc) && !/คนที่มีคะแนนสอบครั้งแรก/.test(bc), bc.slice(0, 400));
-  ok('⭐ ใบเก่าก่อน .79 ขึ้น "รอใบผลรุ่นใหม่ 1 คน" — ไม่ถอยไปคำนวณจาก events (กติกา AUDIT)', /รอใบผลรุ่นใหม่ 1 คน/.test(bc), bc.slice(0, 300));
-  ok('⭐ ใบภาค 2 ที่มี _boss_first 30 ไม่ถูกนับ (ถ้าหลุดจะเป็น 2 จาก 2)', !/2 จาก 2/.test(bc), bc.slice(0, 200));
-  ok('การ์ดไม่ยิงอ่าน events อีก (เลิกมีสามที่คิดเลขเดียวกัน)', !calls.some((c) => /\/rest\/v1\/events\?kind=eq\.boss/.test(c.url || String(c))), calls.filter((c) => /events/.test(c.url || String(c))).length);
-  ok('บรรทัด "ยังไม่ได้ทำแบบทดสอบ" ติดตัวเลข', /ยังไม่ได้ทำแบบทดสอบ 0 คน จาก 5 คนในห้อง/.test(bc), bc.slice(0, 300));
-  ok('⭐ [.44 · คำชี้ขาด AUDIT] ใบ .79 ที่ _boss_first = 0 ∧ _boss = 21 (S3B) + ใบ .80 ที่ไม่มีคีย์ (S4B) → "ไม่ทราบคะแนนครั้งที่ 1 · 2 คน (ยืนยันจาก events…)" ไม่เข้าฐาน', /ไม่ทราบคะแนนครั้งที่ 1 · 2 คน \(ยืนยันจาก events/.test(bc), bc.slice(0, 400));
-  ok('⭐ [.44] ถ้อยคำบนจอไม่มีคำว่า "ได้ 0"/"ระบุครั้งแรก 0" (ตามคำชี้ขาด)', !/ระบุครั้งแรก 0|ได้ 0/.test(bc), bc.slice(0, 400));
-  ok('⭐ [.44] ใบ .80 ไม่มีคีย์ ไม่ถูกจัดเป็น "รอใบผลรุ่นใหม่" (ยังคงเป็น 1 คน = S2 ใบ .76)', /รอใบผลรุ่นใหม่ 1 คน/.test(bc), bc.slice(0, 400));
-  ok('ฐาน < 5 → แสดงจำนวน ไม่แสดง % (ฝั่งผู้มีคะแนน n=2) · ฝั่งทั้งห้อง n=5 แสดง % ได้ · หัวการ์ดบอกว่าเกมเป็นผู้คิด', /1 คน ของผู้ที่มีคะแนนในช่อง \(1 จาก 2 คน — ฐานต่ำกว่า 5 คน ไม่แสดงร้อยละ\)/.test(bc) && /เกมเป็นผู้คิด/.test(bc) && (bc.match(/\d+\.\d%/g) || []).length === 1, bc.slice(0, 160));  /* (70%) ในเชิงอรรถไม่ใช่ค่าเฉลี่ย — ค่าเฉลี่ยมีทศนิยมเสมอ */
+  const rsTxt = await p.evaluate(() => (document.getElementById('page-main') || document.body).textContent);
+  ok('⭐ [.48] การ์ด "ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน" ไม่ปรากฏในแท็บวิจัยอีก (ครูสั่งถอด)', !/ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน/.test(rsTxt) && !(await p.evaluate(() => !!document.querySelector('[id^="rs-boss70-"]'))), rsTxt.slice(0, 100));
+  ok('หน้าไม่ยิงอ่าน events kind=boss เอง (กติกา .42 คงอยู่)', !calls.some((c) => /\/rest\/v1\/events\?kind=eq\.boss/.test(c.url || String(c))), calls.filter((c) => /events/.test(c.url || String(c))).length);
   ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
   await p.close();
 }
@@ -745,11 +736,12 @@ console.log('\n═══ 15) [V.1.6.45] ครูสั่ง 4 ข้อ 8 ก.
   await p.click('[data-tab="research"]'); await sleep(900);
   const rs = await p.evaluate(() => {
     const top = document.querySelector('.rs-top');
-    const cols = top ? getComputedStyle(top).gridTemplateColumns.trim().split(/\s+/) : [];
+    const card = document.querySelector('table.rs-lv') && document.querySelector('table.rs-lv').closest('.card');
+    const ratio = card ? card.offsetWidth / card.parentElement.clientWidth : 0;
     const first = Array.from(document.querySelectorAll('table.rs-lv tbody tr td:first-child')).map((x) => x.textContent.trim());
-    return { has: !!top, cols, w: window.innerWidth, first };
+    return { has: !!top, ratio, w: window.innerWidth, first };
   });
-  ok('⭐ [ข้อ 4] ชั้นสรุปหน้าวิจัยเป็น 2 คอลัมน์ (การ์ด 1 ส่วน · ตาราง 2 ส่วน) บนจอกว้าง', rs.has && rs.cols.length === 2 && parseFloat(rs.cols[1]) > parseFloat(rs.cols[0]) * 1.5, rs);
+  ok('⭐ [.48 · ครูสั่งถอดการ์ดเดิม] ไม่มีตัวห่อ .rs-top เหลือ และการ์ดสมรรถนะกว้างเต็ม (≥ 90% ของแถว)', !rs.has && rs.ratio >= 0.9, rs);
   ok('[ข้อ 4] คอลัมน์ "ด้าน" ใช้ชื่อสั้น (C6_SHORT) ไม่ใช่ชื่อเต็ม', rs.first.length > 0 && rs.first.every((x) => x.length <= 14), rs.first);
   ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
   await p.close();
@@ -761,57 +753,74 @@ console.log('\n═══ 15) [V.1.6.45] ครูสั่ง 4 ข้อ 8 ก.
     /\.in\{[^}]*justify-content:space-between[^}]*\}/.test(src) && !/\.sign\{margin-top:auto/.test(src) && /\.sign\{margin-top:0/.test(src));
 }
 
-console.log('\n═══ 16) [V.1.6.46] การ์ดคู่ ครั้งแรก→ครั้งสุดท้าย (view เดียว) · ป้ายผลสัมฤทธิ์ตามรุ่นใบ .82 ═══');
+console.log('\n═══ 16) [V.1.6.48] การ์ดคู่ฐาน 25 (ทั้งห้อง) + สองบรรทัดย่อย ก2 · ตารางระดับมีแถว "ยังไม่มีผลสอบ" · หน้าคลีน ═══');
 {
-  const { p, calls } = await open({ bossPair: F.bossPair5, achieve: F.achieveV82, students: F.studentsBoss3 }, '#/room/' + F.R1);
+  /* ฐาน T = 5 (studentsBoss3) · แถวคู่ 5 คน ⇒ ไม่มีใครขาดสอบ · first [10,21,5,15,22] · last [25,21,29,20,30] */
+  const { p, calls } = await open({ bossPair: F.bossPair5, compDims: F.compDimsRS, students: F.studentsBoss3 }, '#/room/' + F.R1);
   await p.click('[data-tab="research"]'); await sleep(900);
   const t = await p.evaluate(() => {
-    const pair = document.querySelector('[id^="rs-bosspair-"]'), top = document.querySelector('.rs-top');
-    return { pair: pair ? pair.textContent : '', boss: (document.querySelector('[id^="rs-boss70-"]') || {}).textContent || '',
-      before: !!(pair && top && (pair.compareDocumentPosition(top) & Node.DOCUMENT_POSITION_FOLLOWING)) };
+    const pair = document.querySelector('[id^="rs-bosspair-"]');
+    const main = document.getElementById('page-main') || document.body;
+    const clone = main.cloneNode(true); clone.querySelectorAll('details.rs-ref').forEach((d) => d.remove());
+    const bands = Array.from(document.querySelectorAll('#rs-bosspair-bands tbody tr')).map((tr) => Array.from(tr.cells).map((td) => td.textContent.trim()));
+    const perCells = Array.from(document.querySelectorAll('h2.section-title')).find((h) => /ระดับพร้อมจำนวนหลักฐาน/.test(h.textContent));
+    const tbl = perCells && perCells.nextElementSibling && perCells.nextElementSibling.querySelector('table');
+    const cellTxt = tbl ? Array.from(tbl.querySelectorAll('tbody td')).slice(2).map((td) => td.textContent).join('|') : '';
+    return { pair: pair ? pair.textContent : '', top: clone.textContent, bands, legend: perCells ? perCells.textContent : '', cellTxt,
+      ref: (document.querySelector('details.rs-ref') || {}).textContent || '', boss70: !!document.querySelector('[id^="rs-boss70-"]'), rstop: !!document.querySelector('.rs-top') };
   });
-  ok('⭐ การ์ดคู่มี และอ่านจาก view v_student_boss_pair — ไม่ยิง events kind=boss เอง (กติกา .42)',
-    t.pair.length > 0 && calls.some((c) => /v_student_boss_pair/.test(c[1])) && !calls.some((c) => /events\?kind=eq\.boss/.test(c[1])));
-  ok('⭐ ครั้งแรก 2 จาก 5 · ครั้งสุดท้าย 4 จาก 5 — ฐานเดียวกัน แถวห้องอื่นและแถวเกมภาค 2 (-p2) ไม่ปน',
-    /ครั้งแรกที่บันทึกไว้:[^]*?2 จาก 5 คน/.test(t.pair) && /ครั้งสุดท้ายที่บันทึกไว้:[^]*?4 จาก 5 คน/.test(t.pair), t.pair.slice(0, 260));
-  ok('เฉลี่ย 14.60 → 25.00 · ต่างเฉลี่ย +10.40 (ร้อยละแสดงได้เพราะฐาน 5)', /14\.60/.test(t.pair) && /25\.00/.test(t.pair) && /\+10\.40/.test(t.pair) && /%/.test(t.pair), t.pair.slice(0, 400));
-  ok('สูงขึ้น 4 · เท่าเดิม 1 · ต่ำลง 0 · ยังไม่ถึงเกณฑ์แม้สอบซ้ำ 1 (ห้ามตัดประโยคนี้ — PLAN)',
-    /สูงขึ้น 4 คน/.test(t.pair) && /เท่าเดิม 1 คน/.test(t.pair) && /ต่ำลง 0 คน/.test(t.pair) && /ยังไม่ถึงเกณฑ์แม้สอบซ้ำ 1 คน/.test(t.pair));
-  ok('จำนวนครั้ง: มัธยฐาน 3 (พิสัย 1–12) · แจกแจง 1/2/1/1', /มัธยฐาน 3 ครั้ง \(พิสัย 1–12\)/.test(t.pair)
-    && /สอบ 1 ครั้ง 1 คน · 2–4 ครั้ง 2 คน · 5–9 ครั้ง 1 คน · 10 ครั้งขึ้นไป 1 คน/.test(t.pair), t.pair.slice(300, 700));
-  ok('⭐ การ์ดคู่อยู่ก่อน .rs-top (สิ่งแรกของชั้นสรุป — AUDIT)', t.before === true);
-  /* [V.1.6.47 · ครูสั่ง 23:4x] ตารางระดับ 5 ระดับ + ดีขึ้นไป (ACH_BANDS บน 30) · first [10,21,5,15,22] · last [25,21,29,20,30] */
-  const bands = await p.evaluate(() => Array.from(document.querySelectorAll('#rs-bosspair-bands tbody tr')).map((tr) => Array.from(tr.cells).map((td) => td.textContent.trim())));
-  ok('⭐ [.47] ตารางระดับมี 6 แถว (5 ระดับ + ดีขึ้นไป) ชื่อและช่วงคะแนนบน 30 ถูก (24/21/18/15)', bands.length === 6
-    && bands.map((r) => r[0]).join('|') === 'ยังไม่ถึงเกณฑ์|ผ่าน|พอใช้|ดี|ดีเยี่ยม|ระดับดีขึ้นไป (ถึงเกณฑ์ 21/30)'
-    && bands.map((r) => r[1]).join('|') === '0–14|15–17|18–20|21–23|24–30|21–30', bands);
-  ok('⭐ [.47] ครั้งแรก: ยังไม่ถึง 2 (40.0%) · ผ่าน 1 · พอใช้ 0 · ดี 2 · ดีเยี่ยม 0 · ดีขึ้นไป 2 (40.0%)',
-    bands.map((r) => r[2]).join('|') === '2|1|0|2|0|2' && bands[0][3] === '40.0%' && bands[5][3] === '40.0%', bands);
-  ok('⭐ [.47] ครั้งสุดท้าย: ยังไม่ถึง 0 · ผ่าน 0 · พอใช้ 1 · ดี 1 · ดีเยี่ยม 3 (60.0%) · ดีขึ้นไป 4 (80.0%)',
-    bands.map((r) => r[4]).join('|') === '0|0|1|1|3|4' && bands[4][5] === '60.0%' && bands[5][5] === '80.0%', bands);
-  ok('[.47] ผลรวมทุกระดับ = ฐาน 5 ทั้งสองคอลัมน์ (ไม่มีใครตกหล่น/นับซ้ำ)',
-    bands.slice(0, 5).reduce((s, r) => s + Number(r[2]), 0) === 5 && bands.slice(0, 5).reduce((s, r) => s + Number(r[4]), 0) === 5);
+  ok('⭐ [ฐาน 25] ครั้งแรก 2 จาก 5 คนในห้อง (40.0%) · ครั้งสุดท้าย 4 จาก 5 คนในห้อง (80.0%) — ตัวหาร = ทั้งห้อง',
+    /ครั้งแรกที่บันทึกไว้:[^]*?2 จาก 5 คนในห้อง[^]*?40\.0%/.test(t.pair) && /ครั้งสุดท้ายที่บันทึกไว้:[^]*?4 จาก 5 คนในห้อง[^]*?80\.0%/.test(t.pair), t.pair.slice(0, 400));
+  ok('⭐ [ก2 · AUDIT §๒.๓] สองบรรทัดย่อยติดร้อยละเสมอ: ครั้งสุดท้าย "สอบแล้วยังไม่ถึงเกณฑ์ 1 คน · ยังไม่ได้เข้าสอบ 0 คน" · ครั้งแรก "3 คน · 0 คน"',
+    /ครั้งสุดท้ายที่บันทึกไว้:[^]*?สอบแล้วยังไม่ถึงเกณฑ์ 1 คน · ยังไม่ได้เข้าสอบ 0 คน/.test(t.pair) && /ครั้งแรกที่บันทึกไว้:[^]*?สอบแล้วยังไม่ถึงเกณฑ์ 3 คน · ยังไม่ได้เข้าสอบ 0 คน/.test(t.pair), t.pair.slice(0, 500));
+  ok('เฉลี่ยบอกฐานของตัวเอง "ผู้ที่มีแถวสอบ (5 คน)" 14.60 → 25.00 · +10.40 · มัธยฐาน 3 (พิสัย 1–12)',
+    /ผู้ที่มีแถวสอบ \(5 คน\)/.test(t.pair) && /14\.60/.test(t.pair) && /25\.00/.test(t.pair) && /\+10\.40/.test(t.pair) && /มัธยฐาน 3 ครั้ง \(พิสัย 1–12\)/.test(t.pair), t.pair.slice(0, 700));
+  ok('⭐ ตารางระดับ 7 แถว: 5 ระดับ + "ยังไม่มีผลสอบ" (แถวของตัวเอง) + ดีขึ้นไป · ช่วงคะแนน 24/21/18/15',
+    t.bands.length === 7 && t.bands.map((r) => r[0]).join('|') === 'ยังไม่ถึงเกณฑ์|ผ่าน|พอใช้|ดี|ดีเยี่ยม|ยังไม่มีผลสอบ|ระดับดีขึ้นไป (ถึงเกณฑ์ 21/30)'
+    && t.bands.map((r) => r[1]).join('|') === '0–14|15–17|18–20|21–23|24–30|—|21–30', t.bands);
+  ok('⭐ ครั้งแรก 2|1|0|2|0|0 → ดีขึ้นไป 2 (40.0%) · ครั้งสุดท้าย 0|0|1|1|3|0 → ดีขึ้นไป 4 (80.0%) · ทุกคอลัมน์รวม = ฐาน 5',
+    t.bands.map((r) => r[2]).join('|') === '2|1|0|2|0|0|2' && t.bands.map((r) => r[4]).join('|') === '0|0|1|1|3|0|4' && t.bands[6][3] === '40.0%' && t.bands[6][5] === '80.0%'
+    && t.bands.slice(0, 6).reduce((s, r) => s + Number(r[2]), 0) === 5 && t.bands.slice(0, 6).reduce((s, r) => s + Number(r[4]), 0) === 5, t.bands);
+  ok('⭐ [ครูสั่งถอด] ไม่มีการ์ด "ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน" และไม่มีตัวห่อ .rs-top', !t.boss70 && !t.rstop && !/ผลสัมฤทธิ์จากแบบทดสอบหลังเรียน/.test(t.top));
+  ok('⭐ [คลีน] ชั้นบน (นอก <details>) ไม่มีชื่อ view · ชื่อคีย์ · เลขรุ่นเกม · ชื่อแชต · เกณฑ์ตัด 80/70/60/50',
+    !/v_student_boss_pair|_boss_first|V\.7\.99\.|\[AUDIT\]|\[PLAN\]|\[Code\]|AUDIT\+PLAN|80\/70\/60\/50|ขอครูรัน_/.test(t.top), (t.top.match(/v_student_boss_pair|_boss_first|V\.7\.99\.|AUDIT|PLAN|80\/70\/60\/50|ขอครูรัน_/g) || []).slice(0, 5));
+  ok('[คลีน] ของที่ตัดไปโผล่ในชั้นอ้างอิง (ย้าย ไม่ลบ): view · เกณฑ์ตัด · นิยาม ข · กฎ ก2', /v_student_boss_pair/.test(t.ref) && /80\/70\/60\/50/.test(t.ref) && /นิยาม ข/.test(t.ref) && /ก2/.test(t.ref), t.ref.slice(0, 200));
+  ok('[คลีน] ตารางรายคน: legend มีชื่อระดับ 4 ระดับ · เซลล์ไม่มีคำ (เหลือเม็ดเลข)', /เริ่มต้น/.test(t.legend) && /เหนือความคาดหวัง/.test(t.legend)
+    && !/สามารถ|กำลังพัฒนา|เหนือความคาดหวัง|เริ่มต้น/.test(t.cellTxt), t.cellTxt.slice(0, 120));
   ok('ไม่มีคำต้องห้ามในการ์ดคู่ (ก่อนเรียน/หลังเรียน/รายบุคคล/pre-test/post-test)', !/ก่อนเรียน|หลังเรียน|รายบุคคล|pre-?test|post-?test/i.test(t.pair));
-  ok('ป้ายบังคับอยู่ในการ์ด: ชุดข้อสอบเดิม 30 ข้อ · ร่วมกันบนเครื่องเดียว · องค์ประกอบกลุ่ม · ไม่ใช้เลขครั้งของเครื่อง',
-    /ชุดข้อสอบเดิม 30 ข้อ/.test(t.pair) && /ร่วมกันบนเครื่องเดียว/.test(t.pair) && /องค์ประกอบกลุ่ม/.test(t.pair) && /ไม่ใช้เลขครั้งของเครื่อง/.test(t.pair));
-  ok('⭐ ใบผล .82 ทุกคน → ป้ายการ์ดผลสัมฤทธิ์บอก "นิยาม ข" และไม่มี "คะแนนสูงสุด"', /นิยาม ข/.test(t.boss) && !/คะแนนสูงสุด/.test(t.boss), t.boss.slice(-400));
-  ok('ใบ .82 ทุกคนมีช่อง → ไม่มีบรรทัด "ไม่ทราบคะแนนครั้งที่ 1" · ของผู้มีคะแนน 2 จาก 5 (S2 21 · S5B 22)', !/ไม่ทราบคะแนนครั้งที่ 1/.test(t.boss) && /2 จาก 5 คน/.test(t.boss), t.boss.slice(0, 300));
+  ok('ป้ายบังคับยังอยู่ติดตัวเลข: ข้อสอบชุดเดิม 30 ข้อ · ร่วมกันบนเครื่องเดียว · องค์ประกอบกลุ่ม · ไม่ใช้เลขครั้งของเครื่อง · เกมรุ่นก่อนหน้า',
+    /ข้อสอบชุดเดิม 30 ข้อ/.test(t.pair) && /ร่วมกันบนเครื่องเดียว/.test(t.pair) && /องค์ประกอบกลุ่ม/.test(t.pair) && /ไม่ใช้เลขครั้งของเครื่อง/.test(t.pair) && /เกมรุ่นก่อนหน้า/.test(t.pair));
   ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
   await p.close();
 }
 {
-  /* ฐาน < 5 → จำนวนเท่านั้น · ใบผลปน .80/.82 → เห็นทั้งสองบรรทัด · ฐานยังไม่รัน 106 → บอกตรง ๆ ไม่พัง */
-  const { p, calls } = await open({ bossPair: F.bossPair5.slice(0, 4), achieve: F.achieveBossFirst.concat([F.achieveV82[0]]), students: F.studentsBoss3 }, '#/room/' + F.R1);
+  /* ฐาน T = 5 แต่มีแถวคู่แค่ 4 คน (S5B ไม่เคยสอบ) ⇒ "ยังไม่ได้เข้าสอบ 1" ต้องเข้าไปอยู่ในฐานและในตาราง */
+  const { p, calls } = await open({ bossPair: F.bossPair5.slice(0, 4), students: F.studentsBoss3 }, '#/room/' + F.R1);
   await p.click('[data-tab="research"]'); await sleep(900);
-  const t = await p.evaluate(() => ({ pair: (document.querySelector('[id^="rs-bosspair-"]') || {}).textContent || '', boss: (document.querySelector('[id^="rs-boss70-"]') || {}).textContent || '' }));
-  ok('⭐ ฐาน 4 คน → แสดงจำนวน ไม่มีเครื่องหมาย % ในการ์ดคู่ (รวมตารางระดับ: ช่อง % เป็น –) และบอกว่าฐานต่ำกว่า 5', /จาก 4 คน/.test(t.pair) && !/%/.test(t.pair) && /ฐานต่ำกว่า 5 คน/.test(t.pair) && /ระดับดีขึ้นไป/.test(t.pair), t.pair.slice(0, 300));
-  ok('ใบผลปนรุ่น (.76/.79/.80 + .82) → เห็นทั้งป้าย "นิยาม ข" และป้าย "คะแนนสูงสุด" พร้อมคำแนะนำอัปใบผล', /นิยาม ข/.test(t.boss) && /คะแนนสูงสุด/.test(t.boss) && /รุ่นก่อน \.82/.test(t.boss), t.boss.slice(-500));
+  const t = await p.evaluate(() => ({ pair: (document.querySelector('[id^="rs-bosspair-"]') || {}).textContent || '',
+    bands: Array.from(document.querySelectorAll('#rs-bosspair-bands tbody tr')).map((tr) => Array.from(tr.cells).map((td) => td.textContent.trim())) }));
+  ok('⭐ [ฐาน 25 จริง] ครั้งสุดท้าย 3 จาก 5 คนในห้อง (60.0%) — สอบแล้วยังไม่ถึงเกณฑ์ 1 คน · ยังไม่ได้เข้าสอบ 1 คน',
+    /ครั้งสุดท้ายที่บันทึกไว้:[^]*?3 จาก 5 คนในห้อง[^]*?60\.0%[^]*?สอบแล้วยังไม่ถึงเกณฑ์ 1 คน · ยังไม่ได้เข้าสอบ 1 คน/.test(t.pair), t.pair.slice(0, 300));
+  ok('⭐ ครั้งแรก 1 จาก 5 คนในห้อง (20.0%) — สอบแล้วยังไม่ถึงเกณฑ์ 3 คน · ยังไม่ได้เข้าสอบ 1 คน',
+    /ครั้งแรกที่บันทึกไว้:[^]*?1 จาก 5 คนในห้อง[^]*?20\.0%[^]*?สอบแล้วยังไม่ถึงเกณฑ์ 3 คน · ยังไม่ได้เข้าสอบ 1 คน/.test(t.pair), t.pair.slice(0, 500));
+  ok('⭐ แถว "ยังไม่มีผลสอบ" = 1 (20.0%) ทั้งสองคอลัมน์ · ทุกคอลัมน์ยังรวม = 5 · ค่าเฉลี่ยบอกฐาน "4 คน"',
+    t.bands[5][0] === 'ยังไม่มีผลสอบ' && t.bands[5][2] === '1' && t.bands[5][3] === '20.0%' && t.bands[5][4] === '1'
+    && t.bands.slice(0, 6).reduce((s, r) => s + Number(r[2]), 0) === 5 && /ผู้ที่มีแถวสอบ \(4 คน\)/.test(t.pair), t.bands);
+  ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
+  await p.close();
+}
+{
+  /* ฐาน T = 4 (< 5) ⇒ จำนวนเท่านั้น ไม่มี % ทั้งการ์ดและตาราง · ฐานยังไม่รัน 106 → บอกตรง ๆ */
+  const { p, calls } = await open({ bossPair: F.bossPair5, students: F.studentsBoss3.slice(0, 4) }, '#/room/' + F.R1);
+  await p.click('[data-tab="research"]'); await sleep(900);
+  const pairTxt = await p.evaluate(() => (document.querySelector('[id^="rs-bosspair-"]') || {}).textContent || '');
+  ok('⭐ ฐานต่ำกว่า 5 คน (fixture 3–4 คน active) → แสดงจำนวน ไม่มีเครื่องหมาย % และบอกว่าฐานต่ำกว่า 5', /จาก [34] คนในห้อง/.test(pairTxt) && !/%/.test(pairTxt) && /ฐานต่ำกว่า 5 คน/.test(pairTxt), pairTxt.slice(0, 300));
   ok('สคริปต์ไม่พัง', realErrors(calls).length === 0, realErrors(calls));
   await p.close();
   const { p: p2, calls: c2 } = await open({ no106: true, students: F.studentsBoss3 }, '#/room/' + F.R1);
   await p2.click('[data-tab="research"]'); await sleep(900);
-  const t2 = await p2.evaluate(() => ({ pair: (document.querySelector('[id^="rs-bosspair-"]') || {}).textContent || '', top: !!document.querySelector('.rs-top') }));
-  ok('ฐานยังไม่รัน 106 → การ์ดคู่บอก "ขอครูรัน_106" · ชั้นสรุปที่เหลือยังขึ้นปกติ', /ขอครูรัน_106/.test(t2.pair) && t2.top === true, t2.pair);
+  const t2 = await p2.evaluate(() => ({ pair: (document.querySelector('[id^="rs-bosspair-"]') || {}).textContent || '', lv: !!document.querySelector('table.rs-lv') || !!document.querySelector('h2.section-title') }));
+  ok('ฐานยังไม่รัน 106 → การ์ดคู่บอก "ขอครูรัน_106" · ส่วนที่เหลือของหน้ายังขึ้น', /ขอครูรัน_106/.test(t2.pair) && t2.lv === true, t2.pair);
   ok('สคริปต์ไม่พัง (view หาย = 404 ที่ถูกกลืนอย่างตั้งใจ)', realErrors(c2).length === 0, realErrors(c2));
   await p2.close();
 }
